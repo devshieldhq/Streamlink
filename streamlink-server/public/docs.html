@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Docs — StreamLink XR</title>
+  <meta name="description" content="Set up the StreamLink XR backend and headset frontend, connect your platforms, and talk to the AI co-pilot."/>
+  <link rel="icon" type="image/svg+xml" href="streamlink-xr-mark.svg"/>
+  <link rel="stylesheet" href="style.css"/>
+  <style>
+    .docs-layout { display: grid; grid-template-columns: 220px 1fr; gap: 0; max-width: 1000px; margin: 0 auto; padding: 0 48px 90px; }
+    .docs-sidebar { padding-top: 36px; position: sticky; top: 76px; height: fit-content; }
+    .sidebar-section { margin-bottom: 28px; }
+    .sidebar-heading { font-size: 13px; color: var(--muted); margin-bottom: 10px; }
+    .sidebar-links { display: flex; flex-direction: column; gap: 3px; }
+    .sidebar-links a { font-size: 14px; color: var(--muted); text-decoration: none; padding: 5px 10px; border-radius: 5px; border-left: 2px solid transparent; }
+    .sidebar-links a:hover { color: var(--text); background: rgba(255,255,255,0.03); }
+    .sidebar-links a.active { color: var(--accent); border-left-color: var(--accent); }
+    .docs-content { padding: 36px 0 0 40px; border-left: 1px solid var(--border); }
+    .docs-content h1 { font-size: 30px; color: white; margin-bottom: 10px; }
+    .docs-content .subtitle { font-size: 16px; color: var(--muted); margin-bottom: 44px; line-height: 1.7; }
+    .docs-content h2 { font-size: 19px; color: white; margin: 48px 0 14px; padding-top: 48px; border-top: 1px solid var(--border); }
+    .docs-content h2:first-of-type { margin-top: 0; padding-top: 0; border-top: none; }
+    .docs-content h3 { font-size: 15px; color: var(--text); margin: 24px 0 8px; }
+    .docs-content p { font-size: 15px; color: var(--muted); line-height: 1.75; margin-bottom: 14px; }
+    .docs-content ul, .docs-content ol { padding-left: 22px; margin-bottom: 14px; }
+    .docs-content li { font-size: 15px; color: var(--muted); line-height: 1.75; margin-bottom: 5px; }
+    .docs-content a { color: var(--accent); text-decoration: none; }
+    .docs-content a:hover { text-decoration: underline; }
+    .docs-content code { font-family: 'Menlo', 'Consolas', monospace; font-size: 13px; background: rgba(255,255,255,0.06); padding: 2px 6px; border-radius: 4px; }
+    .code-block {
+      background: #090b16; border: 1px solid var(--border); border-radius: 8px;
+      padding: 16px 18px; font-family: 'Menlo', 'Consolas', monospace; font-size: 13px;
+      color: var(--text); margin: 12px 0 22px; overflow-x: auto; white-space: pre;
+    }
+    .platform-table { width: 100%; border-collapse: collapse; margin: 12px 0 28px; }
+    .platform-table th { font-size: 13px; color: var(--muted); text-align: left; padding: 9px 14px; border-bottom: 1px solid var(--border); font-weight: 500; }
+    .platform-table td { font-size: 14px; color: var(--text); padding: 11px 14px; border-bottom: 1px solid rgba(255,255,255,0.04); }
+    .callout { background: rgba(124,92,255,0.06); border: 1px solid rgba(124,92,255,0.2); border-radius: 8px; padding: 16px 20px; margin: 14px 0 22px; }
+    .callout.warn { background: rgba(255,176,32,0.06); border-color: rgba(255,176,32,0.25); }
+    .callout-title { font-size: 14px; color: var(--accent); margin-bottom: 6px; }
+    .callout.warn .callout-title { color: #ffb020; }
+    .callout p { margin: 0; }
+    @media (max-width: 768px) { .docs-layout { grid-template-columns: 1fr; padding: 0 20px 72px; } .docs-sidebar { display: none; } .docs-content { padding: 36px 0 0; border-left: none; } }
+  </style>
+</head>
+<body>
+
+  <nav>
+    <a href="index.html" class="nav-logo"><span class="brand">StreamLink</span><span class="badge">XR</span></a>
+    <div class="nav-links">
+      <a href="index.html#features">Features</a>
+      <a href="index.html#platforms">Platforms</a>
+      <a href="index.html#pricing">Pricing</a>
+      <a href="docs.html" class="active">Docs</a>
+    </div>
+    <a href="contact.html" class="nav-cta">Get started</a>
+  </nav>
+
+  <div class="page-header">
+    <h1 class="page-header-title">Setup guide</h1>
+    <p class="page-header-sub">Run the backend, open the headset frontend, and connect your platforms.</p>
+  </div>
+
+  <div class="docs-layout">
+    <aside class="docs-sidebar">
+      <div class="sidebar-section">
+        <div class="sidebar-heading">Getting started</div>
+        <div class="sidebar-links">
+          <a href="#quickstart" class="active">Quick start</a>
+          <a href="#platforms-setup">Connecting platforms</a>
+          <a href="#agent">The AI agent</a>
+        </div>
+      </div>
+      <div class="sidebar-section">
+        <div class="sidebar-heading">Reference</div>
+        <div class="sidebar-links">
+          <a href="#ingest-urls">Ingest URLs</a>
+          <a href="#quality">Quality presets</a>
+          <a href="#faq">FAQ</a>
+          <a href="#troubleshooting">Troubleshooting</a>
+        </div>
+      </div>
+    </aside>
+
+    <div class="docs-content">
+
+      <h2 id="quickstart">Quick start</h2>
+      <p>StreamLink XR is two pieces: a relay server that fans your stream out to each platform through its own FFmpeg process, and a WebXR page you open on the Quest browser. The headset sends your stream to the server; the server pushes it to whichever platforms you've configured.</p>
+
+      <div class="callout">
+        <div class="callout-title">Prerequisites</div>
+        <p>Node.js 18+ and <a href="https://ffmpeg.org/" target="_blank">FFmpeg</a> installed where the server runs, plus stream keys for whichever platforms you want live.</p>
+      </div>
+
+      <h3>1. Start the server</h3>
+      <div class="code-block">cd streamlink-server
+npm install
+npm start</div>
+      <p>To enable the real AI agent rather than its rule-based fallback, set your key first:</p>
+      <div class="code-block">export ANTHROPIC_API_KEY=sk-ant-...
+npm start</div>
+
+      <h3>2. Serve the headset page over HTTPS</h3>
+      <p>WebXR, the microphone, and hand tracking all require a secure context. <code>localhost</code> is exempt, but a Quest on your network isn't — use a tunnel (<code>ngrok http 8080</code>) or deploy <code>streamlink-xr.html</code> as a static file.</p>
+
+      <h3>3. Open it on the Quest browser</h3>
+      <p>Enter your server's URL and a session ID, add a key or ingest URL for each platform you want live, then press <strong style="color:white">Enter StreamLink XR</strong>.</p>
+
+      <h2 id="platforms-setup">Connecting platforms</h2>
+      <p>Most platforms just need a stream key. A few — Vimeo, LinkedIn Live, X Live, Rumble, and Custom RTMP — generate a one-off ingest URL per event instead of using a fixed endpoint, so the lobby asks for a URL on those.</p>
+
+      <table class="platform-table">
+        <thead><tr><th>Platform</th><th>What you need</th></tr></thead>
+        <tbody>
+          <tr><td>YouTube</td><td>Stream key — YouTube Studio → Go live</td></tr>
+          <tr><td>Twitch</td><td>Stream key — Creator Dashboard → Settings → Stream</td></tr>
+          <tr><td>TikTok</td><td>Stream key — TikTok Live Studio</td></tr>
+          <tr><td>Kick</td><td>Stream key — kick.com/dashboard → Streaming</td></tr>
+          <tr><td>Facebook</td><td>Stream key — Meta Business Suite → Live</td></tr>
+          <tr><td>Instagram</td><td>Stream key — Professional dashboard → Live</td></tr>
+          <tr><td>Vimeo</td><td>Ingest URL + key — generated per event</td></tr>
+          <tr><td>DLive</td><td>Stream key — Creator dashboard</td></tr>
+          <tr><td>LinkedIn Live</td><td>Ingest URL — generated per scheduled event</td></tr>
+          <tr><td>X Live</td><td>Ingest URL — generated per broadcast</td></tr>
+          <tr><td>Rumble</td><td>Ingest URL — generated per stream</td></tr>
+          <tr><td>Custom RTMP</td><td>Your own RTMP(S) endpoint</td></tr>
+        </tbody>
+      </table>
+
+      <h2 id="agent">The AI agent</h2>
+      <p>Press the talk button or say a command out loud — for example, "Twitch dropped, fix it and lower quality if needed." The agent checks live stream health, reconnects the affected platform, checks again, and only changes quality if the numbers still show trouble. Each step appears on the agent pipeline panel as it happens.</p>
+      <p>Without <code>ANTHROPIC_API_KEY</code> set, the server runs a deterministic fallback that performs the same sequence for common commands (start, stop, reconnect a platform, raise or lower quality) — useful for testing without an API key, though it isn't the model doing the deciding.</p>
+
+      <h2 id="ingest-urls">Ingest URLs</h2>
+      <p>These are preconfigured on the server for the fixed-endpoint platforms — you won't need to enter them yourself.</p>
+      <table class="platform-table">
+        <thead><tr><th>Platform</th><th>RTMP endpoint</th></tr></thead>
+        <tbody>
+          <tr><td>YouTube</td><td><code>rtmp://a.rtmp.youtube.com/live2</code></td></tr>
+          <tr><td>Twitch</td><td><code>rtmp://live.twitch.tv/app</code></td></tr>
+          <tr><td>TikTok</td><td><code>rtmp://push.tiktok.com/live</code></td></tr>
+          <tr><td>Kick</td><td><code>rtmp://fa723fc1b171.global-contribute.live-video.net/app</code></td></tr>
+          <tr><td>Facebook</td><td><code>rtmps://live-api-s.facebook.com:443/rtmp</code></td></tr>
+          <tr><td>Instagram</td><td><code>rtmps://live-upload.instagram.com:443/rtmp</code></td></tr>
+          <tr><td>DLive</td><td><code>rtmp://stream.dlive.tv/live</code></td></tr>
+        </tbody>
+      </table>
+
+      <h2 id="quality">Quality presets</h2>
+      <p>Pick a preset from the lobby or say "lower the quality" once you're live — each platform's encoder restarts independently, so the others keep streaming while one adjusts.</p>
+      <table class="platform-table">
+        <thead><tr><th>Preset</th><th>Bitrate</th><th>Frame rate</th></tr></thead>
+        <tbody>
+          <tr><td>Ultra</td><td>4,500 kbps</td><td>60 fps</td></tr>
+          <tr><td>High</td><td>2,500 kbps</td><td>30 fps</td></tr>
+          <tr><td>Medium</td><td>1,500 kbps</td><td>30 fps</td></tr>
+          <tr><td>Low</td><td>800 kbps</td><td>24 fps</td></tr>
+          <tr><td>Mobile</td><td>500 kbps</td><td>20 fps</td></tr>
+        </tbody>
+      </table>
+
+      <h2 id="faq">FAQ</h2>
+      <h3>Why does one platform need a URL and not just a key?</h3>
+      <p>Vimeo, LinkedIn Live, X Live, and Rumble issue a fresh ingest URL for each event rather than reusing one fixed address, so there's nothing to hardcode on the server for those.</p>
+      <h3>Does a dropped platform affect the others?</h3>
+      <p>No — each platform runs its own FFmpeg process. Reconnecting one restarts only that process; the rest keep streaming the whole time.</p>
+      <h3>Do I need hand tracking enabled?</h3>
+      <p>No. Controllers work as a laser-pointer fallback if hand tracking isn't on.</p>
+
+      <h2 id="troubleshooting">Troubleshooting</h2>
+      <h3>The page won't enter VR</h3>
+      <p>Check that it's served over HTTPS (or <code>localhost</code>) — WebXR refuses to start otherwise.</p>
+      <h3>A platform stays on "connecting"</h3>
+      <p>Double-check its key or URL in the lobby — some platforms' keys expire and need regenerating.</p>
+      <h3>Voice commands aren't picked up</h3>
+      <p>Your browser needs Web Speech API support and microphone permission granted to the page.</p>
+
+      <div style="margin-top: 44px; padding-top: 28px; border-top: 1px solid var(--border)">
+        <p>Still stuck? <a href="contact.html">Get in touch</a>.</p>
+      </div>
+
+    </div>
+  </div>
+
+  <footer>
+    <div class="footer-logo brand">StreamLink XR</div>
+    <div class="footer-links">
+      <a href="privacy.html">Privacy</a>
+      <a href="terms.html">Terms</a>
+      <a href="docs.html">Docs</a>
+      <a href="contact.html">Contact</a>
+    </div>
+    <div class="footer-copy">© 2026 StreamLink XR</div>
+  </footer>
+
+  <script>
+    const sections = document.querySelectorAll('[id]');
+    const links = document.querySelectorAll('.sidebar-links a');
+    window.addEventListener('scroll', () => {
+      let current = '';
+      sections.forEach(s => { if (window.scrollY >= s.offsetTop - 120) current = s.id; });
+      links.forEach(a => a.classList.toggle('active', a.getAttribute('href') === '#' + current));
+    });
+  </script>
+</body>
+</html>
