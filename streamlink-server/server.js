@@ -2,6 +2,7 @@ const express  = require('express');
 const { spawn } = require('child_process');
 const cors     = require('cors');
 const http     = require('http');
+const path     = require('path');
 const { Server } = require('socket.io');
 
 const app    = express();
@@ -10,6 +11,10 @@ const io     = new Server(server, { cors: { origin: '*', methods: ['GET', 'POST'
 
 app.use(cors());
 app.use(express.json());
+
+const STATIC_ROOT = path.join(__dirname, 'public');
+app.use(express.static(STATIC_ROOT));
+app.get('/app', (req, res) => res.sendFile(path.join(STATIC_ROOT, 'streamlink-xr.html')));
 
 // ─── PLATFORM REGISTRY ─────────────────────────────────────────────────────
 const RTMP_FIXED = {
@@ -454,7 +459,7 @@ app.post('/agent', async (req, res) => {
 // ─────────────────────────────────────────────────────────────────────────────
 // ROUTES
 // ─────────────────────────────────────────────────────────────────────────────
-app.get('/', (req, res) => {
+app.get('/api/status', (req, res) => {
   res.json({ status: 'StreamLink relay server running', sessions: Object.keys(sessions).length, schedules: Object.keys(schedules).length, uptime: process.uptime() });
 });
 
