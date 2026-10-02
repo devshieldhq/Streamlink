@@ -1,0 +1,10 @@
+services:
+  - type: web
+    name: streamlink-xr
+    runtime: docker
+    rootDir: streamlink-server
+    plan: free
+    healthCheckPath: /api/status
+    envVars:
+      - key: ANTHROPIC_API_KEY
+        sync: false
