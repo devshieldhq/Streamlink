@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Contact — StreamLink XR</title>
+  <link rel="icon" type="image/svg+xml" href="streamlink-xr-mark.svg"/>
+  <link rel="stylesheet" href="style.css"/>
+  <style>
+    .contact-layout { display: grid; grid-template-columns: 1fr 1fr; gap: 56px; max-width: 960px; margin: 0 auto; padding: 0 48px 90px; }
+    .contact-info h2 { font-size: 19px; color: white; margin-bottom: 14px; }
+    .contact-info p { font-size: 15px; color: var(--muted); line-height: 1.75; margin-bottom: 28px; }
+    .contact-method { display: flex; flex-direction: column; gap: 2px; padding: 16px 0; border-bottom: 1px solid var(--border); }
+    .contact-method-label { font-size: 13px; color: var(--muted); }
+    .contact-method-value { font-size: 15px; color: var(--text); }
+    .response-note { margin-top: 32px; padding: 18px 20px; background: rgba(61,220,132,0.06); border: 1px solid rgba(61,220,132,0.2); border-radius: 8px; }
+    .response-note p { font-size: 14px; color: var(--muted); margin: 0; line-height: 1.7; }
+    .form-card { border: 1px solid var(--border); border-radius: 12px; padding: 32px; }
+    .form-group { margin-bottom: 18px; }
+    .form-label { display: block; font-size: 13px; color: var(--muted); margin-bottom: 7px; }
+    .form-input { width: 100%; background: #090b16; border: 1px solid var(--border); border-radius: 6px; padding: 11px 14px; color: var(--text); font-family: 'Inter', sans-serif; font-size: 14px; outline: none; }
+    .form-input:focus { border-color: var(--accent); }
+    textarea.form-input { resize: vertical; min-height: 130px; }
+    .form-submit { width: 100%; background: var(--accent); border: none; border-radius: 6px; padding: 13px; color: white; font-size: 15px; font-weight: 500; cursor: pointer; }
+    .form-submit:hover { background: #6a4bed; }
+    .form-submit:disabled { opacity: 0.5; cursor: not-allowed; }
+    .success-msg { display: none; text-align: center; padding: 32px 0; }
+    .success-title { font-size: 17px; color: var(--live); margin-bottom: 8px; }
+    .success-sub { font-size: 14px; color: var(--muted); }
+    .error-msg { display: none; background: rgba(255,77,94,0.1); border: 1px solid rgba(255,77,94,0.3); border-radius: 6px; padding: 11px 14px; font-size: 13px; color: #ff8a94; margin-bottom: 14px; }
+    @media (max-width: 768px) { .contact-layout { grid-template-columns: 1fr; padding: 0 20px 72px; gap: 36px; } }
+  </style>
+</head>
+<body>
+  <nav>
+    <a href="index.html" class="nav-logo"><span class="brand">StreamLink</span><span class="badge">XR</span></a>
+    <div class="nav-links">
+      <a href="index.html#features">Features</a><a href="index.html#platforms">Platforms</a><a href="index.html#pricing">Pricing</a><a href="docs.html">Docs</a><a href="/app">VR room</a>
+    </div>
+    <a href="/live" class="nav-cta">Go live</a>
+  </nav>
+  <div class="page-header"><h1 class="page-header-title">Get in touch</h1><p class="page-header-sub">Questions, an upgrade, or just want to say hi — we read everything that comes through here.</p></div>
+  <div class="contact-layout">
+    <div class="contact-info">
+      <h2>We'd like to hear from you</h2><p>Setting up StreamLink XR, hit a snag, or curious about the Studio plan — reach out and we'll get back to you.</p>
+      <div class="contact-method"><div class="contact-method-label">Email</div><div class="contact-method-value">hello@streamlinkxr.io</div></div>
+      <div class="contact-method"><div class="contact-method-label">Discord</div><div class="contact-method-value">discord.gg/streamlink</div></div>
+      <div class="contact-method"><div class="contact-method-label">Bug reports</div><div class="contact-method-value">github.com/streamlink</div></div>
+      <div class="response-note"><p>Typical response time is 2–4 hours on weekdays, within 24 hours on weekends.</p></div>
+    </div>
+    <div class="form-card">
+      <div id="formWrap">
+        <div class="error-msg" id="errorMsg">Something went wrong. Please try again.</div>
+        <div class="form-group"><label class="form-label" for="name">Your name</label><input class="form-input" type="text" id="name" placeholder="e.g. Alex Johnson" required/></div>
+        <div class="form-group"><label class="form-label" for="email">Email address</label><input class="form-input" type="email" id="email" placeholder="you@example.com" required/></div>
+        <div class="form-group"><label class="form-label" for="subject">Subject</label><select class="form-input" id="subject"><option value="">Select a topic</option><option value="getting-started">Getting started</option><option value="technical-support">Technical support</option><option value="billing">Billing / plans</option><option value="feature-request">Feature request</option><option value="bug">Report a bug</option><option value="other">Other</option></select></div>
+        <div class="form-group"><label class="form-label" for="message">Message</label><textarea class="form-input" id="message" placeholder="Tell us what's on your mind" required></textarea></div>
+        <button class="form-submit" id="submitBtn" onclick="submitForm()">Send message</button>
+      </div>
+      <div class="success-msg" id="successMsg"><div class="success-title">Message sent</div><div class="success-sub">Thanks for reaching out — we'll get back to you soon.</div></div>
+    </div>
+  </div>
+  <footer><div class="footer-logo brand">StreamLink XR</div><div class="footer-links"><a href="privacy.html">Privacy</a><a href="terms.html">Terms</a><a href="docs.html">Docs</a><a href="contact.html">Contact</a></div><div class="footer-copy">© 2026 StreamLink XR</div></footer>
+  <script>
+    function submitForm() {
+      const name = document.getElementById('name').value.trim(), email = document.getElementById('email').value.trim(), message = document.getElementById('message').value.trim(), errorMsg = document.getElementById('errorMsg');
+      errorMsg.style.display = 'none';
+      if (!name || !email || !message) { errorMsg.textContent = 'Please fill in your name, email, and message.'; errorMsg.style.display = 'block'; return; }
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { errorMsg.textContent = 'Please enter a valid email address.'; errorMsg.style.display = 'block'; return; }
+      const btn = document.getElementById('submitBtn'); btn.disabled = true; btn.textContent = 'Sending…';
+      setTimeout(() => { document.getElementById('formWrap').style.display = 'none'; document.getElementById('successMsg').style.display = 'block'; }, 1200);
+    }
+    document.addEventListener('keydown', e => { if (e.key === 'Enter' && e.target.tagName !== 'TEXTAREA') submitForm(); });
+  </script>
+</body>
+</html>
