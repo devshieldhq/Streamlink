@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>StreamLink XR — one control room, every platform</title>
+  <meta name="description" content="Run your multistream from inside VR. Twelve platforms, hand tracking, and an AI co-pilot that watches your stream and fixes problems while you talk to your audience."/>
+  <link rel="icon" type="image/svg+xml" href="streamlink-xr-mark.svg"/>
+  <link rel="stylesheet" href="style.css"/>
+  <style>
+    .hero { min-height: 86vh; display: flex; flex-direction: column; justify-content: center; padding: 40px 48px 80px; max-width: 1100px; margin: 0 auto; }
+    .hero h1 { font-size: clamp(36px, 5.5vw, 60px); color: white; line-height: 1.08; margin-bottom: 22px; max-width: 620px; }
+    .hero p { font-size: 18px; color: var(--muted); max-width: 480px; line-height: 1.7; margin-bottom: 36px; }
+    .hero-actions { display: flex; gap: 14px; flex-wrap: wrap; }
+
+    /* Control-room preview — the actual card layout from the VR app,
+       not an invented analytics dashboard */
+    .room-preview { max-width: 1100px; margin: 0 auto; padding: 0 48px 90px; }
+    .room-frame { background: var(--panel); border: 1px solid var(--border); border-radius: 16px; padding: 28px; }
+    .room-label { font-size: 13px; color: var(--muted); margin-bottom: 18px; }
+    .room-cards { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
+    .room-card { background: #090b16; border: 1px solid var(--border); border-radius: 10px; padding: 16px; }
+    .room-card-top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+    .room-card-name { font-size: 14px; color: var(--text); }
+    .dot { width: 8px; height: 8px; border-radius: 50%; }
+    .dot.live { background: var(--live); }
+    .dot.connecting { background: #ffb020; }
+    .room-card-status { font-size: 12px; color: var(--muted); }
+
+    /* PLATFORMS — plain wrapped list, no marquee */
+    .platform-chips { display: flex; flex-wrap: wrap; gap: 10px; }
+    .chip { border: 1px solid var(--border); border-radius: 100px; padding: 9px 18px; font-size: 14px; color: var(--text); }
+
+    /* FEATURES — text-led, no icon tiles */
+    .features-list { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 32px; }
+    .feature h3 { font-size: 17px; color: white; margin-bottom: 8px; }
+    .feature p { font-size: 15px; color: var(--muted); line-height: 1.7; }
+
+    /* HOW IT WORKS — a real sequence, numbering earns its place here */
+    .steps { display: flex; flex-direction: column; gap: 28px; max-width: 600px; }
+    .step { display: grid; grid-template-columns: 32px 1fr; gap: 20px; }
+    .step-num { font-size: 14px; color: var(--accent); padding-top: 2px; }
+    .step h3 { font-size: 16px; color: white; margin-bottom: 6px; }
+    .step p { font-size: 15px; color: var(--muted); line-height: 1.7; }
+
+    /* PRICING */
+    .pricing-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 20px; }
+    .pricing-card { border: 1px solid var(--border); border-radius: 12px; padding: 28px; }
+    .pricing-card.featured { border-color: var(--accent); }
+    .pricing-tier { font-size: 14px; color: var(--muted); margin-bottom: 10px; }
+    .pricing-price { font-size: 36px; color: white; margin-bottom: 4px; }
+    .pricing-price span { font-size: 15px; color: var(--muted); font-weight: 400; }
+    .pricing-desc { font-size: 14px; color: var(--muted); margin-bottom: 22px; line-height: 1.6; }
+    .pricing-features { list-style: none; margin-bottom: 26px; }
+    .pricing-features li { font-size: 14px; color: var(--text); padding: 7px 0; border-bottom: 1px solid var(--border); }
+    .pricing-features li:last-child { border-bottom: none; }
+
+    .cta-section { padding: 100px 48px; text-align: center; }
+    .cta-section h2 { font-size: clamp(28px, 4vw, 42px); color: white; margin-bottom: 16px; }
+    .cta-section p { font-size: 17px; color: var(--muted); max-width: 480px; margin: 0 auto 36px; }
+
+    @media (max-width: 768px) {
+      .hero { padding: 20px 20px 56px; }
+      .room-cards { grid-template-columns: repeat(2, 1fr); }
+      .room-preview { padding: 0 20px 56px; }
+    }
+  </style>
+</head>
+<body>
+
+  <nav>
+    <a href="index.html" class="nav-logo"><span class="brand">StreamLink</span><span class="badge">XR</span></a>
+    <div class="nav-links">
+      <a href="#features">Features</a>
+      <a href="#platforms">Platforms</a>
+      <a href="#how">How it works</a>
+      <a href="#pricing">Pricing</a>
+      <a href="docs.html">Docs</a>
+      <a href="/app">VR room</a>
+    </div>
+    <a href="/live" class="nav-cta">Go live</a>
+  </nav>
+
+  <section class="hero">
+    <h1>One control room. Every platform. Both hands — or just your phone.</h1>
+    <p>Connect the platforms you stream to and manage the whole broadcast with an AI co-pilot that watches for trouble and fixes it before your audience notices. Full hand-tracked control in VR, or go live straight from your phone or laptop — same backend, either way.</p>
+    <div class="hero-actions">
+      <a href="/live" class="btn-primary">Go live from your phone</a>
+      <a href="/app" class="btn-secondary">Try it in VR</a>
+    </div>
+  </section>
+
+  <div class="room-preview">
+    <div class="room-frame">
+      <div class="room-label">What you see in the headset</div>
+      <div class="room-cards">
+        <div class="room-card"><div class="room-card-top"><div class="room-card-name">YouTube</div><div class="dot live"></div></div><div class="room-card-status">Live</div></div>
+        <div class="room-card"><div class="room-card-top"><div class="room-card-name">Twitch</div><div class="dot live"></div></div><div class="room-card-status">Live</div></div>
+        <div class="room-card"><div class="room-card-top"><div class="room-card-name">TikTok</div><div class="dot connecting"></div></div><div class="room-card-status">Reconnecting</div></div>
+        <div class="room-card"><div class="room-card-top"><div class="room-card-name">Kick</div><div class="dot live"></div></div><div class="room-card-status">Live</div></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="divider"></div>
+
+  <section class="section" id="platforms">
+    <h2 class="section-title">Twelve platforms, one session</h2>
+    <p class="section-sub">Connect as many or as few as you use. Each one runs its own encoder, so a problem on one never touches the others.</p>
+    <div class="platform-chips">
+      <div class="chip">YouTube</div>
+      <div class="chip">Twitch</div>
+      <div class="chip">TikTok</div>
+      <div class="chip">Kick</div>
+      <div class="chip">Facebook</div>
+      <div class="chip">Instagram</div>
+      <div class="chip">Vimeo</div>
+      <div class="chip">DLive</div>
+      <div class="chip">LinkedIn Live</div>
+      <div class="chip">X Live</div>
+      <div class="chip">Rumble</div>
+      <div class="chip">Custom RTMP</div>
+    </div>
+  </section>
+
+  <div class="divider"></div>
+
+  <section class="section" id="features">
+    <h2 class="section-title">Built for running a live broadcast, not just watching one</h2>
+    <div class="features-list">
+      <div class="feature">
+        <h3>Hand-first control</h3>
+        <p>Grab a platform card, pinch a button, move things where you want them. No menus to dig through mid-stream.</p>
+      </div>
+      <div class="feature">
+        <h3>An agent that acts, not just talks</h3>
+        <p>Tell it "Twitch dropped, fix it" and it checks the stream, reconnects the right platform, and tells you what it did.</p>
+      </div>
+      <div class="feature">
+        <h3>Isolated per-platform encoding</h3>
+        <p>Each destination runs its own process. Reconnecting one doesn't interrupt the rest of your broadcast.</p>
+      </div>
+      <div class="feature">
+        <h3>Live stream health</h3>
+        <p>Bitrate, uptime, and reconnect counts update in real time, right there in the room with you.</p>
+      </div>
+      <div class="feature">
+        <h3>Quality presets on demand</h3>
+        <p>Drop from ultra to mobile quality with a pinch — useful the moment your connection gets shaky.</p>
+      </div>
+      <div class="feature">
+        <h3>Creator identity, optional</h3>
+        <p>Connect a wallet if you want one attached to your session. It's there if you want it, invisible if you don't.</p>
+      </div>
+    </div>
+  </section>
+
+  <div class="divider"></div>
+
+  <section class="section" id="how">
+    <h2 class="section-title">Live in a few minutes</h2>
+    <div class="steps">
+      <div class="step">
+        <div class="step-num">1</div>
+        <div><h3>Add your platforms</h3><p>Paste a stream key or ingest URL for each destination you want to go live on.</p></div>
+      </div>
+      <div class="step">
+        <div class="step-num">2</div>
+        <div><h3>Put on the headset</h3><p>Open StreamLink XR on the Quest browser. Your platform cards are waiting in the room.</p></div>
+      </div>
+      <div class="step">
+        <div class="step-num">3</div>
+        <div><h3>Start the stream</h3><p>Pinch start, or just say it — the AI co-pilot handles the request either way.</p></div>
+      </div>
+      <div class="step">
+        <div class="step-num">4</div>
+        <div><h3>Let the co-pilot watch your back</h3><p>If something drops mid-broadcast, it reconnects the affected platform and tells you what happened.</p></div>
+      </div>
+    </div>
+  </section>
+
+  <div class="divider"></div>
+
+  <section class="section" id="pricing">
+    <h2 class="section-title">Simple pricing</h2>
+    <div class="pricing-grid">
+      <div class="pricing-card">
+        <div class="pricing-tier">Starter</div>
+        <div class="pricing-price">$0<span>/mo</span></div>
+        <div class="pricing-desc">For trying it out.</div>
+        <ul class="pricing-features">
+          <li>Up to 3 platforms</li>
+          <li>720p max quality</li>
+          <li>Basic stream health</li>
+        </ul>
+        <a href="/app" class="btn-secondary" style="width:100%;text-align:center;display:block">Start free</a>
+      </div>
+      <div class="pricing-card featured">
+        <div class="pricing-tier">Pro</div>
+        <div class="pricing-price">$19<span>/mo</span></div>
+        <div class="pricing-desc">For streamers running a full broadcast.</div>
+        <ul class="pricing-features">
+          <li>All 12 platforms</li>
+          <li>Up to 4K quality</li>
+          <li>Full AI co-pilot</li>
+          <li>Live telemetry</li>
+        </ul>
+        <a href="/app" class="btn-primary" style="width:100%;text-align:center;display:block">Go Pro</a>
+      </div>
+      <div class="pricing-card">
+        <div class="pricing-tier">Studio</div>
+        <div class="pricing-price">$49<span>/mo</span></div>
+        <div class="pricing-desc">For teams and production studios.</div>
+        <ul class="pricing-features">
+          <li>Everything in Pro</li>
+          <li>5 team seats</li>
+          <li>Custom RTMP endpoints</li>
+          <li>Priority support</li>
+        </ul>
+        <a href="contact.html" class="btn-secondary" style="width:100%;text-align:center;display:block">Contact us</a>
+      </div>
+    </div>
+  </section>
+
+  <section class="cta-section">
+    <h2>Ready to run your broadcast from inside it?</h2>
+    <p>Set up your platforms once. Let the co-pilot handle the rest.</p>
+    <a href="/app" class="btn-primary">Get started</a>
+  </section>
+
+  <footer>
+    <div class="footer-logo brand">StreamLink XR</div>
+    <div class="footer-links">
+      <a href="privacy.html">Privacy</a>
+      <a href="terms.html">Terms</a>
+      <a href="docs.html">Docs</a>
+      <a href="contact.html">Contact</a>
+    </div>
+    <div class="footer-copy">© 2026 StreamLink XR</div>
+  </footer>
+
+</body>
+</html>

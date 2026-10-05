@@ -1,0 +1,409 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"/>
+<title>Go Live — StreamLink XR</title>
+<meta name="description" content="Go live to every platform from your phone or laptop — no headset needed."/>
+<link rel="icon" type="image/svg+xml" href="streamlink-xr-mark.svg"/>
+<link rel="stylesheet" href="style.css"/>
+<style>
+  main { max-width: 640px; margin: 0 auto; padding: 32px 20px 90px; }
+  h1 { font-size: 24px; color: white; margin-bottom: 6px; }
+  .sub { color: var(--muted); font-size: 14px; margin-bottom: 28px; }
+
+  .camera-wrap {
+    position: relative; width: 100%; aspect-ratio: 16/9; background: #090b16;
+    border: 1px solid var(--border); border-radius: 10px; overflow: hidden; margin-bottom: 20px;
+  }
+  .camera-wrap video { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .camera-placeholder {
+    position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center;
+    justify-content: center; gap: 14px; text-align: center; padding: 20px;
+  }
+  .camera-placeholder p { color: var(--muted); font-size: 13px; max-width: 320px; }
+
+  section { margin-bottom: 28px; }
+  section h2 { font-size: 14px; color: var(--muted); margin-bottom: 12px; font-weight: 500; }
+
+  .platform-row { padding: 10px 0; border-bottom: 1px solid var(--border); }
+  .platform-row .name { font-size: 14px; color: var(--text); margin-bottom: 6px; display: flex; justify-content: space-between; }
+  .platform-row .tag { font-size: 10px; color: var(--muted); font-family: 'JetBrains Mono', monospace; }
+  .platform-row input {
+    width: 100%; margin-bottom: 6px; background: #090b16; border: 1px solid var(--border);
+    border-radius: 5px; padding: 8px 10px; color: var(--text); font-size: 13px; font-family: inherit;
+  }
+  .platform-row input:focus { outline: none; border-color: var(--accent); }
+
+  select#quality {
+    width: 100%; background: #090b16; border: 1px solid var(--border); border-radius: 6px;
+    padding: 10px 12px; color: var(--text); font-size: 14px; font-family: inherit;
+  }
+
+  .go-btn {
+    width: 100%; padding: 16px; border: none; border-radius: 8px; font-size: 16px; font-weight: 700;
+    font-family: 'Space Grotesk', sans-serif; cursor: pointer; color: white; background: var(--live);
+  }
+  .go-btn.stop { background: #ff4d5e; }
+
+  .status-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 8px; }
+  .status-card { border: 1px solid var(--border); border-radius: 8px; padding: 10px 12px; }
+  .status-card .name { font-size: 13px; color: var(--text); display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; }
+  .dot { width: 7px; height: 7px; border-radius: 50%; background: #3a3f66; }
+  .dot.live { background: var(--live); }
+  .dot.connecting { background: #ffb020; }
+  .dot.error { background: #ff4d5e; }
+  .status-card .state { font-size: 11px; color: var(--muted); }
+
+  .stats-row { display: flex; gap: 20px; flex-wrap: wrap; font-family: 'JetBrains Mono', monospace; font-size: 13px; color: var(--muted); }
+  .stats-row strong { color: var(--text); }
+
+  .copilot-box { border: 1px solid rgba(124,92,255,0.3); background: rgba(124,92,255,0.06); border-radius: 8px; padding: 14px 16px; margin-bottom: 14px; font-size: 14px; color: var(--text); min-height: 20px; }
+  .agent-log { max-height: 160px; overflow-y: auto; display: flex; flex-direction: column; gap: 4px; font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--muted); margin-bottom: 14px; }
+  .agent-log .last { color: var(--text); }
+  .agent-input-row { display: flex; gap: 8px; }
+  .agent-input-row input {
+    flex: 1; background: #090b16; border: 1px solid var(--border); border-radius: 6px;
+    padding: 10px 12px; color: var(--text); font-size: 14px; font-family: inherit;
+  }
+  .mic-btn {
+    width: 44px; border: 1px solid var(--border); border-radius: 6px; background: transparent;
+    color: var(--text); cursor: pointer; font-size: 16px;
+  }
+  .mic-btn.listening { border-color: #ffb020; color: #ffb020; }
+
+  .advanced-toggle { font-size: 12px; color: var(--muted); cursor: pointer; text-decoration: underline; margin-bottom: 8px; display: inline-block; }
+  #advancedFields { display: none; margin-bottom: 14px; }
+  #advancedFields.open { display: block; }
+  #advancedFields input { width: 100%; background: #090b16; border: 1px solid var(--border); border-radius: 6px; padding: 9px 11px; color: var(--text); font-family: 'JetBrains Mono', monospace; font-size: 13px; }
+</style>
+</head>
+<body>
+
+<nav>
+  <a href="index.html" class="nav-logo"><span class="brand">StreamLink</span><span class="badge">XR</span></a>
+  <div class="nav-links">
+    <a href="/app">VR room</a>
+    <a href="docs.html">Docs</a>
+  </div>
+  <a href="/app" class="nav-cta">Open in VR</a>
+</nav>
+
+<main>
+  <h1>Go live</h1>
+  <div class="sub">Works from your phone or laptop — no headset required.</div>
+
+  <div class="camera-wrap">
+    <video id="preview" autoplay muted playsinline></video>
+    <div class="camera-placeholder" id="cameraPlaceholder">
+      <p>We'll ask for camera and microphone access — that's what actually gets sent to your platforms.</p>
+      <button class="btn-primary" id="enableCameraBtn">Enable camera</button>
+    </div>
+  </div>
+
+  <span class="advanced-toggle" id="advancedToggle">Session ID / advanced</span>
+  <div id="advancedFields">
+    <input id="sessionId" value="" spellcheck="false"/>
+  </div>
+
+  <section>
+    <h2>Quality</h2>
+    <select id="quality">
+      <option value="ultra">Ultra (60fps, 4.5 Mbps)</option>
+      <option value="high" selected>High (30fps, 2.5 Mbps)</option>
+      <option value="medium">Medium (30fps, 1.5 Mbps)</option>
+      <option value="low">Low (24fps, 800 kbps)</option>
+      <option value="mobile">Mobile (20fps, 500 kbps)</option>
+    </select>
+  </section>
+
+  <section>
+    <h2>Platforms</h2>
+    <div id="platformList"></div>
+  </section>
+
+  <section>
+    <button class="go-btn" id="goBtn" disabled>Enable camera first</button>
+  </section>
+
+  <section>
+    <h2>Stream health</h2>
+    <div class="status-grid" id="statusGrid"></div>
+    <div class="stats-row" style="margin-top:12px">
+      <div><strong id="statBitrate">0</strong> kbps</div>
+      <div><strong id="statUptime">0:00</strong> uptime</div>
+      <div><strong id="statReconnects">0</strong> reconnects</div>
+    </div>
+  </section>
+
+  <section>
+    <h2>AI co-pilot</h2>
+    <div class="copilot-box" id="copilotBox">Set up your platforms, then press Go Live — or ask the co-pilot anything once you're live.</div>
+    <div class="agent-log" id="agentLog"></div>
+    <div class="agent-input-row">
+      <input id="agentInput" placeholder='Try: "Twitch dropped, fix it and lower quality if needed"'/>
+      <button class="mic-btn" id="micBtn" title="Voice command">🎤</button>
+    </div>
+  </section>
+</main>
+
+<footer>
+  <div class="footer-logo brand">StreamLink XR</div>
+  <div class="footer-links">
+    <a href="privacy.html">Privacy</a>
+    <a href="terms.html">Terms</a>
+    <a href="docs.html">Docs</a>
+    <a href="contact.html">Contact</a>
+  </div>
+  <div class="footer-copy">© 2026 StreamLink XR</div>
+</footer>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.2/socket.io.min.js"></script>
+<script>
+const API_BASE = window.location.origin;
+let SESSION_ID = 'live-' + Math.random().toString(36).slice(2, 8);
+document.getElementById('sessionId').value = SESSION_ID;
+
+let platformMeta = [];
+let configuredPlatforms = [];
+let currentQuality = 'high';
+let streamActive = false;
+let socket = null;
+
+let cameraStream = null;
+let mediaRecorder = null;
+let uploadQueue = [];
+let uploading = false;
+
+const agentLogLines = [];
+
+/* ---------- platform list ---------- */
+async function fetchPlatformMeta() {
+  try {
+    const res = await fetch(`${API_BASE}/platforms`);
+    platformMeta = await res.json();
+  } catch (e) {
+    platformMeta = [
+      { name: 'youtube', label: 'YouTube', requiresUrl: false }, { name: 'twitch', label: 'Twitch', requiresUrl: false },
+      { name: 'tiktok', label: 'TikTok', requiresUrl: false }, { name: 'kick', label: 'Kick', requiresUrl: false }
+    ];
+  }
+  renderPlatformList();
+  renderStatusGrid();
+}
+
+function renderPlatformList() {
+  const container = document.getElementById('platformList');
+  container.innerHTML = '';
+  for (const p of platformMeta) {
+    const row = document.createElement('div');
+    row.className = 'platform-row';
+    row.innerHTML = `
+      <div class="name"><span>${p.label || p.name}</span>${p.requiresUrl ? '<span class="tag">needs URL</span>' : ''}</div>
+      ${p.requiresUrl ? `<input data-platform="${p.name}" data-field="url" placeholder="Ingest URL" spellcheck="false"/>` : ''}
+      <input data-platform="${p.name}" data-field="key" placeholder="Stream key${p.requiresUrl ? ' (if separate)' : ''}" spellcheck="false"/>
+    `;
+    container.appendChild(row);
+  }
+}
+
+function collectConfiguredPlatforms() {
+  const byName = {};
+  document.querySelectorAll('#platformList input').forEach(input => {
+    const name = input.dataset.platform, field = input.dataset.field, value = input.value.trim();
+    if (!value) return;
+    byName[name] = byName[name] || { name };
+    byName[name][field] = value;
+  });
+  return Object.values(byName);
+}
+
+function renderStatusGrid(statusMap) {
+  const grid = document.getElementById('statusGrid');
+  grid.innerHTML = '';
+  for (const p of platformMeta) {
+    const status = (statusMap && statusMap[p.name]) || 'idle';
+    const card = document.createElement('div');
+    card.className = 'status-card';
+    card.id = `status-${p.name}`;
+    card.innerHTML = `<div class="name">${p.label || p.name}<div class="dot ${status}"></div></div><div class="state">${status}</div>`;
+    grid.appendChild(card);
+  }
+}
+
+function setPlatformStatus(name, status) {
+  const card = document.getElementById(`status-${name}`);
+  if (!card) return;
+  card.querySelector('.dot').className = `dot ${status}`;
+  card.querySelector('.state').textContent = status;
+}
+
+/* ---------- camera capture ---------- */
+document.getElementById('enableCameraBtn').addEventListener('click', async () => {
+  try {
+    cameraStream = await navigator.mediaDevices.getUserMedia({ video: { width: 1280, height: 720, frameRate: 30 }, audio: true });
+    document.getElementById('preview').srcObject = cameraStream;
+    document.getElementById('cameraPlaceholder').style.display = 'none';
+    document.getElementById('goBtn').disabled = false;
+    document.getElementById('goBtn').textContent = 'Go live';
+  } catch (e) {
+    setCopilot(`Camera/mic access was denied or unavailable: ${e.message}`);
+  }
+});
+
+function pickSupportedMimeType() {
+  const candidates = ['video/webm;codecs=vp8,opus', 'video/webm;codecs=vp9,opus', 'video/webm'];
+  return candidates.find(t => window.MediaRecorder && MediaRecorder.isTypeSupported(t)) || '';
+}
+
+function beginRecording() {
+  const mimeType = pickSupportedMimeType();
+  mediaRecorder = new MediaRecorder(cameraStream, mimeType ? { mimeType } : undefined);
+  mediaRecorder.ondataavailable = (e) => { if (e.data && e.data.size > 0) { uploadQueue.push(e.data); processUploadQueue(); } };
+  mediaRecorder.start(1000);
+}
+
+async function processUploadQueue() {
+  if (uploading) return;
+  uploading = true;
+  while (uploadQueue.length) {
+    const chunk = uploadQueue.shift();
+    try { await fetch(`${API_BASE}/stream/${SESSION_ID}`, { method: 'POST', body: chunk }); }
+    catch (e) { console.warn('chunk upload failed', e); }
+  }
+  uploading = false;
+}
+
+function stopRecording() {
+  if (mediaRecorder && mediaRecorder.state !== 'inactive') mediaRecorder.stop();
+  mediaRecorder = null;
+  uploadQueue = [];
+}
+
+/* ---------- go live / stop ---------- */
+document.getElementById('goBtn').addEventListener('click', () => { streamActive ? stopStream() : startStream(); });
+
+async function startStream() {
+  configuredPlatforms = collectConfiguredPlatforms();
+  if (!configuredPlatforms.length) { setCopilot('Add at least one platform key first.'); return; }
+  if (!cameraStream) { setCopilot('Enable the camera first.'); return; }
+  SESSION_ID = document.getElementById('sessionId').value.trim() || SESSION_ID;
+  currentQuality = document.getElementById('quality').value;
+
+  setCopilot('Starting your stream…');
+  try {
+    const res = await fetch(`${API_BASE}/start`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ sessionId: SESSION_ID, platforms: configuredPlatforms, quality: currentQuality })
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Could not start stream');
+    beginRecording();
+    streamActive = true;
+    const btn = document.getElementById('goBtn');
+    btn.textContent = 'Stop stream'; btn.classList.add('stop');
+    setCopilot(`Live on ${data.platforms.length} platform${data.platforms.length === 1 ? '' : 's'}.`);
+    if (!socket) connectSocket();
+  } catch (e) {
+    setCopilot(`Couldn't start the stream: ${e.message}`);
+  }
+}
+
+async function stopStream() {
+  stopRecording();
+  try { await fetch(`${API_BASE}/stop/${SESSION_ID}`, { method: 'POST' }); } catch (e) {}
+  streamActive = false;
+  const btn = document.getElementById('goBtn');
+  btn.textContent = 'Go live'; btn.classList.remove('stop');
+  setCopilot('Stream stopped.');
+}
+
+/* ---------- socket / telemetry / agent ---------- */
+function connectSocket() {
+  socket = io(API_BASE, { transports: ['websocket'] });
+  socket.on('connect', () => socket.emit('join', SESSION_ID));
+  socket.on('platformStatus', ({ platform, status }) => setPlatformStatus(platform, status));
+  socket.on('telemetry', (t) => {
+    document.getElementById('statBitrate').textContent = t.bitrateKbps || 0;
+    const m = Math.floor((t.uptimeSec || 0) / 60), s = (t.uptimeSec || 0) % 60;
+    document.getElementById('statUptime').textContent = `${m}:${String(s).padStart(2, '0')}`;
+    document.getElementById('statReconnects').textContent = t.reconnects || 0;
+  });
+  socket.on('streamWarning', ({ message }) => setCopilot(message));
+  socket.on('recovering', ({ platform, attempt }) => pushLog(`⚠ ${platform} dropped — reconnecting (attempt ${attempt})`));
+  socket.on('recovered', ({ platform }) => pushLog(`✓ ${platform} recovered`));
+  socket.on('agentStep', handleAgentStep);
+}
+
+function setCopilot(text) { document.getElementById('copilotBox').textContent = text; }
+
+function pushLog(line) {
+  agentLogLines.push(line);
+  while (agentLogLines.length > 10) agentLogLines.shift();
+  const el = document.getElementById('agentLog');
+  el.innerHTML = agentLogLines.map((l, i) => `<div class="${i === agentLogLines.length - 1 ? 'last' : ''}">${l}</div>`).join('');
+  el.scrollTop = el.scrollHeight;
+}
+
+function handleAgentStep(step) {
+  if (step.phase === 'reasoning') pushLog(`💭 ${step.text}`);
+  else if (step.phase === 'observing') pushLog('🔍 checking stream health…');
+  else if (step.phase === 'acting') pushLog(`⚙ ${describeTool(step.tool, step.input)}`);
+  else if (step.phase === 'result') pushLog(step.ok ? `✓ ${step.tool} done` : `✗ ${step.tool} failed — ${step.error}`);
+  else if (step.phase === 'report' || step.phase === 'done') { if (step.text) { pushLog(`🗣 ${step.text}`); setCopilot(step.text); } }
+}
+
+function describeTool(tool, input) {
+  switch (tool) {
+    case 'reconnect_platform': return `reconnecting ${input?.platform}…`;
+    case 'set_quality': return `setting quality to ${input?.quality}…`;
+    case 'start_stream': return 'starting stream…';
+    case 'stop_stream': return 'stopping stream…';
+    default: return tool;
+  }
+}
+
+async function sendToAgent(message) {
+  if (!socket) connectSocket();
+  pushLog(`🎙 "${message}"`);
+  try {
+    const res = await fetch(`${API_BASE}/agent`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ sessionId: SESSION_ID, message })
+    });
+    if (!res.ok) throw new Error('agent request failed');
+  } catch (e) { setCopilot("Couldn't reach the AI agent right now."); }
+}
+
+document.getElementById('agentInput').addEventListener('keydown', (e) => {
+  if (e.key === 'Enter' && e.target.value.trim()) { sendToAgent(e.target.value.trim()); e.target.value = ''; }
+});
+
+let recognition = null, listening = false;
+function setupSpeech() {
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!SR) return;
+  recognition = new SR();
+  recognition.continuous = false;
+  recognition.lang = 'en-US';
+  recognition.onresult = (e) => sendToAgent(e.results[0][0].transcript);
+  recognition.onend = () => { listening = false; document.getElementById('micBtn').classList.remove('listening'); };
+}
+document.getElementById('micBtn').addEventListener('click', () => {
+  if (!recognition) { setCopilot('Voice commands need a browser with speech recognition support — try typing instead.'); return; }
+  if (listening) { recognition.stop(); return; }
+  listening = true;
+  document.getElementById('micBtn').classList.add('listening');
+  recognition.start();
+});
+
+document.getElementById('advancedToggle').addEventListener('click', () => {
+  document.getElementById('advancedFields').classList.toggle('open');
+});
+
+/* ---------- init ---------- */
+setupSpeech();
+fetchPlatformMeta();
+</script>
+</body>
+</html>

@@ -1,0 +1,960 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>StreamLink XR</title>
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=Inter:wght@400;500&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
+
+<style>
+  :root {
+    --bg:        #05060b;
+    --panel:     #0d1020;
+    --line:      #1c2140;
+    --text:      #e7e9f5;
+    --muted:     #8890b3;
+    --live:      #3ddc84;
+    --connecting:#ffb020;
+    --error:     #ff4d5e;
+    --ai:        #7c5cff;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; background: var(--bg); color: var(--text); font-family: 'Inter', sans-serif; overflow: hidden; }
+
+  #lobby {
+    position: fixed; inset: 0; display: flex; align-items: center; justify-content: center;
+    background: radial-gradient(circle at 50% 0%, rgba(124,92,255,0.12), transparent 60%), var(--bg);
+    z-index: 20; overflow-y: auto; padding: 40px 16px;
+  }
+  #lobby.hidden { display: none; }
+  .card {
+    width: min(560px, 92vw); background: var(--panel); border: 1px solid var(--line);
+    border-radius: 4px; padding: 32px; margin: auto;
+  }
+  .card h1 { font-family: 'Space Grotesk', sans-serif; font-size: 28px; margin: 0 0 4px; letter-spacing: -0.01em; }
+  .card .sub { color: var(--muted); font-size: 14px; margin-bottom: 20px; }
+  label { display: block; font-size: 12px; color: var(--muted); margin: 14px 0 6px; }
+  input, select {
+    width: 100%; padding: 9px 11px; background: #090b16; border: 1px solid var(--line);
+    border-radius: 3px; color: var(--text); font-family: 'JetBrains Mono', monospace; font-size: 13px;
+  }
+  input:focus, select:focus { outline: none; border-color: var(--ai); }
+  .row { display: flex; gap: 8px; }
+  .row > div { flex: 1; }
+  button.primary {
+    margin-top: 22px; width: 100%; padding: 14px; border: none; border-radius: 3px;
+    background: var(--ai); color: white; font-family: 'Space Grotesk', sans-serif;
+    font-size: 15px; font-weight: 700; cursor: pointer;
+  }
+  button.primary:hover { background: #6a4bed; }
+  button.secondary {
+    margin-top: 14px; padding: 9px 14px; border: 1px solid var(--line); background: transparent;
+    color: var(--text); font-family: 'Inter', sans-serif; font-size: 13px; border-radius: 3px; cursor: pointer;
+  }
+  button.secondary:hover { border-color: var(--ai); }
+
+  .platform-list { margin-top: 10px; border-top: 1px solid var(--line); }
+  .platform-row { padding: 12px 0; border-bottom: 1px solid var(--line); }
+  .platform-row .name { font-family: 'Space Grotesk', sans-serif; font-size: 14px; margin-bottom: 6px; display: flex; justify-content: space-between; }
+  .platform-row .tag { font-size: 10px; color: var(--muted); font-family: 'JetBrains Mono', monospace; }
+
+  .toggle-row { display: flex; align-items: center; gap: 10px; margin-top: 20px; }
+  .toggle-row input[type=checkbox] { width: auto; }
+  .toggle-row label { margin: 0; color: var(--text); font-size: 13px; }
+
+  #xrNote { margin-top: 14px; font-size: 12px; color: var(--muted); line-height: 1.5; }
+  #hud {
+    position: fixed; top: 14px; left: 14px; z-index: 10; font-family: 'JetBrains Mono', monospace;
+    font-size: 12px; color: var(--muted); background: rgba(5,6,11,0.6); padding: 6px 10px; border-radius: 3px;
+    pointer-events: none;
+  }
+</style>
+</head>
+<body>
+
+<div id="lobby">
+  <div class="card">
+    <h1>StreamLink XR</h1>
+    <div class="sub">Spatial control room for your multistream session.</div>
+
+    <label for="sessionId">Session ID</label>
+    <input id="sessionId" value="xr-demo-session" spellcheck="false" />
+
+    <label for="quality">Starting quality</label>
+    <select id="quality">
+      <option value="ultra">Ultra (60fps, 4.5 Mbps)</option>
+      <option value="high" selected>High (30fps, 2.5 Mbps)</option>
+      <option value="medium">Medium (30fps, 1.5 Mbps)</option>
+      <option value="low">Low (24fps, 800 kbps)</option>
+      <option value="mobile">Mobile (20fps, 500 kbps)</option>
+    </select>
+
+    <div id="platformList" class="platform-list"></div>
+
+    <div class="toggle-row">
+      <input type="checkbox" id="web3Toggle" />
+      <label for="web3Toggle">Enable Web3 creator identity — experimental, UI only, no contract calls yet</label>
+    </div>
+
+    <button class="primary" id="enterBtn">Enter StreamLink XR</button>
+    <div id="xrNote">Fill in a key (or url, for platforms that need one) only for the destinations you want live. Open on the Quest browser over HTTPS — hand tracking or controllers both work. You'll be asked for camera and microphone access on the next step — that's what actually gets sent to your platforms. Try saying "Twitch dropped, fix it and lower quality if needed" once you're in.</div>
+  </div>
+</div>
+
+<div id="hud"></div>
+
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+    "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+  }
+}
+</script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.2/socket.io.min.js"></script>
+
+<script type="module">
+import * as THREE from 'three';
+import { VRButton } from 'three/addons/webxr/VRButton.js';
+import { XRControllerModelFactory } from 'three/addons/webxr/XRControllerModelFactory.js';
+import { XRHandModelFactory } from 'three/addons/webxr/XRHandModelFactory.js';
+
+/* ────────────────────────────────────────────────────────────────────────
+   CONFIG
+   ──────────────────────────────────────────────────────────────────────── */
+const API_BASE = window.location.origin; // same-origin — this page is served by streamlink-server itself
+let SESSION_ID = 'xr-demo-session';
+let WEB3_ENABLED = false;
+let platformMeta = [];        // from GET /platforms
+let configuredPlatforms = []; // [{name, key?, url?}] — only ones the user filled in
+
+/* ────────────────────────────────────────────────────────────────────────
+   LOBBY — dynamic platform key/url entry
+   ──────────────────────────────────────────────────────────────────────── */
+async function fetchPlatformMeta() {
+  try {
+    const res = await fetch(`${window.location.origin}/platforms`);
+    platformMeta = await res.json();
+  } catch (e) {
+    console.warn('Could not reach /platforms, using a static fallback list', e);
+    platformMeta = [
+      { name: 'youtube', label: 'YouTube', requiresUrl: false }, { name: 'twitch', label: 'Twitch', requiresUrl: false },
+      { name: 'tiktok', label: 'TikTok', requiresUrl: false }, { name: 'instagram', label: 'Instagram', requiresUrl: false },
+      { name: 'facebook', label: 'Facebook', requiresUrl: false }, { name: 'kick', label: 'Kick', requiresUrl: false },
+      { name: 'vimeo', label: 'Vimeo', requiresUrl: true }, { name: 'dlive', label: 'DLive', requiresUrl: false },
+      { name: 'linkedin', label: 'LinkedIn Live', requiresUrl: true }, { name: 'x', label: 'X Live', requiresUrl: true },
+      { name: 'rumble', label: 'Rumble', requiresUrl: true }, { name: 'custom', label: 'Custom RTMP', requiresUrl: true }
+    ];
+  }
+  renderPlatformList();
+}
+
+function renderPlatformList() {
+  const container = document.getElementById('platformList');
+  container.innerHTML = '';
+  for (const p of platformMeta) {
+    const row = document.createElement('div');
+    row.className = 'platform-row';
+    row.innerHTML = `
+      <div class="name"><span>${p.label || p.name}</span>${p.requiresUrl ? '<span class="tag">needs URL</span>' : ''}</div>
+      ${p.requiresUrl ? `<input data-platform="${p.name}" data-field="url" placeholder="Ingest URL from ${p.label || p.name}" spellcheck="false" style="margin-bottom:6px;" />` : ''}
+      <input data-platform="${p.name}" data-field="key" placeholder="Stream key${p.requiresUrl ? ' (if separate from URL)' : ''}" spellcheck="false" />
+    `;
+    container.appendChild(row);
+  }
+}
+
+function collectConfiguredPlatforms() {
+  const byName = {};
+  document.querySelectorAll('#platformList input').forEach(input => {
+    const name = input.dataset.platform, field = input.dataset.field, value = input.value.trim();
+    if (!value) return;
+    byName[name] = byName[name] || { name };
+    byName[name][field] = value;
+  });
+  return Object.values(byName);
+}
+
+fetchPlatformMeta(); // same-origin now — no server URL to configure
+
+/* ────────────────────────────────────────────────────────────────────────
+   THREE.JS SETUP
+   ──────────────────────────────────────────────────────────────────────── */
+let scene, camera, renderer, clock;
+let socket = null;
+let streamActive = false;
+let currentQuality = 'high';
+
+const grabbables = [];
+const pressables = [];
+
+init();
+
+function init() {
+  scene = new THREE.Scene();
+  scene.background = new THREE.Color(0x05060b);
+  scene.fog = new THREE.Fog(0x05060b, 5, 14);
+
+  camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.05, 50);
+  camera.position.set(0, 1.6, 2.2);
+  clock = new THREE.Clock();
+
+  renderer = new THREE.WebGLRenderer({ antialias: true });
+  renderer.setPixelRatio(window.devicePixelRatio);
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  renderer.xr.enabled = true;
+  document.body.appendChild(renderer.domElement);
+
+  buildRoom();
+  buildStarfield();
+  buildCopilotPanel();
+  buildControlButtons();
+  buildQualityButtons();
+  buildStatsPanel();
+  buildAgentLogPanel();
+  // Creator panel is built lazily in enter handler if Web3 is enabled — it
+  // stays a secondary, optional panel and is never required for the core loop.
+  // Platform cards are (re)built once /platforms responds — see layoutPlatformCards().
+
+  setupControllers();
+  setupHands();
+
+  window.addEventListener('resize', onResize);
+  renderer.setAnimationLoop(animate);
+}
+
+function buildRoom() {
+  scene.add(new THREE.HemisphereLight(0x8890ff, 0x0a0a12, 0.9));
+  const key = new THREE.PointLight(0x7c5cff, 1.3, 9);
+  key.position.set(0, 2.8, -1);
+  scene.add(key);
+  const rim = new THREE.PointLight(0x3ddc84, 0.4, 9);
+  rim.position.set(0, 0.3, 2);
+  scene.add(rim);
+
+  const floor = new THREE.Mesh(
+    new THREE.CircleGeometry(4.5, 48),
+    new THREE.MeshStandardMaterial({ color: 0x0a0c18, roughness: 0.85, metalness: 0.15 })
+  );
+  floor.rotation.x = -Math.PI / 2;
+  scene.add(floor);
+
+  const grid = new THREE.GridHelper(9, 36, 0x2a2f55, 0x11142a);
+  grid.position.y = 0.001;
+  scene.add(grid);
+}
+
+// Cheap ambient polish — a slow-drifting field of points behind the console,
+// so the room doesn't read as an empty void once the novelty of the cards wears off.
+function buildStarfield() {
+  const count = 400;
+  const positions = new Float32Array(count * 3);
+  for (let i = 0; i < count; i++) {
+    const r = 6 + Math.random() * 6;
+    const theta = Math.random() * Math.PI * 2;
+    const y = Math.random() * 5;
+    positions[i * 3] = Math.cos(theta) * r;
+    positions[i * 3 + 1] = y;
+    positions[i * 3 + 2] = Math.sin(theta) * r;
+  }
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+  const mat = new THREE.PointsMaterial({ color: 0x4a4f8a, size: 0.03, transparent: true, opacity: 0.6 });
+  const points = new THREE.Points(geo, mat);
+  points.userData.isStarfield = true;
+  scene.add(points);
+}
+
+/* ────────────────────────────────────────────────────────────────────────
+   CANVAS PANELS
+   ──────────────────────────────────────────────────────────────────────── */
+function makeCanvasPanel(width, height, draw) {
+  const canvas = document.createElement('canvas');
+  canvas.width = 512; canvas.height = Math.round(512 * (height / width));
+  const ctx = canvas.getContext('2d');
+  const texture = new THREE.CanvasTexture(canvas);
+  const geo = new THREE.PlaneGeometry(width, height);
+  const mat = new THREE.MeshBasicMaterial({ map: texture, transparent: true });
+  const mesh = new THREE.Mesh(geo, mat);
+  mesh.userData.redraw = (state) => { draw(ctx, canvas.width, canvas.height, state || {}); texture.needsUpdate = true; };
+  mesh.userData.redraw({});
+  return mesh;
+}
+
+function roundRect(ctx, x, y, w, h, r) {
+  ctx.beginPath();
+  ctx.moveTo(x + r, y);
+  ctx.arcTo(x + w, y, x + w, y + h, r);
+  ctx.arcTo(x + w, y + h, x, y + h, r);
+  ctx.arcTo(x, y + h, x, y, r);
+  ctx.arcTo(x, y, x + w, y, r);
+  ctx.closePath();
+}
+
+function wrapText(ctx, text, x, y, maxWidth, lineHeight) {
+  const words = text.split(' ');
+  let line = '', cy = y;
+  for (const word of words) {
+    const test = line + word + ' ';
+    if (ctx.measureText(test).width > maxWidth && line) { ctx.fillText(line, x, cy); line = word + ' '; cy += lineHeight; }
+    else line = test;
+  }
+  ctx.fillText(line, x, cy);
+}
+
+const STATUS_COLOR = { live: '#3ddc84', connecting: '#ffb020', error: '#ff4d5e' };
+
+/* ────────────────────────────────────────────────────────────────────────
+   PLATFORM CARDS — two arcs so up to 12 fit comfortably in view
+   ──────────────────────────────────────────────────────────────────────── */
+const platformCards = {};
+
+function layoutPlatformCards(list) {
+  for (const name in platformCards) { scene.remove(platformCards[name]); }
+  for (const k in platformCards) delete platformCards[k];
+  grabbables.length = 0;
+  grabbables.push(copilotPanel, statsPanel, agentLogPanel);
+
+  const rows = [
+    { items: list.slice(0, 6),  radius: 1.6, y: 1.65 },
+    { items: list.slice(6, 12), radius: 1.9, y: 1.15 }
+  ];
+
+  rows.forEach(({ items, radius, y }) => {
+    const n = items.length;
+    items.forEach((p, i) => {
+      const angle = n > 1 ? (-n / 2 + i + 0.5) / n * Math.PI * 1.1 : 0;
+      const card = makeCanvasPanel(0.46, 0.3, (ctx, w, h, state) => drawPlatformCard(ctx, w, h, p, state));
+      card.position.set(Math.sin(angle) * radius, y, -Math.cos(angle) * radius);
+      card.lookAt(0, y, 0);
+      card.userData.grabbable = true;
+      card.userData.platform = p.name;
+      scene.add(card);
+      grabbables.push(card);
+      platformCards[p.name] = card;
+    });
+  });
+}
+
+function drawPlatformCard(ctx, w, h, platform, state) {
+  const status = state.status || 'idle';
+  const color = STATUS_COLOR[status] || '#3a3f66';
+  ctx.clearRect(0, 0, w, h);
+  ctx.fillStyle = 'rgba(13,16,32,0.92)';
+  roundRect(ctx, 4, 4, w - 8, h - 8, 14); ctx.fill();
+  ctx.strokeStyle = color; ctx.lineWidth = 4;
+  roundRect(ctx, 4, 4, w - 8, h - 8, 14); ctx.stroke();
+
+  ctx.fillStyle = '#e7e9f5';
+  ctx.font = '600 30px "Space Grotesk", sans-serif';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(platform.label || platform.name, 26, h * 0.4);
+
+  ctx.beginPath(); ctx.fillStyle = color; ctx.arc(32, h * 0.72, 9, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = '#8890b3'; ctx.font = '500 20px "Inter", sans-serif';
+  ctx.fillText(status.toUpperCase(), 52, h * 0.72);
+}
+
+function setPlatformStatus(name, status) {
+  const card = platformCards[name];
+  if (!card) return;
+  card.userData.lastStatus = status;
+  card.userData.redraw({ status });
+}
+
+/* ────────────────────────────────────────────────────────────────────────
+   AI COPILOT PANEL
+   ──────────────────────────────────────────────────────────────────────── */
+let copilotPanel;
+
+function buildCopilotPanel() {
+  copilotPanel = makeCanvasPanel(1.15, 0.34, drawCopilot);
+  copilotPanel.position.set(0, 2.15, -1.4);
+  copilotPanel.userData.grabbable = true;
+  scene.add(copilotPanel);
+  setCopilotMessage('Configure your platforms, then try: "Twitch dropped, fix it and lower quality if needed."', false);
+}
+
+function drawCopilot(ctx, w, h, state) {
+  ctx.clearRect(0, 0, w, h);
+  ctx.fillStyle = 'rgba(13,16,32,0.92)';
+  roundRect(ctx, 4, 4, w - 8, h - 8, 16); ctx.fill();
+  ctx.strokeStyle = '#7c5cff'; ctx.lineWidth = 4;
+  roundRect(ctx, 4, 4, w - 8, h - 8, 16); ctx.stroke();
+  ctx.fillStyle = '#7c5cff'; ctx.font = '700 24px "Space Grotesk", sans-serif'; ctx.textBaseline = 'top';
+  ctx.fillText('AI CO-PILOT', 26, 18);
+  ctx.fillStyle = '#e7e9f5'; ctx.font = '500 22px "Inter", sans-serif';
+  wrapText(ctx, state.message || '', 26, 62, w - 52, 28);
+}
+
+function setCopilotMessage(message, doSpeak = true) {
+  copilotPanel.userData.redraw({ message });
+  if (doSpeak) speak(message);
+}
+
+/* ────────────────────────────────────────────────────────────────────────
+   STATS PANEL — real-time stream intelligence readout
+   ──────────────────────────────────────────────────────────────────────── */
+let statsPanel;
+let lastTelemetry = { bitrateKbps: 0, uptimeSec: 0, reconnects: 0 };
+
+function buildStatsPanel() {
+  statsPanel = makeCanvasPanel(0.7, 0.4, drawStats);
+  statsPanel.position.set(1.35, 1.9, -0.9);
+  statsPanel.lookAt(0, 1.9, 0);
+  statsPanel.userData.grabbable = true;
+  scene.add(statsPanel);
+}
+
+function drawStats(ctx, w, h, state) {
+  ctx.clearRect(0, 0, w, h);
+  ctx.fillStyle = 'rgba(13,16,32,0.92)';
+  roundRect(ctx, 4, 4, w - 8, h - 8, 14); ctx.fill();
+  ctx.strokeStyle = '#3ddc84'; ctx.lineWidth = 3;
+  roundRect(ctx, 4, 4, w - 8, h - 8, 14); ctx.stroke();
+  ctx.fillStyle = '#8890b3'; ctx.font = '700 18px "Space Grotesk", sans-serif'; ctx.textBaseline = 'top';
+  ctx.fillText('STREAM INTELLIGENCE', 20, 16);
+
+  const t = state.telemetry || lastTelemetry;
+  const mins = Math.floor((t.uptimeSec || 0) / 60), secs = (t.uptimeSec || 0) % 60;
+  ctx.fillStyle = '#e7e9f5'; ctx.font = '500 22px "JetBrains Mono", monospace';
+  ctx.fillText(`${t.bitrateKbps || 0} kbps`, 20, 50);
+  ctx.fillText(`${mins}:${String(secs).padStart(2, '0')} uptime`, 20, 78);
+  ctx.fillText(`${t.reconnects || 0} reconnects`, 20, 106);
+}
+
+/* ────────────────────────────────────────────────────────────────────────
+   AGENT LOG PANEL — makes the agent's observe → decide → act → report
+   pipeline visible step by step, instead of only showing a final chat
+   reply. Each line is pushed live as 'agentStep' socket events arrive
+   while the backend's tool-use loop is still running.
+   ──────────────────────────────────────────────────────────────────────── */
+let agentLogPanel;
+const agentLogLines = [];
+
+function buildAgentLogPanel() {
+  agentLogPanel = makeCanvasPanel(0.85, 0.5, drawAgentLog);
+  agentLogPanel.position.set(-1.35, 1.55, -0.9);
+  agentLogPanel.lookAt(0, 1.55, 0);
+  agentLogPanel.userData.grabbable = true;
+  scene.add(agentLogPanel);
+  pushAgentLog('Agent idle. Waiting for a voice command…');
+}
+
+function drawAgentLog(ctx, w, h, state) {
+  ctx.clearRect(0, 0, w, h);
+  ctx.fillStyle = 'rgba(13,16,32,0.92)';
+  roundRect(ctx, 4, 4, w - 8, h - 8, 14); ctx.fill();
+  ctx.strokeStyle = '#ffb020'; ctx.lineWidth = 3;
+  roundRect(ctx, 4, 4, w - 8, h - 8, 14); ctx.stroke();
+  ctx.fillStyle = '#8890b3'; ctx.font = '700 16px "Space Grotesk", sans-serif'; ctx.textBaseline = 'top';
+  ctx.fillText('AGENT PIPELINE', 18, 14);
+
+  ctx.font = '500 16px "JetBrains Mono", monospace';
+  const lines = state.lines || agentLogLines;
+  lines.forEach((line, i) => {
+    ctx.fillStyle = i === lines.length - 1 ? '#e7e9f5' : '#6a7099';
+    ctx.fillText(truncate(ctx, line, w - 36), 18, 44 + i * 24);
+  });
+}
+
+function truncate(ctx, text, maxWidth) {
+  if (ctx.measureText(text).width <= maxWidth) return text;
+  while (text.length > 1 && ctx.measureText(text + '…').width > maxWidth) text = text.slice(0, -1);
+  return text + '…';
+}
+
+function pushAgentLog(line) {
+  agentLogLines.push(line);
+  while (agentLogLines.length > 8) agentLogLines.shift();
+  agentLogPanel.userData.redraw({ lines: agentLogLines });
+}
+
+// Maps a phase from the backend's tool-use loop onto a log line + any local
+// state update (button highlight, platform card color) — this is what makes
+// "observes → decides → reconnects → changes quality → reports" visible in
+// real time as each step of the loop actually happens server-side.
+function handleAgentStep(step) {
+  if (step.phase === 'reasoning') {
+    pushAgentLog(`💭 ${step.text}`);
+  } else if (step.phase === 'observing') {
+    pushAgentLog(`🔍 checking stream health…`);
+  } else if (step.phase === 'acting') {
+    pushAgentLog(`⚙ ${describeTool(step.tool, step.input)}`);
+  } else if (step.phase === 'result') {
+    pushAgentLog(step.ok ? `✓ ${step.tool} done` : `✗ ${step.tool} failed — ${step.error}`);
+    if (step.ok) {
+      if (step.tool === 'start_stream') { streamActive = true; startStopBtn.userData.redraw(); }
+      if (step.tool === 'stop_stream')  { streamActive = false; startStopBtn.userData.redraw(); }
+      if (step.tool === 'set_quality' && step.input) highlightQuality(step.input.quality);
+      if (step.tool === 'reconnect_platform' && step.input) setPlatformStatus(step.input.platform, 'connecting');
+    }
+  } else if (step.phase === 'report' || step.phase === 'done') {
+    if (step.text) { pushAgentLog(`🗣 ${step.text}`); setCopilotMessage(step.text); }
+  }
+}
+
+function describeTool(tool, input) {
+  switch (tool) {
+    case 'reconnect_platform': return `reconnecting ${input?.platform}…`;
+    case 'set_quality':        return `setting quality to ${input?.quality}…`;
+    case 'start_stream':       return 'starting stream…';
+    case 'stop_stream':        return 'stopping stream…';
+    default:                  return tool;
+  }
+}
+
+/* ────────────────────────────────────────────────────────────────────────
+   CONTROL BUTTONS — start/stop, voice, quality presets
+   ──────────────────────────────────────────────────────────────────────── */
+let startStopBtn, voiceBtn;
+const qualityButtons = {};
+
+function buildControlButtons() {
+  startStopBtn = makeCanvasPanel(0.4, 0.4, (ctx, w, h) => drawButton(ctx, w, h, streamActive ? 'STOP' : 'START', streamActive ? '#ff4d5e' : '#3ddc84'));
+  startStopBtn.position.set(-0.6, 1.0, -1.2);
+  startStopBtn.userData.onPress = toggleStream;
+  scene.add(startStopBtn);
+  pressables.push(startStopBtn);
+
+  voiceBtn = makeCanvasPanel(0.4, 0.4, (ctx, w, h, s) => drawButton(ctx, w, h, s.listening ? 'LISTENING…' : 'TALK', s.listening ? '#ffb020' : '#7c5cff'));
+  voiceBtn.position.set(0.6, 1.0, -1.2);
+  voiceBtn.userData.onPress = toggleListening;
+  scene.add(voiceBtn);
+  pressables.push(voiceBtn);
+}
+
+function drawButton(ctx, w, h, label, color) {
+  ctx.clearRect(0, 0, w, h);
+  ctx.fillStyle = 'rgba(13,16,32,0.92)';
+  roundRect(ctx, 4, 4, w - 8, h - 8, 20); ctx.fill();
+  ctx.strokeStyle = color; ctx.lineWidth = 6;
+  roundRect(ctx, 4, 4, w - 8, h - 8, 20); ctx.stroke();
+  ctx.fillStyle = color; ctx.font = '700 24px "Space Grotesk", sans-serif';
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.fillText(label, w / 2, h / 2);
+  ctx.textAlign = 'left';
+}
+
+function buildQualityButtons() {
+  const presets = ['ultra', 'high', 'medium', 'low', 'mobile'];
+  presets.forEach((preset, i) => {
+    const btn = makeCanvasPanel(0.26, 0.16, (ctx, w, h, s) => drawQualityButton(ctx, w, h, preset, s.active));
+    btn.position.set(-0.64 + i * 0.32, 0.5, -1.3);
+    btn.userData.onPress = () => setQuality(preset);
+    scene.add(btn);
+    pressables.push(btn);
+    qualityButtons[preset] = btn;
+  });
+  qualityButtons.high.userData.redraw({ active: true });
+}
+
+function drawQualityButton(ctx, w, h, preset, active) {
+  ctx.clearRect(0, 0, w, h);
+  ctx.fillStyle = active ? 'rgba(124,92,255,0.25)' : 'rgba(13,16,32,0.92)';
+  roundRect(ctx, 3, 3, w - 6, h - 6, 8); ctx.fill();
+  ctx.strokeStyle = active ? '#7c5cff' : '#2a2f55'; ctx.lineWidth = 3;
+  roundRect(ctx, 3, 3, w - 6, h - 6, 8); ctx.stroke();
+  ctx.fillStyle = active ? '#e7e9f5' : '#8890b3';
+  ctx.font = '600 20px "Inter", sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.fillText(preset.toUpperCase(), w / 2, h / 2);
+  ctx.textAlign = 'left';
+}
+
+function highlightQuality(preset) {
+  currentQuality = preset;
+  for (const p in qualityButtons) qualityButtons[p].userData.redraw({ active: p === preset });
+}
+
+/* ────────────────────────────────────────────────────────────────────────
+   WEB3 CREATOR IDENTITY (optional layer)
+   Uses an injected wallet (window.ethereum) if present. This is a UI/UX
+   layer only — no contract calls are wired up. Achievement/stream-history
+   numbers are placeholders for where you'd query your own contract or
+   subgraph once StreamLink XR mints them.
+   ──────────────────────────────────────────────────────────────────────── */
+let creatorPanel;
+let creatorAddress = null;
+
+function buildCreatorPanel() {
+  creatorPanel = makeCanvasPanel(0.6, 0.42, drawCreatorPanel);
+  creatorPanel.position.set(-1.35, 1.9, -0.9);
+  creatorPanel.lookAt(0, 1.9, 0);
+  creatorPanel.userData.grabbable = true;
+  creatorPanel.userData.onPress = connectWallet; // pinch/press it to connect
+  scene.add(creatorPanel);
+  grabbables.push(creatorPanel);
+  pressables.push(creatorPanel);
+}
+
+function drawCreatorPanel(ctx, w, h, state) {
+  ctx.clearRect(0, 0, w, h);
+  ctx.fillStyle = 'rgba(13,16,32,0.92)';
+  roundRect(ctx, 4, 4, w - 8, h - 8, 14); ctx.fill();
+  ctx.strokeStyle = '#7c5cff'; ctx.lineWidth = 3;
+  roundRect(ctx, 4, 4, w - 8, h - 8, 14); ctx.stroke();
+  ctx.fillStyle = '#8890b3'; ctx.font = '700 16px "Space Grotesk", sans-serif'; ctx.textBaseline = 'top';
+  ctx.fillText('CREATOR IDENTITY', 18, 14);
+
+  if (!state.address) {
+    ctx.fillStyle = '#e7e9f5'; ctx.font = '500 20px "Inter", sans-serif';
+    ctx.fillText('Tap to connect wallet', 18, 60);
+  } else {
+    ctx.fillStyle = '#3ddc84'; ctx.font = '600 22px "JetBrains Mono", monospace';
+    ctx.fillText(`${state.address.slice(0, 6)}…${state.address.slice(-4)}`, 18, 48);
+    ctx.fillStyle = '#8890b3'; ctx.font = '500 18px "Inter", sans-serif';
+    ctx.fillText('Streams: — (not yet minted)', 18, 84);
+    ctx.fillText('Achievements: — (not yet minted)', 18, 108);
+  }
+}
+
+async function connectWallet() {
+  if (creatorAddress) return; // already connected
+  if (!window.ethereum) {
+    setCopilotMessage('No injected wallet found in this browser.');
+    return;
+  }
+  try {
+    const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
+    creatorAddress = accounts[0];
+    creatorPanel.userData.redraw({ address: creatorAddress });
+    setCopilotMessage('Wallet connected. Your creator identity is linked.');
+  } catch (e) {
+    setCopilotMessage(`Wallet connection failed: ${e.message}`);
+  }
+}
+
+/* ────────────────────────────────────────────────────────────────────────
+   BACKEND WIRING
+   ──────────────────────────────────────────────────────────────────────── */
+function connectSocket() {
+  socket = io(API_BASE, { transports: ['websocket'] });
+  socket.on('connect', () => socket.emit('join', SESSION_ID));
+
+  socket.on('platformStatus', ({ platform, status }) => {
+    const wasError = platformCards[platform]?.userData.lastStatus === 'error';
+    setPlatformStatus(platform, status);
+    if (status === 'error') setCopilotMessage(`${label(platform)} has disconnected. Reconnecting now.`);
+    else if (status === 'live' && wasError) setCopilotMessage(`${label(platform)} is back online.`);
+  });
+
+  socket.on('recovering', ({ attempt }) => setCopilotMessage(`Auto-recovering the stream — attempt ${attempt}.`));
+  socket.on('recovered', () => setCopilotMessage('Stream recovered.'));
+  socket.on('stopped', () => { streamActive = false; startStopBtn.userData.redraw(); });
+
+  socket.on('telemetry', (t) => {
+    lastTelemetry = t;
+    statsPanel.userData.redraw({ telemetry: t });
+    if (t.quality && t.quality !== currentQuality) highlightQuality(t.quality);
+  });
+
+  socket.on('streamWarning', ({ message }) => setCopilotMessage(message));
+
+  socket.on('agentStep', handleAgentStep);
+}
+
+function label(name) { return name.charAt(0).toUpperCase() + name.slice(1); }
+
+/* ────────────────────────────────────────────────────────────────────────
+   CAMERA/MIC CAPTURE → /stream/:sessionId
+   This is the piece that was missing entirely before: without it, /start
+   spins up FFmpeg processes that sit waiting on stdin forever, and nothing
+   actually goes live. getUserMedia grabs the camera once (on entering, so
+   the permission prompt doesn't interrupt mid-session); MediaRecorder
+   encodes it to webm in chunks; each chunk is POSTed in order. Order
+   matters — only the first chunk carries the webm container header, so
+   chunks must reach the server (and ffmpeg's stdin) in the sequence they
+   were recorded, which is why uploads are queued and sent one at a time
+   rather than fired off in parallel.
+   ──────────────────────────────────────────────────────────────────────── */
+let cameraStream = null;
+let mediaRecorder = null;
+let uploadQueue = [];
+let uploading = false;
+
+async function initCamera() {
+  try {
+    cameraStream = await navigator.mediaDevices.getUserMedia({
+      video: { width: 1280, height: 720, frameRate: 30 },
+      audio: true
+    });
+  } catch (e) {
+    setCopilotMessage(`Camera/mic access was denied or unavailable: ${e.message}`);
+    cameraStream = null;
+  }
+}
+
+function pickSupportedMimeType() {
+  const candidates = ['video/webm;codecs=vp8,opus', 'video/webm;codecs=vp9,opus', 'video/webm'];
+  return candidates.find(t => window.MediaRecorder && MediaRecorder.isTypeSupported(t)) || '';
+}
+
+function beginRecording() {
+  if (!cameraStream) return;
+  const mimeType = pickSupportedMimeType();
+  mediaRecorder = new MediaRecorder(cameraStream, mimeType ? { mimeType } : undefined);
+  mediaRecorder.ondataavailable = (e) => {
+    if (e.data && e.data.size > 0) { uploadQueue.push(e.data); processUploadQueue(); }
+  };
+  mediaRecorder.start(1000); // one chunk per second
+}
+
+async function processUploadQueue() {
+  if (uploading) return;
+  uploading = true;
+  while (uploadQueue.length) {
+    const chunk = uploadQueue.shift();
+    try { await fetch(`${API_BASE}/stream/${SESSION_ID}`, { method: 'POST', body: chunk }); }
+    catch (e) { console.warn('chunk upload failed', e); }
+  }
+  uploading = false;
+}
+
+function stopRecording() {
+  if (mediaRecorder && mediaRecorder.state !== 'inactive') mediaRecorder.stop();
+  mediaRecorder = null;
+  uploadQueue = [];
+}
+
+async function toggleStream() { streamActive ? stopStream() : startStream(); }
+
+async function startStream() {
+  if (!configuredPlatforms.length) { setCopilotMessage('No platforms are configured — add a key in the lobby first.'); return; }
+  if (!cameraStream) { setCopilotMessage("Camera isn't available — check permissions and re-enter."); return; }
+  setCopilotMessage('Starting your stream…');
+  try {
+    const res = await fetch(`${API_BASE}/start`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ sessionId: SESSION_ID, platforms: configuredPlatforms, quality: currentQuality })
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Could not start stream');
+    beginRecording();
+    streamActive = true;
+    startStopBtn.userData.redraw();
+    setCopilotMessage(`Your stream is ready on ${data.platforms.length} platform${data.platforms.length === 1 ? '' : 's'}.`);
+  } catch (e) {
+    setCopilotMessage(`Couldn't start the stream: ${e.message}`);
+  }
+}
+
+async function stopStream() {
+  stopRecording();
+  try { await fetch(`${API_BASE}/stop/${SESSION_ID}`, { method: 'POST' }); } catch (e) {}
+  streamActive = false;
+  startStopBtn.userData.redraw();
+  setCopilotMessage('Stream stopped.');
+}
+
+async function setQuality(preset) {
+  highlightQuality(preset);
+  if (!streamActive) return; // just remembered for the next /start
+  try {
+    await fetch(`${API_BASE}/quality/${SESSION_ID}`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ quality: preset })
+    });
+  } catch (e) { setCopilotMessage(`Couldn't change quality: ${e.message}`); }
+}
+
+/* ────────────────────────────────────────────────────────────────────────
+   VOICE → REAL AI AGENT
+   The transcript is sent to the server's /agent endpoint, which reasons
+   over live session state with Claude (tool use) and performs whatever
+   action it decides on — this replaces the local regex command parser.
+   ──────────────────────────────────────────────────────────────────────── */
+let recognition = null;
+let listening = false;
+
+function setupSpeech() {
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!SR) { console.warn('SpeechRecognition not supported in this browser'); return; }
+  recognition = new SR();
+  recognition.continuous = false;
+  recognition.lang = 'en-US';
+  recognition.onresult = (e) => sendToAgent(e.results[0][0].transcript);
+  recognition.onend = () => { listening = false; voiceBtn.userData.redraw({ listening }); };
+}
+
+function toggleListening() {
+  if (!recognition) { setCopilotMessage('Voice commands need a browser with speech recognition support.'); return; }
+  if (listening) { recognition.stop(); return; }
+  listening = true;
+  voiceBtn.userData.redraw({ listening });
+  recognition.start();
+}
+
+async function sendToAgent(message) {
+  pushAgentLog(`🎙 "${message}"`);
+  try {
+    const res = await fetch(`${API_BASE}/agent`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ sessionId: SESSION_ID, message })
+    });
+    if (!res.ok) throw new Error('agent request failed');
+    // Every further update — reasoning, each tool call, its result, and the
+    // final report — arrives live via 'agentStep' socket events as the
+    // backend's loop runs, and is handled by handleAgentStep(). Nothing
+    // further to do with the HTTP response itself on success.
+  } catch (e) {
+    setCopilotMessage("I couldn't reach the AI agent right now.");
+  }
+}
+
+function speak(text) {
+  if (!window.speechSynthesis) return;
+  window.speechSynthesis.cancel();
+  window.speechSynthesis.speak(new SpeechSynthesisUtterance(text));
+}
+
+/* ────────────────────────────────────────────────────────────────────────
+   HAND & CONTROLLER INTERACTION
+   ──────────────────────────────────────────────────────────────────────── */
+const controllerModelFactory = new XRControllerModelFactory();
+const handModelFactory = new XRHandModelFactory();
+const raycaster = new THREE.Raycaster();
+const tempMatrix = new THREE.Matrix4();
+const held = new Map();
+
+function setupControllers() {
+  for (let i = 0; i < 2; i++) {
+    const controller = renderer.xr.getController(i);
+    controller.addEventListener('selectstart', () => onSelectStart(controller));
+    controller.addEventListener('selectend', () => held.delete(controller));
+    scene.add(controller);
+
+    const grip = renderer.xr.getControllerGrip(i);
+    grip.add(controllerModelFactory.createControllerModel(grip));
+    scene.add(grip);
+
+    const geometry = new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(0, 0, 0), new THREE.Vector3(0, 0, -1)]);
+    const line = new THREE.Line(geometry, new THREE.LineBasicMaterial({ color: 0x7c5cff }));
+    line.scale.z = 1.5;
+    controller.add(line);
+  }
+}
+
+function setupHands() {
+  for (let i = 0; i < 2; i++) {
+    const hand = renderer.xr.getHand(i);
+    hand.add(handModelFactory.createHandModel(hand, 'mesh'));
+    hand.userData.pinching = false;
+    scene.add(hand);
+  }
+}
+
+function onSelectStart(controller) {
+  const hit = intersectInteractive(controller);
+  if (!hit) return;
+  grabOrPress(controller, hit.object);
+  pulseHaptics(controller);
+}
+
+function intersectInteractive(controller) {
+  tempMatrix.identity().extractRotation(controller.matrixWorld);
+  raycaster.ray.origin.setFromMatrixPosition(controller.matrixWorld);
+  raycaster.ray.direction.set(0, 0, -1).applyMatrix4(tempMatrix);
+  const hits = raycaster.intersectObjects([...grabbables, ...pressables], false);
+  return hits[0] || null;
+}
+
+function grabOrPress(source, object) {
+  if (object.userData.onPress) { object.userData.onPress(); return; }
+  if (object.userData.grabbable) held.set(source, { object });
+}
+
+function pulseHaptics(source) {
+  const gp = source.gamepad; // controllers only — hands have no haptics
+  if (gp && gp.hapticActuators && gp.hapticActuators[0]) {
+    gp.hapticActuators[0].pulse(0.4, 60);
+  }
+}
+
+const PINCH_DISTANCE = 0.025;
+
+function updateHandPinch(hand) {
+  const joints = hand.joints;
+  if (!joints || !joints['index-finger-tip'] || !joints['thumb-tip']) return;
+  const dist = joints['index-finger-tip'].position.distanceTo(joints['thumb-tip'].position);
+  const isPinching = dist < PINCH_DISTANCE;
+
+  if (isPinching && !hand.userData.pinching) {
+    const tip = new THREE.Vector3();
+    joints['index-finger-tip'].getWorldPosition(tip);
+    let closest = null, closestDist = 0.12;
+    for (const obj of [...grabbables, ...pressables]) {
+      const d = obj.position.distanceTo(tip);
+      if (d < closestDist) { closest = obj; closestDist = d; }
+    }
+    if (closest) grabOrPress(hand, closest);
+  } else if (!isPinching && hand.userData.pinching) {
+    held.delete(hand);
+  }
+  hand.userData.pinching = isPinching;
+}
+
+function updateHeldObjects() {
+  held.forEach(({ object }, source) => {
+    if (!object.userData.grabbable) return;
+    const target = new THREE.Vector3();
+    if (source.joints) source.joints['index-finger-tip'].getWorldPosition(target);
+    else source.getWorldPosition(target);
+    object.position.lerp(target, 0.6);
+    object.lookAt(camera.position);
+  });
+}
+
+/* ────────────────────────────────────────────────────────────────────────
+   RENDER LOOP
+   ──────────────────────────────────────────────────────────────────────── */
+function animate(time) {
+  const session = renderer.xr.getSession();
+  if (session) {
+    for (const source of session.inputSources) {
+      if (source.hand) updateHandPinch(source.handedness === 'left' ? renderer.xr.getHand(0) : renderer.xr.getHand(1));
+    }
+  }
+  updateHeldObjects();
+
+  scene.traverse(obj => { if (obj.userData.isStarfield) obj.rotation.y = time * 0.00002; });
+
+  renderer.render(scene, camera);
+}
+
+function onResize() {
+  camera.aspect = window.innerWidth / window.innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth, window.innerHeight);
+}
+
+/* ────────────────────────────────────────────────────────────────────────
+   LOBBY → ENTER XR
+   ──────────────────────────────────────────────────────────────────────── */
+document.getElementById('enterBtn').addEventListener('click', async () => {
+  SESSION_ID = document.getElementById('sessionId').value.trim() || 'xr-demo-session';
+  currentQuality = document.getElementById('quality').value;
+  WEB3_ENABLED = document.getElementById('web3Toggle').checked;
+  configuredPlatforms = collectConfiguredPlatforms();
+
+  setupSpeech();
+  layoutPlatformCards(platformMeta.length ? platformMeta : []);
+  highlightQuality(currentQuality);
+  if (WEB3_ENABLED) buildCreatorPanel();
+  connectSocket();
+  await initCamera(); // ask now, while this click still counts as a user gesture
+
+  document.getElementById('lobby').classList.add('hidden');
+
+  if (!navigator.xr) {
+    document.getElementById('hud').textContent = 'WebXR not available — showing flat preview. Open on a Quest browser for VR.';
+    return;
+  }
+
+  const vrButton = VRButton.createButton(renderer, { optionalFeatures: ['hand-tracking'] });
+  document.body.appendChild(vrButton);
+  vrButton.click();
+});
+</script>
+</body>
+</html>
