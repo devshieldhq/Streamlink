@@ -1,0 +1,11 @@
+Upload each folder's FILES (not the folder itself) into the matching place in your GitHub repo:
+
+  1-repo-root/                  ->  repo root            (README.md)
+  2-streamlink-server/          ->  streamlink-server/   (server.js)
+  3-streamlink-server-public/   ->  streamlink-server/public/   (9 files: 2 new, 7 updated)
+
+NEW files:     account.html, auth.js
+UPDATED files: server.js, go-live.html, streamlink-xr.html, index.html,
+               docs.html, contact.html, privacy.html, terms.html, README.md
+
+Uploading a file with the same name replaces it. Commit to main, and Render redeploys on its own.
