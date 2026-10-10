@@ -1,0 +1,13 @@
+# Render Blueprint. Must live at the repo root (Render's requirement, not
+# a choice) even though the actual service lives in streamlink-server/ —
+# rootDir below points Render at the right subfolder to build from.
+services:
+  - type: web
+    name: streamlink-xr
+    runtime: docker
+    rootDir: streamlink-server
+    plan: free
+    healthCheckPath: /api/status
+    envVars:
+      - key: ANTHROPIC_API_KEY
+        sync: false   # set this manually in the Render dashboard — never commit a real key

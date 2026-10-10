@@ -1,0 +1,349 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Account — StreamLink XR</title>
+  <meta name="description" content="Sign in or create a StreamLink XR account to keep your stream keys saved."/>
+  <link rel="icon" type="image/svg+xml" href="streamlink-xr-mark.svg"/>
+  <link rel="stylesheet" href="style.css"/>
+  <style>
+    .account-wrap { max-width: 440px; margin: 0 auto; padding: 56px 20px 90px; }
+    .account-wrap h1 { font-size: 26px; color: white; margin-bottom: 8px; }
+    .account-wrap .sub { color: var(--muted); font-size: 15px; margin-bottom: 30px; line-height: 1.65; }
+    .field-label { display: block; font-size: 13px; color: var(--muted); margin-bottom: 7px; }
+    .text-input {
+      width: 100%; background: #090b16; border: 1px solid var(--border); border-radius: 6px;
+      padding: 12px 14px; color: var(--text); font-size: 15px; font-family: inherit; margin-bottom: 12px;
+    }
+    .text-input:focus { outline: none; border-color: var(--accent); }
+    .full-btn { width: 100%; text-align: center; cursor: pointer; font-family: inherit; }
+    button.btn-primary:disabled { opacity: 0.55; cursor: not-allowed; }
+    .or-row { display: flex; align-items: center; gap: 14px; margin: 22px 0; color: var(--muted); font-size: 13px; }
+    .or-row::before, .or-row::after { content: ''; flex: 1; height: 1px; background: var(--border); }
+    .note { font-size: 13px; color: var(--muted); line-height: 1.6; margin-top: 16px; }
+    .msg { display: none; border-radius: 8px; padding: 12px 14px; font-size: 14px; line-height: 1.55; margin-bottom: 16px; }
+    .msg.ok { display: block; background: rgba(61,220,132,0.08); border: 1px solid rgba(61,220,132,0.25); color: var(--text); }
+    .msg.err { display: block; background: rgba(255,77,94,0.08); border: 1px solid rgba(255,77,94,0.3); color: #ff8a94; }
+    .signed-in-email { color: white; font-weight: 600; word-break: break-all; }
+    .action-row { display: flex; gap: 10px; flex-wrap: wrap; margin: 22px 0 8px; }
+    .saved-list { margin-top: 30px; border-top: 1px solid var(--border); padding-top: 22px; }
+    .saved-list h2 { font-size: 15px; color: white; margin-bottom: 4px; }
+    .saved-list .hint { font-size: 13px; color: var(--muted); margin-bottom: 12px; }
+    .saved-row { display: flex; justify-content: space-between; align-items: center; padding: 10px 0; border-bottom: 1px solid var(--border); font-size: 14px; }
+    .saved-row button { background: none; border: none; color: var(--muted); font-size: 13px; cursor: pointer; text-decoration: underline; font-family: inherit; }
+    .saved-row button:hover { color: #ff8a94; }
+    .link-btn { background: none; border: none; color: var(--muted); font-size: 13px; cursor: pointer; text-decoration: underline; font-family: inherit; padding: 0; }
+    .passport { margin-top: 30px; border: 1px solid var(--border); border-radius: 12px; padding: 20px 20px 16px; }
+    .passport h2 { font-size: 15px; color: white; margin-bottom: 12px; }
+    .pp-row { display: flex; justify-content: space-between; gap: 16px; padding: 9px 0; border-bottom: 1px solid var(--border); font-size: 14px; color: var(--muted); }
+    .pp-row span:last-child { color: var(--text); text-align: right; word-break: break-all; }
+    .pp-row .copy { background: none; border: none; color: var(--accent); cursor: pointer; font-size: 12px; margin-left: 8px; font-family: inherit; }
+    .badges { display: flex; flex-wrap: wrap; gap: 8px; margin: 16px 0 10px; }
+    .badge-chip { border: 1px solid var(--border); border-radius: 100px; padding: 6px 12px; font-size: 12px; color: #4a4f70; }
+    .badge-chip.earned { border-color: var(--accent); color: var(--text); background: rgba(124,92,255,0.12); }
+    .passport .fine { font-size: 12px; color: var(--muted); line-height: 1.55; margin-top: 6px; }
+    .passport { margin-top: 34px; border-top: 1px solid var(--border); padding-top: 24px; }
+    .passport h2 { font-size: 15px; color: white; margin-bottom: 4px; }
+    .passport .hint { font-size: 13px; color: var(--muted); margin-bottom: 14px; line-height: 1.6; }
+    .wallet-card { border: 1px solid var(--border); border-radius: 10px; padding: 16px; margin-bottom: 16px; }
+    .wallet-addr { font-family: 'JetBrains Mono', monospace; font-size: 13px; color: var(--text); word-break: break-all; margin: 6px 0 12px; }
+    .tag-verified { display: inline-block; font-size: 11px; color: #05060b; background: var(--live); border-radius: 4px; padding: 2px 7px; font-weight: 700; }
+    .stat-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 16px; }
+    .stat { border: 1px solid var(--border); border-radius: 8px; padding: 12px; }
+    .stat b { display: block; font-family: 'Space Grotesk', sans-serif; font-size: 22px; color: white; }
+    .stat span { font-size: 12px; color: var(--muted); }
+    .badge-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .badge-item { border: 1px solid var(--border); border-radius: 8px; padding: 12px; opacity: 0.45; }
+    .badge-item.earned { opacity: 1; border-color: rgba(124,92,255,0.6); background: rgba(124,92,255,0.07); }
+    .badge-item b { display: block; font-size: 14px; color: white; }
+    .badge-item span { font-size: 12px; color: var(--muted); }
+    .small-note { font-size: 12px; color: var(--muted); line-height: 1.6; margin-top: 12px; }
+    #signedIn, #signedOut, #notConfigured { display: none; }
+  </style>
+</head>
+<body>
+
+  <nav>
+    <a href="index.html" class="nav-logo"><span class="brand">StreamLink</span><span class="badge">XR</span></a>
+    <div class="nav-links">
+      <a href="index.html#features">Features</a>
+      <a href="index.html#platforms">Platforms</a>
+      <a href="index.html#pricing">Pricing</a>
+      <a href="docs.html">Docs</a>
+      <a href="/app">VR room</a>
+      <a href="/account.html" class="active">Account</a>
+    </div>
+    <a href="/live" class="nav-cta">Go live</a>
+  </nav>
+
+  <div class="account-wrap">
+    <div id="msg" class="msg"></div>
+
+    <!-- Accounts not set up on this server -->
+    <div id="notConfigured">
+      <h1>Accounts aren't switched on here</h1>
+      <p class="sub">This server doesn't have its Supabase settings yet, so sign-in is unavailable. You can still <a href="/live" style="color:var(--accent)">go live without an account</a> — you'll just type your stream keys each time.</p>
+    </div>
+
+    <!-- Signed out: one form handles both signing in and signing up -->
+    <div id="signedOut">
+      <h1>Sign in or create an account</h1>
+      <p class="sub">An account keeps your stream keys saved, so you aren't pasting them in every time you go live. New here? The same form creates your account.</p>
+
+      <label class="field-label" for="email">Email</label>
+      <input class="text-input" id="email" type="email" placeholder="you@example.com" autocomplete="email"/>
+      <button class="btn-primary full-btn" id="magicBtn">Email me a sign-in link</button>
+
+      <div class="or-row">or</div>
+
+      <button class="btn-secondary full-btn" id="googleBtn">Continue with Google</button>
+      <button class="btn-secondary full-btn" id="walletBtn" style="margin-top:10px">Continue with a wallet</button>
+
+      <p class="note">No password to remember. We'll email you a link — open it on this device and you're in. A wallet works too: you sign a free message, no transaction and no access to your funds.</p>
+    </div>
+
+    <!-- Signed in -->
+    <div id="signedIn">
+      <h1>You're signed in</h1>
+      <p class="sub">Signed in as <span class="signed-in-email" id="userEmail"></span></p>
+
+      <div class="action-row">
+        <a href="/live" class="btn-primary">Go live</a>
+        <a href="/app" class="btn-secondary">Open VR room</a>
+      </div>
+      <button class="link-btn" id="signOutBtn">Sign out</button>
+
+      <div class="passport" id="passport">
+        <h2>Creator passport</h2>
+        <div class="pp-row"><span>Signed in with</span><span id="ppMethod"></span></div>
+        <div class="pp-row" id="ppWalletRow"><span>Wallet</span><span><span id="ppWallet"></span><button class="copy" id="ppCopy">Copy</button></span></div>
+        <div class="pp-row" id="ppBalRow"><span>Balance on Base</span><span id="ppBalance">…</span></div>
+        <div class="pp-row"><span>Streams</span><span id="ppStreams">…</span></div>
+        <div class="pp-row"><span>Time live</span><span id="ppTime">…</span></div>
+        <div class="pp-row"><span>Most platforms at once</span><span id="ppMax">…</span></div>
+        <div class="badges" id="ppBadges"></div>
+        <p class="fine" id="ppNote"></p>
+      </div>
+
+      <div class="saved-list">
+        <h2>Saved platforms</h2>
+        <p class="hint">These load automatically next time you go live. Keys are never shown here — only which platforms you've saved.</p>
+        <div id="savedRows"><div class="hint">Loading…</div></div>
+      </div>
+
+      <div class="passport">
+        <h2>Creator passport</h2>
+        <p class="hint">Link a wallet to prove it's yours. It's free — you sign a message, nothing is sent on-chain and we never get access to your funds.</p>
+        <div class="wallet-card" id="walletCard"><div class="hint">Loading…</div></div>
+        <div class="stat-row" id="statRow"></div>
+        <div class="badge-grid" id="badgeGrid"></div>
+        <p class="small-note">Stream history and badges are recorded from your own sessions here and aren't on-chain. Your wallet link is verified by signature.</p>
+      </div>
+    </div>
+  </div>
+
+  <footer>
+    <div class="footer-logo brand">StreamLink XR</div>
+    <div class="footer-links">
+      <a href="privacy.html">Privacy</a>
+      <a href="terms.html">Terms</a>
+      <a href="docs.html">Docs</a>
+      <a href="contact.html">Contact</a>
+    </div>
+    <div class="footer-copy">© 2026 StreamLink XR</div>
+  </footer>
+
+  <script src="/config.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="auth.js"></script>
+  <script>
+    const $ = (id) => document.getElementById(id);
+
+    function show(which) {
+      for (const id of ['notConfigured', 'signedOut', 'signedIn']) $(id).style.display = (id === which) ? 'block' : 'none';
+    }
+    function flash(text, kind) {
+      const el = $('msg');
+      el.className = 'msg ' + kind;
+      el.textContent = text;
+    }
+    function clearFlash() { $('msg').className = 'msg'; $('msg').textContent = ''; }
+
+    async function renderSaved() {
+      const rows = await SLAuth.loadCredentials();
+      const box = $('savedRows');
+      if (!rows.length) { box.innerHTML = '<div class="hint">Nothing saved yet — your keys are saved automatically the first time you go live while signed in.</div>'; return; }
+      box.innerHTML = '';
+      for (const r of rows) {
+        const row = document.createElement('div');
+        row.className = 'saved-row';
+        const name = document.createElement('span');
+        name.textContent = r.platform_name;
+        const btn = document.createElement('button');
+        btn.textContent = 'Remove';
+        btn.onclick = async () => { await SLAuth.deleteCredential(r.platform_name); renderSaved(); };
+        row.append(name, btn);
+        box.appendChild(row);
+      }
+    }
+
+    const METHOD_LABEL = { email: 'Email link', google: 'Google', web3: 'Wallet' };
+    const BADGES = [
+      { name: 'First stream',  test: (st) => st.streams >= 1 },
+      { name: 'Multi-platform', test: (st) => st.maxPlatforms >= 3 },
+      { name: 'One hour live', test: (st) => st.minutes >= 60 },
+      { name: 'Regular (10 streams)', test: (st) => st.streams >= 10 }
+    ];
+    const short = (a) => a.slice(0, 6) + '…' + a.slice(-4);
+
+    async function renderPassport(user) {
+      const provider = (user.app_metadata && user.app_metadata.provider) || 'email';
+      $('ppMethod').textContent = METHOD_LABEL[provider] || provider;
+
+      const walletUser = SLAuth.isWalletUser(user);
+      let address = walletUser ? SLAuth.walletAddressOf(user) : null;
+      if (walletUser && !address && window.ethereum) {
+        try { const accs = await window.ethereum.request({ method: 'eth_accounts' }); address = accs && accs[0]; } catch (e) {}
+      }
+      $('ppWalletRow').style.display = walletUser ? 'flex' : 'none';
+      $('ppBalRow').style.display = walletUser && address ? 'flex' : 'none';
+      if (walletUser) {
+        $('ppWallet').textContent = address ? short(address) : 'connected';
+        $('ppCopy').style.display = address ? 'inline' : 'none';
+        $('ppCopy').onclick = () => { navigator.clipboard && navigator.clipboard.writeText(address); $('ppCopy').textContent = 'Copied'; setTimeout(() => $('ppCopy').textContent = 'Copy', 1500); };
+        if (address) SLAuth.baseBalance(address).then(b => { $('ppBalance').textContent = b === null ? 'unavailable' : b.toFixed(4) + ' ETH'; });
+      }
+
+      const st = await SLAuth.loadStats();
+      if (st) {
+        $('ppStreams').textContent = st.streams;
+        const h = Math.floor(st.minutes / 60), m = st.minutes % 60;
+        $('ppTime').textContent = h ? h + 'h ' + m + 'm' : m + ' min';
+        $('ppMax').textContent = st.maxPlatforms || '—';
+        $('ppBadges').innerHTML = '';
+        for (const b of BADGES) {
+          const chip = document.createElement('span');
+          chip.className = 'badge-chip' + (b.test(st) ? ' earned' : '');
+          chip.textContent = b.name;
+          $('ppBadges').appendChild(chip);
+        }
+      } else {
+        for (const id of ['ppStreams', 'ppTime', 'ppMax']) $(id).textContent = '—';
+      }
+      $('ppNote').textContent = walletUser
+        ? "Your wallet address is verified by a signed message. Badges are worked out from your stream history on this site — nothing is minted on-chain."
+        : "Signed in without a wallet. Signing in with a wallet creates a separate account — linking a wallet to this one isn't built yet. Badges are worked out from your stream history; nothing is minted on-chain.";
+    }
+
+    function el(tag, cls, text) { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; }
+
+    async function renderPassport() {
+      const [wallet, stats] = await Promise.all([SLAuth.getWallet(), SLAuth.getStats()]);
+
+      const card = $('walletCard'); card.innerHTML = '';
+      if (wallet) {
+        card.append(el('span', 'tag-verified', 'Verified wallet'));
+        card.append(el('div', 'wallet-addr', wallet.address));
+        const un = el('button', 'btn-secondary', 'Unlink wallet');
+        un.style.cursor = 'pointer';
+        un.onclick = async () => {
+          un.disabled = true;
+          try { await SLAuth.unlinkWallet(); clearFlash(); } catch (e) { flash(e.message, 'err'); }
+          renderPassport();
+        };
+        card.append(un);
+      } else {
+        const noWallet = !window.ethereum;
+        const btn = el('button', 'btn-primary', 'Link a wallet');
+        btn.style.cursor = 'pointer';
+        btn.onclick = async () => {
+          clearFlash(); btn.disabled = true; btn.textContent = 'Check your wallet…';
+          try {
+            await SLAuth.linkWallet();
+            flash('Wallet linked and verified.', 'ok');
+          } catch (e) {
+            if (e.message === 'NO_WALLET') flash('No wallet found in this browser. On desktop, install a wallet extension like MetaMask; on a phone, open this page inside your wallet app\'s built-in browser.', 'err');
+            else flash(e.message || 'Could not link the wallet.', 'err');
+          }
+          renderPassport();
+        };
+        card.append(btn);
+        if (noWallet) card.append(el('p', 'small-note', 'No wallet detected in this browser. Linking needs a wallet extension (desktop) or your wallet app\'s built-in browser (phone). The Meta Quest browser can\'t link wallets, but it will show your linked wallet in the VR room.'));
+      }
+
+      const row = $('statRow'); row.innerHTML = '';
+      const grid = $('badgeGrid'); grid.innerHTML = '';
+      if (stats) {
+        const mk = (n, l) => { const d = el('div', 'stat'); d.append(el('b', null, n), el('span', null, l)); return d; };
+        row.append(mk(String(stats.streams), 'Broadcasts'), mk(stats.hours.toFixed(1), 'Hours live'), mk(String(stats.maxPlatforms), 'Most platforms at once'));
+        for (const b of stats.badges) {
+          const d = el('div', 'badge-item' + (b.earned ? ' earned' : ''));
+          d.append(el('b', null, b.name), el('span', null, b.desc));
+          grid.append(d);
+        }
+      }
+    }
+
+    async function render(user) {
+      if (!SLAuth.enabled) { show('notConfigured'); return; }
+      if (user) {
+        $('userEmail').textContent = user.email || 'your account';
+        show('signedIn');
+        renderSaved();
+        renderPassport();
+        renderPassport(user);
+      } else {
+        show('signedOut');
+      }
+    }
+
+    $('magicBtn').onclick = async () => {
+      clearFlash();
+      const email = $('email').value.trim();
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { flash('Please enter a valid email address.', 'err'); return; }
+      const btn = $('magicBtn'); btn.disabled = true; btn.textContent = 'Sending…';
+      const { error } = await SLAuth.sendMagicLink(email);
+      btn.disabled = false; btn.textContent = 'Email me a sign-in link';
+      if (error) {
+        flash(error.message || 'Could not send the link. Please try again in a moment.', 'err');
+      } else {
+        flash('Check your inbox — we sent a sign-in link to ' + email + '. It can take a minute to arrive.', 'ok');
+      }
+    };
+    $('email').addEventListener('keydown', (e) => { if (e.key === 'Enter') $('magicBtn').click(); });
+
+    $('googleBtn').onclick = async () => {
+      clearFlash();
+      const { error } = await SLAuth.signInWithGoogle();
+      if (error) flash(error.message || 'Google sign-in is not available right now.', 'err');
+    };
+
+    $('walletBtn').onclick = async () => {
+      clearFlash();
+      const btn = $('walletBtn'); btn.disabled = true; btn.textContent = 'Check your wallet…';
+      const { error } = await SLAuth.signInWithWallet();
+      btn.disabled = false; btn.textContent = 'Continue with a wallet';
+      if (error) {
+        const msg = error.message || 'Wallet sign-in failed.';
+        flash(/provider/i.test(msg) && /(disabled|not enabled)/i.test(msg)
+          ? 'Wallet sign-in isn\'t switched on for this project yet (Supabase → Authentication → Providers → Web3 Wallet). (' + msg + ')'
+          : msg, 'err');
+      }
+    };
+
+    $('signOutBtn').onclick = async () => { await SLAuth.signOut(); clearFlash(); render(null); };
+
+    (async function init() {
+      // Surface errors Supabase puts in the URL after a failed/expired link.
+      const params = new URLSearchParams(window.location.hash.replace(/^#/, '') || window.location.search);
+      const urlErr = params.get('error_description');
+      if (urlErr) flash(urlErr.replace(/\+/g, ' '), 'err');
+
+      if (!SLAuth.enabled) { render(null); return; }
+      render(await SLAuth.getUser());
+      SLAuth.onChange((user) => render(user));
+    })();
+  </script>
+</body>
+</html>
