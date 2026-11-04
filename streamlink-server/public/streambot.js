@@ -8,7 +8,7 @@
     <section id="streambot-panel" role="dialog" aria-label="Chat with StreamBot" aria-modal="false">
       <header id="streambot-head">
         <div id="streambot-avatar" aria-hidden="true">S</div>
-        <div id="streambot-heading"><strong>StreamBot</strong><small>StreamLink XR assistant · Meta Llama</small></div>
+        <div id="streambot-heading"><strong>StreamBot</strong><small>StreamLink XR assistant</small></div>
         <button id="streambot-close" type="button" aria-label="Close StreamBot">×</button>
       </header>
       <div id="streambot-status" aria-live="polite">Connecting to StreamLink…</div>
@@ -61,8 +61,8 @@
       const data = await res.json();
       if (!res.ok) throw new Error('Status unavailable');
       status.textContent = data.configured
-        ? '● Online · Meta Llama connected'
-        : '○ Setup required · Meta Llama key not configured';
+        ? '● Online'
+        : '○ Setup required · API key not configured';
       status.style.color = data.configured ? '#70dfb0' : '#ffc77a';
       if (!messagesEl.childElementCount) {
         addMessage('bot', 'Hey! I’m StreamBot, your StreamLink XR assistant. I can help with setup, streaming, VR/XR, accounts and troubleshooting. What would you like to do?');
