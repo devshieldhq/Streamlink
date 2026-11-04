@@ -577,7 +577,7 @@ function fallbackAgentReply(sessionId, message) {
 async function callLlamaAgent(sessionId, message) {
   const summary = getSessionSummary(sessionId);
   const system =
-    `You are StreamBot, the official AI assistant built into StreamLink XR. You are StreamBot. ` +
+    `You are StreamBot, the official AI assistant built into StreamLink XR. built for StreamLink XR. ` +
     `Help users understand StreamLink XR, streaming, multistream setup, supported destinations, VR/XR controls, account features, and troubleshooting. ` +
     `Keep replies clear, friendly, concise, and practical. Never claim a feature is available unless the platform context or live status confirms it. ` +
     `For stream actions, inspect health first, use only the supplied tools, and verify the result after acting. ` +
@@ -595,7 +595,7 @@ async function callLlamaAgent(sessionId, message) {
     const res = await fetch('https://api.meta.ai/v1/chat/completions', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${process.env.MODEL_API_KEY}` },
-      body: JSON.stringify({ model: process.env.META_MODEL || 'muse-spark-1.3', messages, tools, tool_choice: 'auto', temperature: 0.3, max_tokens: 700 })
+      body: JSON.stringify({ model: process.env.META_MODEL || 'muse-spark-1.3', messages, tools, tool_choice: 'auto', temperature: 0.3, max_completion_tokens: 700 })
     });
     if (!res.ok) throw new Error(`Meta Model API error: ${res.status} ${(await res.text()).slice(0, 300)}`);
     const data = await res.json();
@@ -677,7 +677,7 @@ app.post('/api/streambot/chat', async (req, res) => {
       method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${process.env.MODEL_API_KEY}` },
       body: JSON.stringify({ model: process.env.META_MODEL || 'muse-spark-1.3',
         messages: [{ role: 'system', content: system }, ...safeHistory, { role: 'user', content: message }],
-        temperature: 0.4, max_tokens: 700 })
+        temperature: 0.4, max_completion_tokens: 700 })
     });
     if (!response.ok) throw new Error(`Meta Model API returned ${response.status}`);
     const data = await response.json();
