@@ -6,7 +6,7 @@ StreamBot is the built-in StreamLink XR assistant. Its chat widget is injected i
 
 Set these in the `streamlink-server` service environment (Render/Railway):
 
-- `GROQ_API_KEY`: API key from the Groq Console. Keep it private; never add it to browser JavaScript or commit it.
+- `MODEL_API_KEY`: API key from the Groq Console. Keep it private; never add it to browser JavaScript or commit it.
 - `GROQ_MODEL`: optional model override. Defaults to `llama-3.3-70b-versatile`.
 
 After setting the key, redeploy/restart the service. The widget's status line should show **Online · Meta Llama connected**.
