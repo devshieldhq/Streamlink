@@ -995,8 +995,11 @@ function updateHeldObjects() {
 function animate(time) {
   const session = renderer.xr.getSession();
   if (session) {
-    for (const source of session.inputSources) {
-      if (source.hand) updateHandPinch(renderer.xr.getHand(source.handedness === 'left' ? 0 : 1));
+    // Three.js assigns XR controller/hand objects by inputSources array index.
+    // Use that same index instead of assuming left is always slot 0 and right slot 1.
+    for (let i = 0; i < session.inputSources.length; i++) {
+      const source = session.inputSources[i];
+      if (source.hand) updateHandPinch(renderer.xr.getHand(i));
     }
   }
   updateHeldObjects();
@@ -1041,7 +1044,12 @@ document.getElementById('enterBtn').addEventListener('click', async () => {
     optionalFeatures: ['local-floor']
   });
   document.body.appendChild(vrButton);
-  vrButton.click();
+  // Do not call vrButton.click() here. The camera permission prompt above is
+  // asynchronous and can consume the browser's transient user activation.
+  // Quest requires a real user gesture for requestSession(), so the user must
+  // tap the visible ENTER VR button after the camera/mic prompt completes.
+  document.getElementById('hud').textContent =
+    'Camera setup complete. Select ENTER VR to start the hand-tracking session.';
 });
 </script>
 </body>
