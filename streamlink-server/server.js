@@ -3,6 +3,7 @@ const { spawn } = require('child_process');
 const cors     = require('cors');
 const http     = require('http');
 const path     = require('path');
+const fs       = require('fs');
 const { Server } = require('socket.io');
 
 const app    = express();
@@ -61,7 +62,7 @@ app.use(express.json({ limit: '256kb' }));
 // Supabase user (Authorization: Bearer <access token>). The pages also send
 // people to sign in first, but that alone is a courtesy: this is what actually
 // stops someone calling /start, /stream or /agent directly (/agent spends the
-// Anthropic key; /start would make this server an open RTMP relay).
+// Meta Llama key; /start would make this server an open RTMP relay).
 //
 // It is on whenever SUPABASE_URL and SUPABASE_ANON_KEY are set. Set
 // REQUIRE_SIGN_IN=false on the host to switch it off without changing code
@@ -150,6 +151,19 @@ app.get('/config.js', (req, res) => {
   })};`);
 });
 
+// Inject the shared StreamBot widget into every public HTML page.
+app.use((req, res, next) => {
+  if (req.method !== 'GET') return next();
+  const route = req.path === '/app' ? '/streamlink-xr.html' : req.path === '/live' ? '/go-live.html' : req.path === '/' ? '/index.html' : req.path;
+  if (!route.endsWith('.html')) return next();
+  const filePath = path.resolve(STATIC_ROOT, '.' + route);
+  if (!filePath.startsWith(STATIC_ROOT + path.sep)) return next();
+  fs.readFile(filePath, 'utf8', (err, html) => {
+    if (err) return next();
+    const assets = '<link rel="stylesheet" href="/streambot.css"><script src="/streambot.js" defer></script>';
+    res.type('html').send(html.includes('</body>') ? html.replace('</body>', assets + '</body>') : html + assets);
+  });
+});
 app.use(express.static(STATIC_ROOT));
 app.get('/app', (req, res) => res.sendFile(path.join(STATIC_ROOT, 'streamlink-xr.html')));
 app.get('/live', (req, res) => res.sendFile(path.join(STATIC_ROOT, 'go-live.html')));
@@ -481,7 +495,7 @@ function getSessionSummary(sessionId) {
 // step — e.g. "Twitch dropped. Fix it and lower quality if needed" genuinely
 // requires reconnect → re-check bitrate → conditionally lower quality → report,
 // which is exactly this loop, not a single tool call.
-// Requires ANTHROPIC_API_KEY. Without it, falls back to a small deterministic
+// Requires GROQ_API_KEY. Without it, falls back to a small deterministic
 // handler (below) that still performs the same observe→act→report sequence
 // for the common commands, so the demo doesn't depend on the API being up.
 // ─────────────────────────────────────────────────────────────────────────────
@@ -510,13 +524,13 @@ function executeAgentTool(sessionId, toolName, input) {
   }
 }
 
-// Deterministic fallback used when ANTHROPIC_API_KEY isn't set (or the API
+// Deterministic fallback used when GROQ_API_KEY isn't set (or the API
 // call fails). It emits the same 'agentStep' events as the real loop so the
 // VR agent log looks identical either way — it just isn't an LLM deciding.
 function fallbackAgentReply(sessionId, message) {
   const cmd = message.toLowerCase();
   const emitStep = (phase, extra) => io.to(sessionId).emit('agentStep', { phase, ...extra });
-  emitStep('reasoning', { text: '(rule-based fallback — set ANTHROPIC_API_KEY for the real agent)' });
+  emitStep('reasoning', { text: '(rule-based fallback — set GROQ_API_KEY for the real agent)' });
 
   const runTool = (tool, input) => {
     emitStep(phaseForTool(tool), { tool, input });
@@ -560,54 +574,52 @@ function fallbackAgentReply(sessionId, message) {
   return { reply, ok: true };
 }
 
-async function callAnthropicAgent(sessionId, message) {
+async function callLlamaAgent(sessionId, message) {
   const summary = getSessionSummary(sessionId);
   const system =
-    `You are the AI co-pilot inside StreamLink XR, a VR streaming control room. ` +
-    `Speak the way you would out loud to a streamer wearing a headset — short, plain sentences, no markdown. ` +
-    `Before acting, briefly say what you're checking or about to do, then call the matching tool. ` +
-    `Use check_stream_health to observe current status and bitrate — call it again after an action like ` +
-    `reconnect_platform to verify the result before deciding on any further step (for example, only lower ` +
-    `quality if the health check actually still shows a weak bitrate). ` +
-    `When you are completely done, give one short final spoken summary with no further tool calls. ` +
-    `Starting session state: ${JSON.stringify(summary)}`;
+    `You are StreamBot, the official AI assistant built into StreamLink XR. You are powered by Meta Llama. ` +
+    `Help users understand StreamLink XR, streaming, multistream setup, supported destinations, VR/XR controls, account features, and troubleshooting. ` +
+    `Keep replies clear, friendly, concise, and practical. Never claim a feature is available unless the platform context or live status confirms it. ` +
+    `For stream actions, inspect health first, use only the supplied tools, and verify the result after acting. ` +
+    `Never reveal secrets, stream keys, API keys, or another user's private data. ` +
+    `Current platform facts: StreamLink XR supports YouTube, Twitch, TikTok, Instagram, Facebook, Kick, Vimeo, DLive, LinkedIn Live, X Live, Rumble and custom RTMP. ` +
+    `It has isolated FFmpeg output per destination, quality presets, automatic reconnect, stream telemetry, voice control, a VR room, account sign-in and saved platform credentials. ` +
+    `Current session state: ${JSON.stringify(summary)}`;
 
-  let messages = [{ role: 'user', content: message }];
+  let messages = [{ role: 'system', content: system }, { role: 'user', content: message }];
+  const tools = AGENT_TOOLS.map(t => ({ type: 'function', function: { name: t.name, description: t.description, parameters: t.input_schema } }));
   const allActions = [];
   let finalText = '';
 
   for (let turn = 0; turn < 6; turn++) {
-    const res = await fetch('https://api.anthropic.com/v1/messages', {
+    const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'x-api-key': process.env.ANTHROPIC_API_KEY, 'anthropic-version': '2023-06-01' },
-      body: JSON.stringify({ model: 'claude-sonnet-4-6', max_tokens: 400, system, messages, tools: AGENT_TOOLS })
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${process.env.GROQ_API_KEY}` },
+      body: JSON.stringify({ model: process.env.GROQ_MODEL || 'llama-3.3-70b-versatile', messages, tools, tool_choice: 'auto', temperature: 0.3, max_tokens: 700 })
     });
-    if (!res.ok) throw new Error(`Anthropic API error: ${res.status}`);
+    if (!res.ok) throw new Error(`Meta Llama API error: ${res.status} ${(await res.text()).slice(0, 300)}`);
     const data = await res.json();
-
-    const toolUses = (data.content || []).filter(b => b.type === 'tool_use');
-    const text = (data.content || []).filter(b => b.type === 'text').map(b => b.text).join(' ').trim();
-
-    if (text) {
-      finalText = text;
-      io.to(sessionId).emit('agentStep', { phase: toolUses.length ? 'reasoning' : 'report', text });
+    const assistant = data.choices?.[0]?.message;
+    if (!assistant) throw new Error('Meta Llama returned an empty response.');
+    const toolCalls = assistant.tool_calls || [];
+    if (assistant.content) {
+      finalText = assistant.content.trim();
+      io.to(sessionId).emit('agentStep', { phase: toolCalls.length ? 'reasoning' : 'report', text: finalText });
     }
-    if (toolUses.length === 0) break;
-
-    messages.push({ role: 'assistant', content: data.content });
-
-    const toolResultBlocks = [];
-    for (const block of toolUses) {
-      io.to(sessionId).emit('agentStep', { phase: phaseForTool(block.name), tool: block.name, input: block.input });
-      const result = executeAgentTool(sessionId, block.name, block.input || {});
-      allActions.push({ tool: block.name, input: block.input, ...result });
-      io.to(sessionId).emit('agentStep', { phase: 'result', tool: block.name, input: block.input, ...result });
-      toolResultBlocks.push({ type: 'tool_result', tool_use_id: block.id, content: JSON.stringify(result) });
+    messages.push(assistant);
+    if (!toolCalls.length) break;
+    for (const call of toolCalls) {
+      const name = call.function?.name;
+      let input = {};
+      try { input = JSON.parse(call.function?.arguments || '{}'); } catch (e) {}
+      io.to(sessionId).emit('agentStep', { phase: phaseForTool(name), tool: name, input });
+      const result = executeAgentTool(sessionId, name, input);
+      allActions.push({ tool: name, input, ...result });
+      io.to(sessionId).emit('agentStep', { phase: 'result', tool: name, input, ...result });
+      messages.push({ role: 'tool', tool_call_id: call.id, content: JSON.stringify(result) });
     }
-    messages.push({ role: 'user', content: toolResultBlocks });
   }
-
-  if (!finalText) finalText = allActions.length ? 'Done.' : "I'm not sure what you'd like me to do.";
+  if (!finalText) finalText = allActions.length ? 'Done.' : 'I could not complete that request.';
   io.to(sessionId).emit('agentStep', { phase: 'done', text: finalText });
   return { reply: finalText, actionsTaken: allActions };
 }
@@ -615,18 +627,66 @@ async function callAnthropicAgent(sessionId, message) {
 app.post('/agent', requireUser, async (req, res) => {
   const { sessionId, message } = req.body;
   if (!sessionId || !message) return res.status(400).json({ error: 'sessionId and message required' });
+  if (typeof message !== 'string' || message.length > 2000) return res.status(400).json({ error: 'Message must be 2000 characters or fewer.' });
   if (denyIfNotOwner(req, res, sessionId)) return;
   claimSession(req, sessionId);
-
-  if (!process.env.ANTHROPIC_API_KEY) {
-    return res.json({ ...fallbackAgentReply(sessionId, message), fallback: true });
-  }
+  if (!process.env.GROQ_API_KEY) return res.status(503).json({ error: 'StreamBot AI is not configured yet. Add GROQ_API_KEY to the server environment.' });
   try {
-    const result = await callAnthropicAgent(sessionId, message);
-    res.json({ ...result, fallback: false });
+    const result = await callLlamaAgent(sessionId, message);
+    res.json({ ...result, fallback: false, provider: 'Meta Llama' });
   } catch (e) {
-    console.error('Agent call failed, using fallback:', e.message);
-    res.json({ ...fallbackAgentReply(sessionId, message), fallback: true, error: e.message });
+    console.error('StreamBot agent call failed:', e.message);
+    res.status(502).json({ error: 'StreamBot could not reach its AI engine. Please try again.' });
+  }
+});
+
+// General StreamBot chat, available across the public platform pages.
+const STREAMBOT_UPDATES = () => {
+  try { return JSON.parse(process.env.STREAMBOT_UPDATES || '[]'); } catch (e) { return []; }
+};
+
+app.get('/api/streambot/status', (req, res) => {
+  res.json({ name: 'StreamBot', provider: 'Meta Llama', configured: !!process.env.GROQ_API_KEY,
+    platform: 'StreamLink XR', server: 'online', sessions: Object.keys(sessions).length,
+    uptimeSeconds: Math.floor(process.uptime()), updates: STREAMBOT_UPDATES() });
+});
+
+app.post('/api/streambot/chat', async (req, res) => {
+  const message = typeof req.body.message === 'string' ? req.body.message.trim() : '';
+  if (!message || message.length > 1200) return res.status(400).json({ error: 'Enter a message of up to 1200 characters.' });
+  if (!process.env.GROQ_API_KEY) return res.status(503).json({ error: 'StreamBot is waiting for its Meta Llama API key. Please try again later.' });
+  const history = Array.isArray(req.body.history) ? req.body.history.slice(-8) : [];
+  const safeHistory = history.filter(m => m && ['user', 'assistant'].includes(m.role) && typeof m.content === 'string')
+    .map(m => ({ role: m.role, content: m.content.slice(0, 1200) }));
+  const status = { sessions: Object.keys(sessions).length, uptimeSeconds: Math.floor(process.uptime()),
+    activeSessions: Object.entries(sessions).map(([id, s]) => ({ sessionId: id, active: !!s.active,
+      platforms: (s.platforms || []).map(p => p.name) })).slice(0, 10) };
+  const system = [
+    'You are StreamBot, the official AI assistant inside StreamLink XR, powered by Meta Llama, not Claude.',
+    'Help with onboarding, accounts, platform connections, multistreaming, stream quality, troubleshooting, community comments, encrypted direct messages, VR/XR, safety and product guidance.',
+    'Use plain English, short helpful answers and practical steps. Never pretend to have performed an action.',
+    'Platform knowledge: StreamLink XR is a multistream control room with a browser/mobile Go Live page and a VR room. Supported destinations: YouTube, Twitch, TikTok, Instagram, Facebook, Kick, Vimeo, DLive, LinkedIn Live, X Live, Rumble and custom RTMP. Each destination has its own FFmpeg process, quality presets, reconnect recovery and telemetry. Voice commands work in supported browsers. Users can sign in and save their own platform credentials.',
+    'Security: never ask users to paste stream keys, passwords, API keys or recovery phrases into chat. Never expose credentials or another user’s information.',
+    'Do not claim external YouTube/Twitch/TikTok comments are imported unless official API integration is configured. Do not claim social monitoring or automatic alerts unless a connected integration confirms it.',
+    'For latest news, distinguish live server status from release notes. Only use the verified update list below; if empty, say no published updates are available to you yet.',
+    'Live server status: ' + JSON.stringify(status),
+    'Published platform updates: ' + JSON.stringify(STREAMBOT_UPDATES())
+  ].join('\n\n');
+  try {
+    const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+      method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${process.env.GROQ_API_KEY}` },
+      body: JSON.stringify({ model: process.env.GROQ_MODEL || 'llama-3.3-70b-versatile',
+        messages: [{ role: 'system', content: system }, ...safeHistory, { role: 'user', content: message }],
+        temperature: 0.4, max_tokens: 700 })
+    });
+    if (!response.ok) throw new Error(`Llama API returned ${response.status}`);
+    const data = await response.json();
+    const reply = data.choices?.[0]?.message?.content?.trim();
+    if (!reply) throw new Error('Llama returned an empty response.');
+    res.json({ reply, provider: 'Meta Llama', bot: 'StreamBot' });
+  } catch (e) {
+    console.error('StreamBot chat failed:', e.message);
+    res.status(502).json({ error: 'StreamBot is temporarily unavailable. Please try again shortly.' });
   }
 });
 
