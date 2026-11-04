@@ -597,7 +597,14 @@ async function callLlamaAgent(sessionId, message) {
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${process.env.MODEL_API_KEY}` },
       body: JSON.stringify({ model: process.env.META_MODEL || 'muse-spark-1.3', messages, tools, tool_choice: 'auto', temperature: 0.3, max_completion_tokens: 700 })
     });
-    if (!res.ok) throw new Error(`Meta Model API error: ${res.status} ${(await res.text()).slice(0, 300)}`);
+    if (!res.ok) {
+      const errorBody = await res.text();
+      const safeErrorBody = errorBody
+        .replaceAll(process.env.MODEL_API_KEY || '\u0000', '[REDACTED]')
+        .replace(/LLM_[A-Za-z0-9_-]+/g, '[REDACTED]');
+      console.error('Meta Model API response:', res.status, safeErrorBody.slice(0, 500));
+      throw new Error(`Meta Model API error: ${res.status}`);
+    }
     const data = await res.json();
     const assistant = data.choices?.[0]?.message;
     if (!assistant) throw new Error('Meta Model API returned an empty response.');
@@ -679,7 +686,14 @@ app.post('/api/streambot/chat', async (req, res) => {
         messages: [{ role: 'system', content: system }, ...safeHistory, { role: 'user', content: message }],
         temperature: 0.4, max_completion_tokens: 700 })
     });
-    if (!response.ok) throw new Error(`Meta Model API returned ${response.status}`);
+    if (!response.ok) {
+      const errorBody = await response.text();
+      const safeErrorBody = errorBody
+        .replaceAll(process.env.MODEL_API_KEY || '\u0000', '[REDACTED]')
+        .replace(/LLM_[A-Za-z0-9_-]+/g, '[REDACTED]');
+      console.error('Meta Model API response:', response.status, safeErrorBody.slice(0, 500));
+      throw new Error(`Meta Model API returned ${response.status}`);
+    }
     const data = await response.json();
     const reply = data.choices?.[0]?.message?.content?.trim();
     if (!reply) throw new Error('Meta Model API returned an empty response.');
