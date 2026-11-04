@@ -341,6 +341,38 @@ function spawnPlatformFFmpeg(sessionId, platform, quality) {
   return proc;
 }
 
+// Read the model catalog available to this API key and select a supported model.
+let metaModelCatalogCache = { ids: [], expiresAt: 0 };
+async function resolveMetaModel() {
+  if (metaModelCatalogCache.expiresAt > Date.now() && metaModelCatalogCache.ids.length) {
+    return metaModelCatalogCache.ids[0];
+  }
+  const response = await fetch('https://api.meta.ai/v1/models', {
+    headers: { Authorization: `Bearer ${process.env.MODEL_API_KEY}` }
+  });
+  if (!response.ok) {
+    const body = await response.text();
+    const safeBody = body
+      .replaceAll(process.env.MODEL_API_KEY || '\\u0000', '[REDACTED]')
+      .replace(/LLM_[A-Za-z0-9_-]+/g, '[REDACTED]');
+    console.error('Meta model catalog response:', response.status, safeBody.slice(0, 500));
+    throw new Error(`Meta model catalog returned ${response.status}`);
+  }
+  const catalog = await response.json();
+  const ids = Array.isArray(catalog.data)
+    ? catalog.data.map(model => model && model.id).filter(id => typeof id === 'string')
+    : [];
+  const priority = ['muse-spark-1.3', 'muse-spark-1.2', 'muse-spark-1.1', 'muse-wonder-1.0'];
+  const available = priority.filter(id => ids.includes(id));
+  if (!available.length) {
+    console.error('Meta model catalog returned no supported Muse model IDs.');
+    throw new Error('No supported Muse model is available for this MODEL_API_KEY');
+  }
+  metaModelCatalogCache = { ids: available, expiresAt: Date.now() + 5 * 60 * 1000 };
+  console.log('StreamBot model catalog verified. Selected:', available[0], 'Fallbacks:', available.slice(1).join(', ') || 'none');
+  return available[0];
+}
+
 // ── REAL-TIME STREAM INTELLIGENCE ────────────────────────────────────────────
 const TELEMETRY_INTERVAL_MS = 3000;
 const LOW_BITRATE_KBPS = 300;
@@ -595,7 +627,7 @@ async function callLlamaAgent(sessionId, message) {
     const res = await fetch('https://api.meta.ai/v1/chat/completions', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${process.env.MODEL_API_KEY}` },
-      body: JSON.stringify({ model: 'muse-spark-1.3', messages, tools, tool_choice: 'auto', temperature: 0.3, max_completion_tokens: 700 })
+      body: JSON.stringify({ model: await resolveMetaModel(), messages, tools, tool_choice: 'auto', temperature: 0.3, max_completion_tokens: 700 })
     });
     if (!res.ok) {
       const errorBody = await res.text();
@@ -682,7 +714,7 @@ app.post('/api/streambot/chat', async (req, res) => {
   try {
     const response = await fetch('https://api.meta.ai/v1/chat/completions', {
       method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${process.env.MODEL_API_KEY}` },
-      body: JSON.stringify({ model: 'muse-spark-1.3',
+      body: JSON.stringify({ model: await resolveMetaModel(),
         messages: [{ role: 'system', content: system }, ...safeHistory, { role: 'user', content: message }],
         temperature: 0.4, max_completion_tokens: 700 })
     });
