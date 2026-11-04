@@ -85,7 +85,7 @@
 <div id="lobby">
   <div class="card">
     <h1>StreamLink XR</h1>
-    <div class="sub">Spatial control room for your multistream session.</div>
+    <div class="sub">A seated, hand-first creator workspace for live streaming and creator operations.</div>
     <div id="accountLine"></div>
 
     <label for="sessionId">Session ID</label>
@@ -108,7 +108,7 @@
     </div>
 
     <button class="primary" id="enterBtn">Enter StreamLink XR</button>
-    <div id="xrNote">Fill in a key (or url, for platforms that need one) only for the destinations you want live. Open on the Quest browser over HTTPS — hand tracking or controllers both work. You'll be asked for camera and microphone access on the next step — that's what actually gets sent to your platforms. Try saying "Twitch dropped, fix it and lower quality if needed" once you're in.</div>
+    <div id="xrNote">Fill in a key (or url, for platforms that need one) only for the destinations you want live. Open on Meta Quest Browser over HTTPS. This workspace is designed for seated use and hand tracking; controllers are optional. You’ll be asked for camera and microphone access before entering. Try saying “Twitch dropped, fix it and lower quality if needed” once you’re inside.</div>
   </div>
 </div>
 
@@ -249,6 +249,7 @@ function init() {
   renderer.setPixelRatio(window.devicePixelRatio);
   renderer.setSize(window.innerWidth, window.innerHeight);
   renderer.xr.enabled = true;
+  renderer.xr.setReferenceSpaceType('local-floor');
   document.body.appendChild(renderer.domElement);
 
   buildRoom();
@@ -954,22 +955,26 @@ const PINCH_DISTANCE = 0.025;
 
 function updateHandPinch(hand) {
   const joints = hand.joints;
-  if (!joints || !joints['index-finger-tip'] || !joints['thumb-tip']) return;
-  const dist = joints['index-finger-tip'].position.distanceTo(joints['thumb-tip'].position);
-  const isPinching = dist < PINCH_DISTANCE;
+  const tipJoint = joints && joints['index-finger-tip'];
+  const distalJoint = joints && joints['index-finger-phalanx-distal'];
+  const thumbJoint = joints && joints['thumb-tip'];
+  if (!tipJoint || !distalJoint || !thumbJoint) return;
 
-  if (isPinching && !hand.userData.pinching) {
-    const tip = new THREE.Vector3();
-    joints['index-finger-tip'].getWorldPosition(tip);
-    let closest = null, closestDist = 0.12;
-    for (const obj of [...grabbables, ...pressables]) {
-      const d = obj.position.distanceTo(tip);
-      if (d < closestDist) { closest = obj; closestDist = d; }
-    }
-    if (closest) grabOrPress(hand, closest);
-  } else if (!isPinching && hand.userData.pinching) {
-    held.delete(hand);
-  }
+  // Aim from the index fingertip along the finger direction for precise
+  // pinch targeting, rather than selecting whichever panel is nearest.
+  const tip = new THREE.Vector3();
+  const distal = new THREE.Vector3();
+  tipJoint.getWorldPosition(tip);
+  distalJoint.getWorldPosition(distal);
+  const direction = tip.clone().sub(distal).normalize();
+  raycaster.ray.set(tip, direction);
+  const hit = raycaster.intersectObjects([...grabbables, ...pressables], false)[0];
+
+  const thumb = new THREE.Vector3();
+  thumbJoint.getWorldPosition(thumb);
+  const isPinching = tip.distanceTo(thumb) < PINCH_DISTANCE;
+  if (isPinching && !hand.userData.pinching && hit) grabOrPress(hand, hit.object);
+  else if (!isPinching && hand.userData.pinching) held.delete(hand);
   hand.userData.pinching = isPinching;
 }
 
@@ -990,8 +995,8 @@ function updateHeldObjects() {
 function animate(time) {
   const session = renderer.xr.getSession();
   if (session) {
-    for (const source of session.inputSources) {
-      if (source.hand) updateHandPinch(source.handedness === 'left' ? renderer.xr.getHand(0) : renderer.xr.getHand(1));
+    for (let i = 0; i < session.inputSources.length; i++) {
+      if (session.inputSources[i].hand) updateHandPinch(renderer.xr.getHand(i));
     }
   }
   updateHeldObjects();
@@ -1031,7 +1036,10 @@ document.getElementById('enterBtn').addEventListener('click', async () => {
     return;
   }
 
-  const vrButton = VRButton.createButton(renderer, { optionalFeatures: ['hand-tracking'] });
+  const vrButton = VRButton.createButton(renderer, {
+    requiredFeatures: ['hand-tracking'],
+    optionalFeatures: ['local-floor']
+  });
   document.body.appendChild(vrButton);
   vrButton.click();
 });
