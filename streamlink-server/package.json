@@ -1,7 +1,7 @@
 {
   "name": "streamlink-relay-server",
   "version": "4.0.0",
-  "description": "StreamLink multistream relay server with isolated FFmpeg outputs, automatic recovery, real-time telemetry, and StreamBot AI powered by Meta Llama through Groq.",
+  "description": "StreamLink XR multistream relay and hands-first Meta Quest Creator Studio with StreamBot AI.",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
