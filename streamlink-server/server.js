@@ -595,7 +595,7 @@ async function callLlamaAgent(sessionId, message) {
     const res = await fetch('https://api.meta.ai/v1/chat/completions', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${process.env.MODEL_API_KEY}` },
-      body: JSON.stringify({ model: process.env.META_MODEL || 'muse-spark-1.3', messages, tools, tool_choice: 'auto', temperature: 0.3, max_completion_tokens: 700 })
+      body: JSON.stringify({ model: 'muse-spark-1.3', messages, tools, tool_choice: 'auto', temperature: 0.3, max_completion_tokens: 700 })
     });
     if (!res.ok) {
       const errorBody = await res.text();
@@ -682,7 +682,7 @@ app.post('/api/streambot/chat', async (req, res) => {
   try {
     const response = await fetch('https://api.meta.ai/v1/chat/completions', {
       method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${process.env.MODEL_API_KEY}` },
-      body: JSON.stringify({ model: process.env.META_MODEL || 'muse-spark-1.3',
+      body: JSON.stringify({ model: 'muse-spark-1.3',
         messages: [{ role: 'system', content: system }, ...safeHistory, { role: 'user', content: message }],
         temperature: 0.4, max_completion_tokens: 700 })
     });
