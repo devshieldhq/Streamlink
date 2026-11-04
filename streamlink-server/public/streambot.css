@@ -1,0 +1,23 @@
+#streambot-root{position:fixed;right:22px;bottom:22px;z-index:2147483000;font-family:Inter,system-ui,-apple-system,Segoe UI,sans-serif;color:#eef1ff}
+#streambot-toggle{width:62px;height:62px;border:0;border-radius:50%;background:linear-gradient(135deg,#7865ff,#19b6a5);color:#fff;box-shadow:0 10px 35px #0008;cursor:pointer;font-size:25px;font-weight:800}
+#streambot-toggle:focus-visible,#streambot-panel button:focus-visible,#streambot-panel textarea:focus-visible{outline:3px solid #a99cff;outline-offset:3px}
+#streambot-panel{position:absolute;right:0;bottom:76px;width:min(380px,calc(100vw - 32px));height:min(560px,calc(100vh - 120px));display:none;flex-direction:column;overflow:hidden;border:1px solid #343b5b;border-radius:20px;background:#101426;box-shadow:0 22px 70px #000b}
+#streambot-panel.open{display:flex}
+#streambot-head{display:flex;align-items:center;gap:11px;padding:16px;background:linear-gradient(120deg,#1b2140,#171b31);border-bottom:1px solid #303653}
+#streambot-avatar{width:38px;height:38px;display:grid;place-items:center;border-radius:12px;background:linear-gradient(135deg,#7865ff,#19b6a5);font-weight:900}
+#streambot-heading{flex:1;min-width:0}#streambot-heading strong{display:block;font-size:15px}#streambot-heading small{display:block;margin-top:3px;color:#9ea8c8;font-size:11px}
+#streambot-close{border:0;background:transparent;color:#aeb7d6;font-size:24px;cursor:pointer}
+#streambot-status{padding:9px 15px;color:#aab4d2;font-size:11px;border-bottom:1px solid #272e48}
+#streambot-messages{flex:1;overflow:auto;padding:15px;display:flex;flex-direction:column;gap:11px;scroll-behavior:smooth}
+.streambot-msg{max-width:88%;padding:10px 12px;border-radius:13px;font-size:13px;line-height:1.5;white-space:pre-wrap;overflow-wrap:anywhere}
+.streambot-msg.bot{align-self:flex-start;background:#202844;color:#edf0ff;border-bottom-left-radius:4px}
+.streambot-msg.user{align-self:flex-end;background:#6255d9;color:white;border-bottom-right-radius:4px}
+.streambot-msg.error{border:1px solid #874b59;color:#ffc2ca}
+#streambot-suggestions{display:flex;gap:7px;flex-wrap:wrap;padding:0 14px 10px}
+#streambot-suggestions button{border:1px solid #3a4264;border-radius:20px;background:#171e35;color:#cbd2ef;padding:7px 10px;font-size:11px;cursor:pointer}
+#streambot-form{display:flex;gap:8px;padding:12px;border-top:1px solid #303653;background:#141a2e}
+#streambot-input{min-width:0;flex:1;resize:none;max-height:90px;border:1px solid #3a4264;border-radius:12px;padding:10px;background:#0d1222;color:#fff;font:inherit;font-size:13px}
+#streambot-send{border:0;border-radius:12px;padding:0 15px;background:#6b5ce7;color:white;font-weight:700;cursor:pointer}
+#streambot-send:disabled{opacity:.55;cursor:wait}
+#streambot-foot{padding:0 14px 10px;background:#141a2e;color:#818bab;font-size:10px}
+@media(max-width:480px){#streambot-root{right:12px;bottom:12px}#streambot-panel{right:-2px;bottom:72px;height:min(560px,calc(100dvh - 100px))}}
