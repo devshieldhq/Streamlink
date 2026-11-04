@@ -630,6 +630,62 @@ app.post('/agent', requireUser, async (req, res) => {
   }
 });
 
+// ─── COMMUNITY COMMENTS ──────────────────────────────────────────────────────
+// Native StreamLink comments are persisted in Supabase. Platform labels are
+// stored with each imported comment; external ingestion still requires the
+// relevant platform API/webhook credentials and must not be spoofed by clients.
+async function supabaseRequest(pathname, token, options = {}) {
+  const response = await fetch(`${SUPABASE_URL}/rest/v1/${pathname}`, {
+    ...options,
+    headers: {
+      apikey: SUPABASE_ANON_KEY,
+      Authorization: `Bearer ${token}`,
+      'Content-Type': 'application/json',
+      Prefer: options.method === 'POST' ? 'return=representation' : 'count=none',
+      ...(options.headers || {})
+    }
+  });
+  const body = await response.text();
+  if (!response.ok) throw new Error(`Supabase request failed: ${response.status} ${body.slice(0, 200)}`);
+  return body ? JSON.parse(body) : [];
+}
+
+app.get('/api/comments/:sessionId', requireUser, async (req, res) => {
+  if (!AUTH_REQUIRED) return res.status(503).json({ error: 'Comments require Supabase sign-in and database configuration.' });
+  try {
+    const rows = await supabaseRequest(
+      `stream_comments?select=id,session_id,author_name,body,origin_platform,created_at&session_id=eq.${encodeURIComponent(req.params.sessionId)}&order=created_at.asc&limit=100`,
+      bearerToken(req)
+    );
+    res.json({ comments: rows });
+  } catch (e) {
+    console.error('Comment fetch failed:', e.message);
+    res.status(502).json({ error: 'Could not load comments.' });
+  }
+});
+
+app.post('/api/comments/:sessionId', requireUser, async (req, res) => {
+  if (!AUTH_REQUIRED) return res.status(503).json({ error: 'Comments require Supabase sign-in and database configuration.' });
+  const body = typeof req.body.body === 'string' ? req.body.body.trim() : '';
+  if (!body || body.length > 2000) return res.status(400).json({ error: 'Comment must be between 1 and 2000 characters.' });
+  try {
+    const rows = await supabaseRequest('stream_comments', bearerToken(req), {
+      method: 'POST',
+      body: JSON.stringify({
+        session_id: req.params.sessionId,
+        author_id: req.user.id,
+        author_name: String(req.body.authorName || req.user.email || 'Streamer').slice(0, 80),
+        body,
+        origin_platform: 'streamlink'
+      })
+    });
+    res.status(201).json({ comment: rows[0] });
+  } catch (e) {
+    console.error('Comment post failed:', e.message);
+    res.status(502).json({ error: 'Could not post comment. Confirm the Supabase schema migration has been applied.' });
+  }
+});
+
 // ─────────────────────────────────────────────────────────────────────────────
 // ROUTES
 // ─────────────────────────────────────────────────────────────────────────────
