@@ -365,7 +365,9 @@ async function resolveMetaModel() {
   const priority = ['muse-spark-1.3', 'muse-spark-1.2', 'muse-spark-1.1', 'muse-wonder-1.0'];
   const available = priority.filter(id => ids.includes(id));
   if (!available.length) {
-    console.error('Meta model catalog returned no supported Muse model IDs.');
+    const catalogShape = catalog && typeof catalog === 'object' ? Object.keys(catalog) : [];
+    const returnedIds = Array.isArray(catalog && catalog.data) ? catalog.data.map(model => model && model.id).filter(id => typeof id === 'string').slice(0, 40) : [];
+    console.error('Meta model catalog contained no recognized Muse IDs. Response shape:', JSON.stringify({ keys: catalogShape, object: catalog && catalog.object, dataType: Array.isArray(catalog && catalog.data) ? 'array' : typeof (catalog && catalog.data), count: Array.isArray(catalog && catalog.data) ? catalog.data.length : null, ids: returnedIds }));
     throw new Error('No supported Muse model is available for this MODEL_API_KEY');
   }
   metaModelCatalogCache = { ids: available, expiresAt: Date.now() + 5 * 60 * 1000 };
