@@ -995,8 +995,8 @@ function updateHeldObjects() {
 function animate(time) {
   const session = renderer.xr.getSession();
   if (session) {
-    for (let i = 0; i < session.inputSources.length; i++) {
-      if (session.inputSources[i].hand) updateHandPinch(renderer.xr.getHand(i));
+    for (const source of session.inputSources) {
+      if (source.hand) updateHandPinch(renderer.xr.getHand(source.handedness === 'left' ? 0 : 1));
     }
   }
   updateHeldObjects();
