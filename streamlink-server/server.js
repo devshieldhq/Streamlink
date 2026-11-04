@@ -495,7 +495,7 @@ function getSessionSummary(sessionId) {
 // step — e.g. "Twitch dropped. Fix it and lower quality if needed" genuinely
 // requires reconnect → re-check bitrate → conditionally lower quality → report,
 // which is exactly this loop, not a single tool call.
-// Requires GROQ_API_KEY. Without it, falls back to a small deterministic
+// Requires MODEL_API_KEY. Without it, falls back to a small deterministic
 // handler (below) that still performs the same observe→act→report sequence
 // for the common commands, so the demo doesn't depend on the API being up.
 // ─────────────────────────────────────────────────────────────────────────────
@@ -524,13 +524,13 @@ function executeAgentTool(sessionId, toolName, input) {
   }
 }
 
-// Deterministic fallback used when GROQ_API_KEY isn't set (or the API
+// Deterministic fallback used when MODEL_API_KEY isn't set (or the API
 // call fails). It emits the same 'agentStep' events as the real loop so the
 // VR agent log looks identical either way — it just isn't an LLM deciding.
 function fallbackAgentReply(sessionId, message) {
   const cmd = message.toLowerCase();
   const emitStep = (phase, extra) => io.to(sessionId).emit('agentStep', { phase, ...extra });
-  emitStep('reasoning', { text: '(rule-based fallback — set GROQ_API_KEY for the real agent)' });
+  emitStep('reasoning', { text: '(rule-based fallback — set MODEL_API_KEY for the real agent)' });
 
   const runTool = (tool, input) => {
     emitStep(phaseForTool(tool), { tool, input });
@@ -594,7 +594,7 @@ async function callLlamaAgent(sessionId, message) {
   for (let turn = 0; turn < 6; turn++) {
     const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${process.env.GROQ_API_KEY}` },
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${process.env.MODEL_API_KEY}` },
       body: JSON.stringify({ model: process.env.GROQ_MODEL || 'llama-3.3-70b-versatile', messages, tools, tool_choice: 'auto', temperature: 0.3, max_tokens: 700 })
     });
     if (!res.ok) throw new Error(`Meta Llama API error: ${res.status} ${(await res.text()).slice(0, 300)}`);
@@ -630,7 +630,7 @@ app.post('/agent', requireUser, async (req, res) => {
   if (typeof message !== 'string' || message.length > 2000) return res.status(400).json({ error: 'Message must be 2000 characters or fewer.' });
   if (denyIfNotOwner(req, res, sessionId)) return;
   claimSession(req, sessionId);
-  if (!process.env.GROQ_API_KEY) return res.status(503).json({ error: 'StreamBot AI is not configured yet. Add GROQ_API_KEY to the server environment.' });
+  if (!process.env.MODEL_API_KEY) return res.status(503).json({ error: 'StreamBot AI is not configured yet. Add MODEL_API_KEY to the server environment.' });
   try {
     const result = await callLlamaAgent(sessionId, message);
     res.json({ ...result, fallback: false, provider: 'Meta Llama' });
@@ -646,7 +646,7 @@ const STREAMBOT_UPDATES = () => {
 };
 
 app.get('/api/streambot/status', (req, res) => {
-  res.json({ name: 'StreamBot', provider: 'Meta Llama', configured: !!process.env.GROQ_API_KEY,
+  res.json({ name: 'StreamBot', provider: 'Meta Llama', configured: !!process.env.MODEL_API_KEY,
     platform: 'StreamLink XR', server: 'online', sessions: Object.keys(sessions).length,
     uptimeSeconds: Math.floor(process.uptime()), updates: STREAMBOT_UPDATES() });
 });
@@ -654,7 +654,7 @@ app.get('/api/streambot/status', (req, res) => {
 app.post('/api/streambot/chat', async (req, res) => {
   const message = typeof req.body.message === 'string' ? req.body.message.trim() : '';
   if (!message || message.length > 1200) return res.status(400).json({ error: 'Enter a message of up to 1200 characters.' });
-  if (!process.env.GROQ_API_KEY) return res.status(503).json({ error: 'StreamBot is waiting for its Meta Llama API key. Please try again later.' });
+  if (!process.env.MODEL_API_KEY) return res.status(503).json({ error: 'StreamBot is waiting for its Meta Llama API key. Please try again later.' });
   const history = Array.isArray(req.body.history) ? req.body.history.slice(-8) : [];
   const safeHistory = history.filter(m => m && ['user', 'assistant'].includes(m.role) && typeof m.content === 'string')
     .map(m => ({ role: m.role, content: m.content.slice(0, 1200) }));
@@ -674,7 +674,7 @@ app.post('/api/streambot/chat', async (req, res) => {
   ].join('\n\n');
   try {
     const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-      method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${process.env.GROQ_API_KEY}` },
+      method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${process.env.MODEL_API_KEY}` },
       body: JSON.stringify({ model: process.env.GROQ_MODEL || 'llama-3.3-70b-versatile',
         messages: [{ role: 'system', content: system }, ...safeHistory, { role: 'user', content: message }],
         temperature: 0.4, max_tokens: 700 })
