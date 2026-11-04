@@ -7,10 +7,54 @@ const { Server } = require('socket.io');
 
 const app    = express();
 const server = http.createServer(app);
-const io     = new Server(server, { cors: { origin: '*', methods: ['GET', 'POST', 'DELETE'] } });
+const allowedOrigins = (process.env.ALLOWED_ORIGINS || '').split(',').map(v => v.trim()).filter(Boolean);
+const io     = new Server(server, {
+  cors: { origin: allowedOrigins.length ? allowedOrigins : false, methods: ['GET', 'POST', 'DELETE'] },
+  maxHttpBufferSize: 1e6,
+  connectTimeout: 20000,
+  pingTimeout: 20000,
+  pingInterval: 25000
+});
 
-app.use(cors());
-app.use(express.json());
+// Layered abuse protection: bounded in-memory counters, temporary IP blocks,
+// a strict JSON body limit, and a separate streaming upload size cap below.
+const abuse = new Map();
+const WINDOW_MS = 60 * 1000;
+const IP_LIMIT = 120;
+const BLOCK_MS = 10 * 60 * 1000;
+function clientIp(req) {
+  // Trust proxy only when explicitly enabled by the deployment.
+  return process.env.TRUST_PROXY === 'true'
+    ? String(req.headers['x-forwarded-for'] || req.socket.remoteAddress || '').split(',')[0].trim()
+    : (req.socket.remoteAddress || 'unknown');
+}
+function abuseGuard(req, res, next) {
+  const ip = clientIp(req);
+  const now = Date.now();
+  let entry = abuse.get(ip);
+  if (entry && entry.blockedUntil > now) {
+    res.set('Retry-After', String(Math.ceil((entry.blockedUntil - now) / 1000)));
+    return res.status(429).json({ error: 'Temporarily blocked due to excessive requests. Try again later.' });
+  }
+  if (!entry || now - entry.startedAt >= WINDOW_MS) entry = { startedAt: now, count: 0, blockedUntil: 0 };
+  entry.count++;
+  if (entry.count > IP_LIMIT) {
+    entry.blockedUntil = now + BLOCK_MS;
+    abuse.set(ip, entry);
+    return res.status(429).json({ error: 'Too many requests. This IP is temporarily blocked.' });
+  }
+  abuse.set(ip, entry);
+  next();
+}
+setInterval(() => {
+  const now = Date.now();
+  for (const [ip, entry] of abuse) if (entry.blockedUntil <= now && now - entry.startedAt > WINDOW_MS) abuse.delete(ip);
+  while (abuse.size > 10000) abuse.delete(abuse.keys().next().value);
+}, 60 * 1000).unref();
+
+app.use(abuseGuard);
+app.use(cors({ origin: allowedOrigins.length ? allowedOrigins : false }));
+app.use(express.json({ limit: '256kb' }));
 
 // ─── SIGN-IN ENFORCEMENT ─────────────────────────────────────────────────────
 // Everything that starts, feeds, controls or reads a stream needs a signed-in
@@ -612,9 +656,21 @@ app.post('/stream/:sessionId', requireUser, (req, res) => {
   if (denyIfNotOwner(req, res, req.params.sessionId)) return;
   const session = sessions[req.params.sessionId];
   if (!session) return res.status(404).json({ error: 'No active session' });
+  const MAX_CHUNK_BYTES = 2 * 1024 * 1024;
   const chunks = [];
-  req.on('data', c => chunks.push(c));
+  let totalBytes = 0;
+  req.on('data', c => {
+    totalBytes += c.length;
+    if (totalBytes > MAX_CHUNK_BYTES) {
+      req.pause();
+      res.status(413).json({ error: 'Stream chunk exceeds the 2 MB limit.' });
+      req.destroy();
+      return;
+    }
+    chunks.push(c);
+  });
   req.on('end', () => {
+    if (res.headersSent) return;
     const data = Buffer.concat(chunks);
     session.bytesReceived += data.length;
     captureWebmHeader(session, data);
@@ -733,7 +789,16 @@ io.use(async (socket, next) => {
   next();
 });
 
+const socketCounts = new Map();
 io.on('connection', (socket) => {
+  const socketIp = String(socket.handshake.address || 'unknown');
+  const count = socketCounts.get(socketIp) || 0;
+  if (count >= 8) { socket.disconnect(true); return; }
+  socketCounts.set(socketIp, count + 1);
+  socket.once('disconnect', () => {
+    const left = Math.max(0, (socketCounts.get(socketIp) || 1) - 1);
+    if (left) socketCounts.set(socketIp, left); else socketCounts.delete(socketIp);
+  });
   const mayUse = (sessionId) => typeof sessionId === 'string' && ownsSession(sessionId, socket.data.user);
 
   socket.on('join', (sessionId) => { if (mayUse(sessionId)) socket.join(sessionId); });
