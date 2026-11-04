@@ -41,7 +41,7 @@ knowing if you ever see this pattern elsewhere.)
 ```bash
 cd streamlink-server
 npm install
-export ANTHROPIC_API_KEY=sk-ant-...   # optional — enables the real AI agent
+export MODEL_API_KEY=your-meta-api-key   # optional — enables StreamBot AI
 npm start
 ```
 
@@ -69,13 +69,12 @@ root — Render requires the Blueprint file to live at repo root even though
 
 **Easiest path:** on [render.com](https://render.com), New → Blueprint →
 connect this repo. It reads `render.yaml` and creates the service for you.
-You'll be prompted to set `ANTHROPIC_API_KEY` (optional) since it's marked
+You'll be prompted to set `MODEL_API_KEY` (optional) since it's marked
 `sync: false` — that just means "ask for this, don't commit it."
 
 **Manual path**, if you'd rather not use a Blueprint: New → Web Service →
 connect the repo → Root Directory: `streamlink-server` → Runtime: Docker
-→ set `ANTHROPIC_API_KEY` in the Environment tab if you want the real
-agent → Deploy.
+→ set `MODEL_API_KEY` in the Environment tab if you want StreamBot AI → Deploy.
 
 **Worth knowing about the free tier:** a free Render web service spins
 down after 15 minutes with no traffic and takes about a minute to wake
@@ -98,7 +97,7 @@ Demo line, said in VR: **"Twitch dropped. Fix it and lower quality if
 needed."** Watch the AGENT PIPELINE panel — it observes, reconnects,
 observes again, decides whether quality needs to drop, and reports. Falls
 back to a deterministic version of the same sequence without
-`ANTHROPIC_API_KEY` set.
+`MODEL_API_KEY` set.
 
 ## Reconnect architecture
 
