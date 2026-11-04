@@ -62,7 +62,7 @@ app.use(express.json({ limit: '256kb' }));
 // Supabase user (Authorization: Bearer <access token>). The pages also send
 // people to sign in first, but that alone is a courtesy: this is what actually
 // stops someone calling /start, /stream or /agent directly (/agent spends the
-// Meta Llama key; /start would make this server an open RTMP relay).
+// model API key; /start would make this server an open RTMP relay).
 //
 // It is on whenever SUPABASE_URL and SUPABASE_ANON_KEY are set. Set
 // REQUIRE_SIGN_IN=false on the host to switch it off without changing code
@@ -577,7 +577,7 @@ function fallbackAgentReply(sessionId, message) {
 async function callLlamaAgent(sessionId, message) {
   const summary = getSessionSummary(sessionId);
   const system =
-    `You are StreamBot, the official AI assistant built into StreamLink XR. You are powered by Meta Llama. ` +
+    `You are StreamBot, the official AI assistant built into StreamLink XR. You are StreamBot. ` +
     `Help users understand StreamLink XR, streaming, multistream setup, supported destinations, VR/XR controls, account features, and troubleshooting. ` +
     `Keep replies clear, friendly, concise, and practical. Never claim a feature is available unless the platform context or live status confirms it. ` +
     `For stream actions, inspect health first, use only the supplied tools, and verify the result after acting. ` +
@@ -592,15 +592,15 @@ async function callLlamaAgent(sessionId, message) {
   let finalText = '';
 
   for (let turn = 0; turn < 6; turn++) {
-    const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+    const res = await fetch('https://api.meta.ai/v1/chat/completions', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${process.env.MODEL_API_KEY}` },
-      body: JSON.stringify({ model: process.env.GROQ_MODEL || 'llama-3.3-70b-versatile', messages, tools, tool_choice: 'auto', temperature: 0.3, max_tokens: 700 })
+      body: JSON.stringify({ model: process.env.META_MODEL || 'muse-spark-1.3', messages, tools, tool_choice: 'auto', temperature: 0.3, max_tokens: 700 })
     });
-    if (!res.ok) throw new Error(`Meta Llama API error: ${res.status} ${(await res.text()).slice(0, 300)}`);
+    if (!res.ok) throw new Error(`Meta Model API error: ${res.status} ${(await res.text()).slice(0, 300)}`);
     const data = await res.json();
     const assistant = data.choices?.[0]?.message;
-    if (!assistant) throw new Error('Meta Llama returned an empty response.');
+    if (!assistant) throw new Error('Meta Model API returned an empty response.');
     const toolCalls = assistant.tool_calls || [];
     if (assistant.content) {
       finalText = assistant.content.trim();
@@ -633,7 +633,7 @@ app.post('/agent', requireUser, async (req, res) => {
   if (!process.env.MODEL_API_KEY) return res.status(503).json({ error: 'StreamBot AI is not configured yet. Add MODEL_API_KEY to the server environment.' });
   try {
     const result = await callLlamaAgent(sessionId, message);
-    res.json({ ...result, fallback: false, provider: 'Meta Llama' });
+    res.json({ ...result, fallback: false });
   } catch (e) {
     console.error('StreamBot agent call failed:', e.message);
     res.status(502).json({ error: 'StreamBot could not reach its AI engine. Please try again.' });
@@ -646,7 +646,7 @@ const STREAMBOT_UPDATES = () => {
 };
 
 app.get('/api/streambot/status', (req, res) => {
-  res.json({ name: 'StreamBot', provider: 'Meta Llama', configured: !!process.env.MODEL_API_KEY,
+  res.json({ name: 'StreamBot', configured: !!process.env.MODEL_API_KEY,
     platform: 'StreamLink XR', server: 'online', sessions: Object.keys(sessions).length,
     uptimeSeconds: Math.floor(process.uptime()), updates: STREAMBOT_UPDATES() });
 });
@@ -654,7 +654,7 @@ app.get('/api/streambot/status', (req, res) => {
 app.post('/api/streambot/chat', async (req, res) => {
   const message = typeof req.body.message === 'string' ? req.body.message.trim() : '';
   if (!message || message.length > 1200) return res.status(400).json({ error: 'Enter a message of up to 1200 characters.' });
-  if (!process.env.MODEL_API_KEY) return res.status(503).json({ error: 'StreamBot is waiting for its Meta Llama API key. Please try again later.' });
+  if (!process.env.MODEL_API_KEY) return res.status(503).json({ error: 'StreamBot is waiting for its API key. Please try again later.' });
   const history = Array.isArray(req.body.history) ? req.body.history.slice(-8) : [];
   const safeHistory = history.filter(m => m && ['user', 'assistant'].includes(m.role) && typeof m.content === 'string')
     .map(m => ({ role: m.role, content: m.content.slice(0, 1200) }));
@@ -662,7 +662,7 @@ app.post('/api/streambot/chat', async (req, res) => {
     activeSessions: Object.entries(sessions).map(([id, s]) => ({ sessionId: id, active: !!s.active,
       platforms: (s.platforms || []).map(p => p.name) })).slice(0, 10) };
   const system = [
-    'You are StreamBot, the official AI assistant inside StreamLink XR, powered by Meta Llama, not Claude.',
+    'You are StreamBot, the official AI assistant inside StreamLink XR, built for StreamLink XR.',
     'Help with onboarding, accounts, platform connections, multistreaming, stream quality, troubleshooting, community comments, encrypted direct messages, VR/XR, safety and product guidance.',
     'Use plain English, short helpful answers and practical steps. Never pretend to have performed an action.',
     'Platform knowledge: StreamLink XR is a multistream control room with a browser/mobile Go Live page and a VR room. Supported destinations: YouTube, Twitch, TikTok, Instagram, Facebook, Kick, Vimeo, DLive, LinkedIn Live, X Live, Rumble and custom RTMP. Each destination has its own FFmpeg process, quality presets, reconnect recovery and telemetry. Voice commands work in supported browsers. Users can sign in and save their own platform credentials.',
@@ -673,17 +673,17 @@ app.post('/api/streambot/chat', async (req, res) => {
     'Published platform updates: ' + JSON.stringify(STREAMBOT_UPDATES())
   ].join('\n\n');
   try {
-    const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+    const response = await fetch('https://api.meta.ai/v1/chat/completions', {
       method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${process.env.MODEL_API_KEY}` },
-      body: JSON.stringify({ model: process.env.GROQ_MODEL || 'llama-3.3-70b-versatile',
+      body: JSON.stringify({ model: process.env.META_MODEL || 'muse-spark-1.3',
         messages: [{ role: 'system', content: system }, ...safeHistory, { role: 'user', content: message }],
         temperature: 0.4, max_tokens: 700 })
     });
-    if (!response.ok) throw new Error(`Llama API returned ${response.status}`);
+    if (!response.ok) throw new Error(`Meta Model API returned ${response.status}`);
     const data = await response.json();
     const reply = data.choices?.[0]?.message?.content?.trim();
-    if (!reply) throw new Error('Llama returned an empty response.');
-    res.json({ reply, provider: 'Meta Llama', bot: 'StreamBot' });
+    if (!reply) throw new Error('Meta Model API returned an empty response.');
+    res.json({ reply, bot: 'StreamBot' });
   } catch (e) {
     console.error('StreamBot chat failed:', e.message);
     res.status(502).json({ error: 'StreamBot is temporarily unavailable. Please try again shortly.' });
