@@ -9,5 +9,5 @@ services:
     plan: free
     healthCheckPath: /api/status
     envVars:
-      - key: ANTHROPIC_API_KEY
+      - key: MODEL_API_KEY
         sync: false   # set this manually in the Render dashboard — never commit a real key
