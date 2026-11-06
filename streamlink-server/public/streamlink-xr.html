@@ -337,6 +337,7 @@ function makeCanvasPanel(width, height, draw) {
   const geo = new THREE.PlaneGeometry(width, height);
   const mat = new THREE.MeshBasicMaterial({ map: texture, transparent: true });
   const mesh = new THREE.Mesh(geo, mat);
+  mesh.userData.xrPanel = true;
   mesh.userData.redraw = (state) => { draw(ctx, canvas.width, canvas.height, state || {}); texture.needsUpdate = true; };
   mesh.userData.redraw({});
   return mesh;
@@ -569,8 +570,10 @@ function describeTool(tool, input) {
 /* ────────────────────────────────────────────────────────────────────────
    CONTROL BUTTONS — start/stop, voice, quality presets
    ──────────────────────────────────────────────────────────────────────── */
-let startStopBtn, voiceBtn;
+let startStopBtn, voiceBtn, comfortBtn, resetLayoutBtn;
 const qualityButtons = {};
+let comfortMode = false;
+const defaultPanelLayout = new Map();
 
 function buildControlButtons() {
   startStopBtn = makeCanvasPanel(0.4, 0.4, (ctx, w, h) => drawButton(ctx, w, h, streamActive ? 'STOP' : 'START', streamActive ? '#ff4d5e' : '#3ddc84'));
@@ -584,6 +587,55 @@ function buildControlButtons() {
   voiceBtn.userData.onPress = toggleListening;
   scene.add(voiceBtn);
   pressables.push(voiceBtn);
+
+  comfortBtn = makeCanvasPanel(0.34, 0.18, (ctx, w, h) => drawButton(ctx, w, h, comfortMode ? 'COMFORT ON' : 'COMFORT', comfortMode ? '#3ddc84' : '#7c5cff'));
+  comfortBtn.position.set(-0.22, 0.43, -1.08);
+  comfortBtn.userData.onPress = toggleComfortMode;
+  scene.add(comfortBtn);
+  pressables.push(comfortBtn);
+
+  resetLayoutBtn = makeCanvasPanel(0.34, 0.18, (ctx, w, h) => drawButton(ctx, w, h, 'RESET', '#ffb020'));
+  resetLayoutBtn.position.set(0.22, 0.43, -1.08);
+  resetLayoutBtn.userData.onPress = resetWorkspaceLayout;
+  scene.add(resetLayoutBtn);
+  pressables.push(resetLayoutBtn);
+}
+
+function captureDefaultPanelLayout() {
+  defaultPanelLayout.clear();
+  scene.traverse((object) => {
+    if (!object.userData.xrPanel) return;
+    defaultPanelLayout.set(object, {
+      position: object.position.clone(),
+      quaternion: object.quaternion.clone(),
+      scale: object.scale.clone()
+    });
+  });
+}
+
+function toggleComfortMode() {
+  comfortMode = !comfortMode;
+  defaultPanelLayout.forEach((home, object) => {
+    if (comfortMode) {
+      object.position.set(home.position.x * 0.84, Math.max(0.72, home.position.y - 0.1), home.position.z * 0.9);
+      object.scale.copy(home.scale).multiplyScalar(0.92);
+    } else {
+      object.position.copy(home.position);
+      object.quaternion.copy(home.quaternion);
+      object.scale.copy(home.scale);
+    }
+  });
+  comfortBtn.userData.redraw();
+}
+
+function resetWorkspaceLayout() {
+  comfortMode = false;
+  defaultPanelLayout.forEach((home, object) => {
+    object.position.copy(home.position);
+    object.quaternion.copy(home.quaternion);
+    object.scale.copy(home.scale);
+  });
+  if (comfortBtn) comfortBtn.userData.redraw();
 }
 
 function drawButton(ctx, w, h, label, color) {
@@ -1057,6 +1109,7 @@ document.getElementById('enterBtn').addEventListener('click', async () => {
   layoutPlatformCards(platformMeta.length ? platformMeta : []);
   highlightQuality(currentQuality);
   if (WEB3_ENABLED) buildCreatorPanel();
+  captureDefaultPanelLayout();
   connectSocket();
   await initCamera(); // ask now, while this click still counts as a user gesture
 
