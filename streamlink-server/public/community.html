@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>Community Room — StreamLink XR</title>
+<meta name="description" content="Join a StreamLink XR creator room and chat with the community."/>
+<link rel="icon" type="image/svg+xml" href="streamlink-xr-mark.svg"/>
+<link rel="stylesheet" href="style.css"/>
+<style>
+main{max-width:760px;margin:0 auto;padding:44px 20px 80px}
+h1{font-size:clamp(28px,5vw,40px);color:white;margin-bottom:8px}
+.sub{color:var(--muted);line-height:1.6;margin-bottom:24px}
+.panel{background:var(--panel);border:1px solid var(--border);border-radius:14px;padding:20px;margin:18px 0}
+.row{display:flex;gap:10px;flex-wrap:wrap}
+input,textarea{width:100%;background:#090b16;border:1px solid var(--border);border-radius:7px;padding:12px;color:var(--text);font:inherit}
+.row input{flex:1;min-width:180px}
+button{cursor:pointer;font:inherit}
+.primary{background:var(--accent);color:white;border:0;border-radius:7px;padding:11px 18px;font-weight:600}
+.secondary{background:transparent;color:var(--text);border:1px solid var(--border);border-radius:7px;padding:10px 16px}
+#feed{display:flex;flex-direction:column;gap:10px;min-height:140px;max-height:440px;overflow:auto;margin:16px 0}
+.comment{padding:12px 14px;border:1px solid var(--border);border-radius:9px;background:#090b16}
+.meta{display:flex;justify-content:space-between;gap:10px;color:var(--muted);font-size:12px;margin-bottom:6px}
+.body{white-space:pre-wrap;overflow-wrap:anywhere;font-size:14px}
+#notice{font-size:13px;color:var(--muted);margin-top:10px;min-height:20px}
+#composer{display:grid;gap:10px}
+.small{font-size:12px;color:var(--muted)}
+</style>
+</head>
+<body>
+<nav>
+<a href="/" class="nav-logo"><img src="streamlink-xr-mark.svg" alt="StreamLink XR" width="42" height="42" style="border-radius:8px"/><span class="brand">StreamLink</span><span class="badge">XR</span></a>
+<div class="nav-links"><a href="/">Home</a><a href="/live">Go live</a><a href="/app">VR room</a><a href="/account.html">Account</a></div>
+<a href="/account.html" class="nav-cta">Account</a>
+</nav>
+<main>
+<h1>Community room</h1>
+<p class="sub">Join the conversation around a broadcast. Enter the room ID shared by its creator, then post messages with your StreamLink account.</p>
+<section class="panel">
+<label for="roomId" class="small">Room / session ID</label>
+<div class="row" style="margin-top:8px">
+<input id="roomId" maxlength="100" placeholder="Paste the creator's room ID" autocomplete="off"/>
+<button class="primary" id="joinBtn">Join room</button>
+</div>
+<div id="notice" role="status" aria-live="polite">Sign in to join and post in community rooms.</div>
+</section>
+<section class="panel" aria-label="Community conversation">
+<div class="row" style="align-items:center;justify-content:space-between">
+<strong>Conversation</strong><span class="small" id="roomLabel">No room joined</span>
+</div>
+<div id="feed" aria-live="polite"><p class="small">Messages will appear here after you join a room.</p></div>
+<form id="composer">
+<textarea id="message" rows="3" maxlength="2000" placeholder="Write a message…" required></textarea>
+<div class="row" style="align-items:center;justify-content:space-between">
+<span class="small">Be respectful. Never share passwords, stream keys or private information.</span>
+<button class="primary" type="submit" id="sendBtn">Send message</button>
+</div>
+</form>
+</section>
+</main>
+<footer><div class="footer-logo brand">StreamLink XR</div><div class="footer-links"><a href="privacy.html">Privacy</a><a href="terms.html">Terms</a><a href="docs.html">Docs</a><a href="contact.html">Contact</a></div><div class="footer-copy">© 2026 StreamLink XR</div></footer>
+<script src="/config.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="/auth.js"></script>
+<script>
+(() => {
+ const $=id=>document.getElementById(id);
+ let room='', timer=null, loading=false;
+ const say=t=>$('notice').textContent=t;
+ const escTime=t=>{const d=new Date(t);return Number.isNaN(d.getTime())?'':d.toLocaleString();};
+ function render(rows){
+   const feed=$('feed');feed.replaceChildren();
+   if(!rows.length){const p=document.createElement('p');p.className='small';p.textContent='No messages yet. Start the conversation.';feed.append(p);return;}
+   rows.forEach(item=>{
+     const card=document.createElement('article');card.className='comment';
+     const meta=document.createElement('div');meta.className='meta';
+     const who=document.createElement('strong');who.textContent=item.author_name||'Community member';
+     const when=document.createElement('time');when.textContent=escTime(item.created_at);
+     meta.append(who,when);
+     const body=document.createElement('div');body.className='body';body.textContent=item.body;
+     card.append(meta,body);feed.append(card);
+   });
+   feed.scrollTop=feed.scrollHeight;
+ }
+ async function load(){
+   if(!room||loading)return;loading=true;
+   try{
+     const res=await SLAuth.fetch('/api/comments/'+encodeURIComponent(room));
+     const data=await res.json();if(!res.ok)throw new Error(data.error||'Could not load messages.');
+     render(data.comments||[]);say('Connected to room '+room+'. Updates refresh automatically.');
+   }catch(e){say(e.message);}
+   finally{loading=false;}
+ }
+ async function join(){
+   if(!window.SLAuth||!SLAuth.enabled){say('Account services are not configured.');return;}
+   const user=await SLAuth.getUser();if(!user){location.href='/account.html?reason=signin';return;}
+   const id=$('roomId').value.trim();
+   if(!id){say('Enter a room ID first.');return;}
+   room=id;$('roomLabel').textContent=id;$('feed').replaceChildren();
+   if(timer)clearInterval(timer);await load();timer=setInterval(load,5000);
+ }
+ $('joinBtn').addEventListener('click',join);
+ $('composer').addEventListener('submit',async e=>{
+   e.preventDefault();
+   if(!room){say('Join a room before posting.');return;}
+   const body=$('message').value.trim();if(!body)return;
+   $('sendBtn').disabled=true;
+   try{
+     const res=await SLAuth.fetch('/api/comments/'+encodeURIComponent(room),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({body})});
+     const data=await res.json();if(!res.ok)throw new Error(data.error||'Could not send message.');
+     $('message').value='';await load();say('Message sent.');
+   }catch(e){say(e.message);}
+   finally{$('sendBtn').disabled=false;}
+ });
+ if(window.SLAuth&&SLAuth.enabled){
+   SLAuth.getUser().then(user=>{if(user)say('Signed in. Enter a creator room ID to join.');else say('Sign in to join and post in community rooms.');});
+ }
+})();
+</script>
+</body>
+</html>
