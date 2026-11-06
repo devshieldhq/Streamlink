@@ -6,6 +6,7 @@ A seated, hands-first virtual workspace for creators who need to manage a live b
 ## Implemented experience
 - Seated control-room layout with reachable stream panels and controls.
 - One-pinch Seated Comfort mode that scales and pulls the workspace closer; Reset restores the original panel layout.
+- VR Focus Mode hides secondary panels and quality controls while keeping platform status, stream controls, and the focus toggle visible.
 - Hand tracking requested as a required immersive-session feature.
 - Thumb/index pinch selection using fingertip raycasting.
 - Pinch-and-hold panel movement with a preserved grab offset.
