@@ -233,6 +233,30 @@ wrong wallet, tampered message, other account's message, stale and
 future-dated requests, garbage signatures all rejected). The full browser
 flow (a real wallet, a real signed-in session) has not been run end to end.
 
+## Quest Creator Studio
+
+The /app route is StreamLink XR's seated, hands-first creator workspace. It is
+designed around a reachable control layout rather than standing room-scale
+movement. The room includes multi-destination status cards, stream start/stop,
+quality presets, live telemetry, an agent activity panel, and the StreamBot
+copilot. Optional creator-passport data is loaded from the signed-in account.
+
+**Hands-first interaction:** the immersive session requests hand tracking.
+Pinch thumb and index finger to select controls; keep the pinch held while
+moving a panel. Controllers remain available as an alternate input method
+where the browser exposes them. The user must explicitly press **ENTER VR**
+after camera/microphone setup because the browser requires a fresh user gesture.
+
+The panel layout is positioned for seated reach. Dragging preserves the panel's
+offset from the hand so the panel does not jump to the fingertip. Leaving the
+immersive session stops an active stream and releases camera/microphone tracks.
+
+**Current boundaries:** external platform chat ingestion and moderation are
+not represented as live integrations unless their official API/webhook is
+configured. The Creator Passport is an account display layer; it does not mint
+tokens or NFTs. A real Meta Quest Browser session is still required to verify
+hand tracking, pinch accuracy, seated comfort, camera/microphone permissions,
+and platform delivery.
 ## Still placeholders
 
 - **On-chain anything** (tokens, NFTs, minting) — see *Creator wallet* above.
