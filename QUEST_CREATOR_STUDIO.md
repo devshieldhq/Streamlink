@@ -27,6 +27,7 @@ A seated, hands-first virtual workspace for creators who need to manage a live b
 4. Approve camera and microphone access.
 5. Select ENTER VR.
 6. Pinch a control to select it; pinch and hold a panel to reposition it.
+7. Select VR ARENA. Pinch or point at the five glowing targets to score 10 points per hit during the 45-second round; select EXIT ARENA to stop early.
 7. Start a broadcast and show platform status and telemetry.
 8. Ask StreamBot: “Twitch dropped. Fix it and lower quality if needed.”
 9. Show the agent activity panel and its reported actions.
