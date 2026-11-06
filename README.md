@@ -19,7 +19,7 @@ streamlink-server/           <- the one deployed service (Render builds this)
     index.html, docs.html, contact.html, privacy.html, terms.html, style.css
                              The marketing site
     account.html             Sign in / sign up, saved platforms, creator passport
-    go-live.html             Go live from a phone or laptop      (served at /live)
+    go-live.html             Shared Go Live + Gamey streaming UI (served at /live and /gamey)
     streamlink-xr.html       The VR control room                  (served at /app)
     auth.js                  Shared Supabase helper (accounts, wallet, history)
     streamlink-xr-logo.svg, streamlink-xr-mark.svg
