@@ -969,15 +969,26 @@ async function diagnoseMetaModels() {
     const response = await fetch('https://api.meta.ai/v1/models', {
       headers: { Authorization: `Bearer ${key}` }
     });
-    let payload = {};
-    try { payload = await response.json(); } catch (_) {}
+    const contentType = response.headers.get('content-type') || 'unknown';
+    const raw = await response.text();
+    let payload = null;
+    try { payload = JSON.parse(raw); } catch (_) {}
     if (!response.ok) {
       const code = payload && payload.error && payload.error.code ? payload.error.code : 'unknown_error';
-      console.error('[Meta model diagnostic] HTTP', response.status, 'code:', code);
+      const errorKeys = payload && payload.error && typeof payload.error === 'object' ? Object.keys(payload.error) : [];
+      console.error('[Meta model diagnostic] HTTP', response.status, 'content-type:', contentType, 'error code:', code, 'error keys:', JSON.stringify(errorKeys));
       return;
     }
-    const models = Array.isArray(payload.data) ? payload.data.map(item => item && item.id).filter(Boolean) : [];
-    console.log('[Meta model diagnostic] HTTP', response.status, 'accessible model IDs:', JSON.stringify(models));
+    const topKeys = payload && typeof payload === 'object' ? Object.keys(payload) : [];
+    const dataType = payload == null ? 'null' : Array.isArray(payload.data) ? 'array' : typeof payload.data;
+    const dataCount = Array.isArray(payload.data) ? payload.data.length : null;
+    const otherArrayShapes = payload && typeof payload === 'object'
+      ? Object.entries(payload).filter(([name, value]) => name !== 'data' && Array.isArray(value)).map(([name, value]) => ({ key: name, count: value.length, firstItemKeys: value[0] && typeof value[0] === 'object' ? Object.keys(value[0]) : [] }))
+      : [];
+    const firstItemKeys = Array.isArray(payload && payload.data) && payload.data[0] && typeof payload.data[0] === 'object' ? Object.keys(payload.data[0]) : [];
+    const models = Array.isArray(payload && payload.data) ? payload.data.map(item => item && item.id).filter(Boolean) : [];
+    console.log('[Meta model diagnostic] HTTP', response.status, 'content-type:', contentType, 'top-level keys:', JSON.stringify(topKeys), 'object field:', payload && payload.object, 'data type:', dataType, 'data count:', dataCount, 'data item keys:', JSON.stringify(firstItemKeys), 'other array shapes:', JSON.stringify(otherArrayShapes));
+    console.log('[Meta model diagnostic] accessible model IDs:', JSON.stringify(models));
     console.log('[Meta model diagnostic] configured StreamBot model:', STREAMBOT_MODEL, 'listed:', models.includes(STREAMBOT_MODEL));
   } catch (error) {
     console.error('[Meta model diagnostic] request failed:', error && error.name ? error.name : 'network_error');
