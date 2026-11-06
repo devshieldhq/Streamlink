@@ -276,6 +276,7 @@ function init() {
       'SEATED MODE  •  Pinch thumb + index to select  •  Keep pinched to move a panel';
   });
   renderer.xr.addEventListener('sessionend', () => {
+    if (arenaActive) finishArena('VR session ended. Start a new round when you return.');
     if (streamActive) stopStream();
     if (cameraStream) cameraStream.getTracks().forEach(track => track.stop());
     cameraStream = null;
@@ -573,11 +574,18 @@ function describeTool(tool, input) {
 /* ────────────────────────────────────────────────────────────────────────
    CONTROL BUTTONS — start/stop, voice, quality presets
    ──────────────────────────────────────────────────────────────────────── */
-let startStopBtn, voiceBtn, comfortBtn, resetLayoutBtn, focusBtn;
+let startStopBtn, voiceBtn, comfortBtn, resetLayoutBtn, focusBtn, arenaBtn;
 const qualityButtons = {};
 let comfortMode = false;
 let focusMode = false;
 const defaultPanelLayout = new Map();
+let arenaPanel;
+let arenaActive = false;
+let arenaScore = 0;
+let arenaEndTime = 0;
+let arenaLastSecond = -1;
+const arenaTargets = new Set();
+const ARENA_ROUND_SECONDS = 45;
 
 function buildControlButtons() {
   startStopBtn = makeCanvasPanel(0.4, 0.4, (ctx, w, h) => drawButton(ctx, w, h, streamActive ? 'STOP' : 'START', streamActive ? '#ff4d5e' : '#3ddc84'));
@@ -610,6 +618,17 @@ function buildControlButtons() {
   focusBtn.userData.onPress = toggleFocusMode;
   scene.add(focusBtn);
   pressables.push(focusBtn);
+
+  arenaBtn = makeCanvasPanel(0.38, 0.18, (ctx, w, h) => drawButton(ctx, w, h, arenaActive ? 'EXIT ARENA' : 'VR ARENA', arenaActive ? '#ff4d5e' : '#3ddc84'));
+  arenaBtn.position.set(0.72, 0.16, -1.02);
+  arenaBtn.userData.onPress = toggleArena;
+  scene.add(arenaBtn);
+  pressables.push(arenaBtn);
+
+  arenaPanel = makeCanvasPanel(0.92, 0.42, drawArenaPanel);
+  arenaPanel.position.set(0, 1.72, -1.75);
+  arenaPanel.visible = false;
+  scene.add(arenaPanel);
 }
 
 function toggleFocusMode() {
@@ -617,9 +636,105 @@ function toggleFocusMode() {
   scene.traverse((object) => {
     if (object.userData.focusHide) object.visible = !focusMode;
   });
-  // Keep the focus control reachable so the creator can always restore the full workspace.
+  // Keep the focus and arena controls reachable so the creator can always restore the workspace.
   focusBtn.visible = true;
+  arenaBtn.visible = true;
   focusBtn.userData.redraw();
+}
+
+function drawArenaPanel(ctx, w, h, state = {}) {
+  ctx.clearRect(0, 0, w, h);
+  ctx.fillStyle = 'rgba(8,12,26,0.96)';
+  roundRect(ctx, 4, 4, w - 8, h - 8, 18); ctx.fill();
+  ctx.strokeStyle = '#3ddc84'; ctx.lineWidth = 4;
+  roundRect(ctx, 4, 4, w - 8, h - 8, 18); ctx.stroke();
+  ctx.fillStyle = '#3ddc84'; ctx.font = '700 24px "Space Grotesk", sans-serif'; ctx.textBaseline = 'top';
+  ctx.fillText('STREAMLINK VR ARENA', 24, 18);
+  ctx.fillStyle = '#e7e9f5'; ctx.font = '600 30px "JetBrains Mono", monospace';
+  ctx.fillText(`SCORE  ${state.score ?? arenaScore}`, 24, 70);
+  ctx.fillText(`TIME   ${state.time ?? ARENA_ROUND_SECONDS}s`, 270, 70);
+  ctx.fillStyle = '#8890b3'; ctx.font = '500 17px "Inter", sans-serif';
+  ctx.fillText(state.message || 'Pinch or point at the glowing targets • 10 points each', 24, 124);
+}
+
+function updateArenaPanel(message) {
+  if (!arenaPanel) return;
+  const remaining = arenaActive ? Math.max(0, Math.ceil((arenaEndTime - performance.now()) / 1000)) : ARENA_ROUND_SECONDS;
+  arenaPanel.userData.redraw({ score: arenaScore, time: remaining, message: message || (arenaActive ? 'Hit every glowing target before the timer ends!' : 'Round complete. Select VR ARENA to play again.') });
+}
+
+function spawnArenaTarget() {
+  const x = (Math.random() - 0.5) * 2.5;
+  const y = 1.0 + Math.random() * 1.25;
+  const z = -2.0 - Math.random() * 0.9;
+  const target = new THREE.Mesh(
+    new THREE.SphereGeometry(0.13, 20, 16),
+    new THREE.MeshStandardMaterial({ color: 0x3ddc84, emissive: 0x0b6b39, emissiveIntensity: 1.2, metalness: 0.15, roughness: 0.25 })
+  );
+  target.position.set(x, y, z);
+  target.userData.arenaTarget = true;
+  target.userData.onPress = () => {
+    if (!arenaActive || !arenaTargets.has(target)) return;
+    arenaScore += 10;
+    removeArenaTarget(target);
+    spawnArenaTarget();
+    updateArenaPanel('Nice hit! +10 points. Keep going!');
+  };
+  const ring = new THREE.Mesh(
+    new THREE.TorusGeometry(0.19, 0.018, 8, 32),
+    new THREE.MeshBasicMaterial({ color: 0x9dffd0 })
+  );
+  target.add(ring);
+  scene.add(target);
+  pressables.push(target);
+  arenaTargets.add(target);
+}
+
+function removeArenaTarget(target) {
+  scene.remove(target);
+  const index = pressables.indexOf(target);
+  if (index !== -1) pressables.splice(index, 1);
+  arenaTargets.delete(target);
+  target.geometry.dispose();
+  target.material.dispose();
+  target.children.forEach(child => { child.geometry.dispose(); child.material.dispose(); });
+}
+
+function clearArenaTargets() {
+  [...arenaTargets].forEach(removeArenaTarget);
+}
+
+function toggleArena() {
+  if (arenaActive) {
+    finishArena('Arena paused. Select VR ARENA to start a new round.');
+    return;
+  }
+  arenaActive = true;
+  arenaScore = 0;
+  arenaEndTime = performance.now() + ARENA_ROUND_SECONDS * 1000;
+  arenaLastSecond = -1;
+  arenaPanel.visible = true;
+  clearArenaTargets();
+  for (let i = 0; i < 5; i++) spawnArenaTarget();
+  arenaBtn.userData.redraw();
+  updateArenaPanel('Round started! Hit the glowing targets.');
+}
+
+function finishArena(message) {
+  arenaActive = false;
+  clearArenaTargets();
+  arenaBtn.userData.redraw();
+  updateArenaPanel(message || `Time! Final score: ${arenaScore} points.`);
+}
+
+function updateArena(time) {
+  if (!arenaActive) return;
+  const remaining = Math.max(0, Math.ceil((arenaEndTime - time) / 1000));
+  if (remaining !== arenaLastSecond) {
+    arenaLastSecond = remaining;
+    updateArenaPanel(remaining ? 'Hit every glowing target before the timer ends!' : `Time! Final score: ${arenaScore} points.`);
+  }
+  if (remaining <= 0) finishArena(`Time! Final score: ${arenaScore} points.`);
 }
 
 function captureDefaultPanelLayout() {
@@ -1106,6 +1221,7 @@ function animate(time) {
     }
   }
   updateHeldObjects();
+  updateArena(time);
 
   scene.traverse(obj => { if (obj.userData.isStarfield) obj.rotation.y = time * 0.00002; });
 
