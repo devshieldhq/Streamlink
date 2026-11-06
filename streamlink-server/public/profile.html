@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Gamer Profile — StreamLink XR</title><meta name="description" content="Create your StreamLink XR gamer profile."/>
+<link rel="icon" type="image/svg+xml" href="streamlink-xr-mark.svg"/><link rel="stylesheet" href="style.css"/>
+<style>
+main{max-width:680px;margin:0 auto;padding:48px 20px 80px}h1{font-size:clamp(28px,5vw,40px);color:white;margin:0 0 8px}.sub,.hint{color:var(--muted);line-height:1.6}.panel{background:var(--panel);border:1px solid var(--border);border-radius:14px;padding:22px;margin-top:22px}.field{display:grid;gap:7px;margin:16px 0}.field label{font-size:13px;color:var(--muted)}input,textarea{width:100%;background:#090b16;border:1px solid var(--border);border-radius:7px;padding:12px;color:var(--text);font:inherit}textarea{resize:vertical}.btn{background:var(--accent);color:white;border:0;border-radius:7px;padding:12px 18px;font-weight:600;cursor:pointer}.preview{display:flex;align-items:center;gap:15px;margin-bottom:18px}.avatar{width:64px;height:64px;border-radius:50%;background:#252044;display:grid;place-items:center;font-size:25px;font-weight:700;color:white}.status{font-size:13px;color:var(--muted);min-height:20px;margin-top:12px}
+</style></head>
+<body>
+<nav><a href="/" class="nav-logo"><img src="streamlink-xr-mark.svg" alt="StreamLink XR" width="42" height="42" style="border-radius:8px"/><span class="brand">StreamLink</span><span class="badge">XR</span></a><div class="nav-links"><a href="/">Home</a><a href="/community.html">Community</a><a href="/messages.html">Messages</a><a href="/app">VR room</a></div><a href="/account.html" class="nav-cta">Account</a></nav>
+<main><h1>Your gamer profile</h1><p class="sub">Set up your public creator identity. Use a username people can search for and a short bio about what you play or stream.</p>
+<section class="panel"><div class="preview"><div class="avatar" id="avatar">S</div><div><strong id="previewName">Your display name</strong><div class="hint" id="previewHandle">@username</div></div></div>
+<form id="profileForm">
+<div class="field"><label for="username">Username</label><input id="username" maxlength="24" pattern="[A-Za-z0-9_]{3,24}" placeholder="gamer_name" required/><span class="hint">3–24 letters, numbers or underscores. Unique and searchable.</span></div>
+<div class="field"><label for="displayName">Display name</label><input id="displayName" maxlength="50" placeholder="Your name in the community"/></div>
+<div class="field"><label for="gamerTag">Gaming handle (optional)</label><input id="gamerTag" maxlength="50" placeholder="Your in-game tag"/></div>
+<div class="field"><label for="games">Favorite games</label><input id="games" maxlength="160" placeholder="e.g. Fortnite, Minecraft, Rocket League"/></div>
+<div class="field"><label for="bio">About you</label><textarea id="bio" rows="4" maxlength="280" placeholder="Tell the community what you stream or play…"></textarea><span class="hint">Up to 280 characters.</span></div>
+<button class="btn" id="save" type="submit">Save profile</button><div class="status" id="status" role="status" aria-live="polite"></div>
+</form></section></main>
+<footer><div class="footer-logo brand">StreamLink XR</div><div class="footer-links"><a href="/community.html">Community</a><a href="/privacy.html">Privacy</a><a href="/terms.html">Terms</a></div><div class="footer-copy">© 2026 StreamLink XR</div></footer>
+<script src="/config.js"></script><script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script><script src="/auth.js"></script>
+<script>
+(()=>{const $=id=>document.getElementById(id);const fields=['username','displayName','gamerTag','games','bio'];const setStatus=t=>$('status').textContent=t;
+function preview(){const name=$('displayName').value.trim()||$('username').value.trim()||'Your display name';$('previewName').textContent=name;$('previewHandle').textContent='@'+($('username').value.trim()||'username');$('avatar').textContent=(name[0]||'S').toUpperCase();}
+fields.forEach(id=>$(id).addEventListener('input',preview));
+async function init(){if(!SLAuth.enabled){setStatus('Account services are not configured on this server.');$('save').disabled=true;return;}const user=await SLAuth.getUser();if(!user){location.href='/account.html?reason=signin';return;}
+const {data,error}=await SLAuth.client.from('profiles').select('username,display_name,gamer_tag,favorite_games,bio').eq('user_id',user.id).maybeSingle();
+if(error){setStatus('Profile storage is not ready yet. Please apply the community database upgrade.');return;}
+if(data){$('username').value=data.username||'';$('displayName').value=data.display_name||'';$('gamerTag').value=data.gamer_tag||'';$('games').value=(data.favorite_games||[]).join(', ');$('bio').value=data.bio||'';preview();setStatus('Your profile is loaded.');}else setStatus('Choose a username to create your profile.');}
+$('profileForm').addEventListener('submit',async e=>{e.preventDefault();const user=await SLAuth.getUser();if(!user){location.href='/account.html?reason=signin';return;}const username=$('username').value.trim().toLowerCase();if(!/^[a-z0-9_]{3,24}$/.test(username)){setStatus('Use 3–24 lowercase letters, numbers or underscores.');return;}
+$('save').disabled=true;setStatus('Saving…');const row={user_id:user.id,username,display_name:$('displayName').value.trim().slice(0,50)||username,gamer_tag:$('gamerTag').value.trim().slice(0,50)||null,favorite_games:$('games').value.split(',').map(x=>x.trim()).filter(Boolean).slice(0,8),bio:$('bio').value.trim().slice(0,280),updated_at:new Date().toISOString()};
+try{const {error}=await SLAuth.client.from('profiles').upsert(row,{onConflict:'user_id'});if(error)throw error;setStatus('Profile saved. Your community identity is ready.');preview();}catch(err){setStatus(err.code==='23505'?'That username is already taken. Try another.':(err.message||'Could not save profile.'));}finally{$('save').disabled=false;}});
+init().catch(e=>setStatus(e.message||'Could not load profile.'));
+})();
+</script></body></html>
