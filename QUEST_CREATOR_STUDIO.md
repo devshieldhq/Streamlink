@@ -7,6 +7,7 @@ A seated, hands-first virtual workspace for creators who need to manage a live b
 - Seated control-room layout with reachable stream panels and controls.
 - One-pinch Seated Comfort mode that scales and pulls the workspace closer; Reset restores the original panel layout.
 - VR Focus Mode hides secondary panels and quality controls while keeping platform status, stream controls, and the focus toggle visible.
+- VR Gaming Arena adds a 45-second target challenge with hand/controller pointing or pinch selection, five glowing targets, live score updates, and a replayable round.
 - Hand tracking requested as a required immersive-session feature.
 - Thumb/index pinch selection using fingertip raycasting.
 - Pinch-and-hold panel movement with a preserved grab offset.
