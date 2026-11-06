@@ -100,7 +100,7 @@
 npm install
 npm start</div>
       <p>To enable the real AI agent rather than its deterministic fallback, set your key first:</p>
-      <div class="code-block">export ANTHROPIC_API_KEY=sk-ant-...
+      <div class="code-block">export MODEL_API_KEY=your-meta-api-key
 npm start</div>
 
       <h3>2. Serve it over HTTPS</h3>
@@ -137,7 +137,7 @@ npm start</div>
 
       <h2 id="agent">The AI agent</h2>
       <p>Press the talk button or say a command out loud — for example, "Twitch dropped, fix it and lower quality if needed." The agent checks live stream health, reconnects the affected platform, checks again, and only changes quality if the numbers still show trouble. Each step appears on the agent pipeline panel as it happens.</p>
-      <p>Without <code>ANTHROPIC_API_KEY</code> set, the server runs a deterministic fallback that performs the same sequence for common commands (start, stop, reconnect a platform, raise or lower quality) — useful for testing without an API key, though it isn't the model doing the deciding.</p>
+      <p>Without <code>MODEL_API_KEY</code> set, the server runs a deterministic fallback that performs the same sequence for common commands (start, stop, reconnect a platform, raise or lower quality) — useful for testing without an API key, though it isn't the model doing the deciding.</p>
 
       <h2 id="ingest-urls">Ingest URLs</h2>
       <p>These are preconfigured on the server for the fixed-endpoint platforms — you won't need to enter them yourself.</p>
