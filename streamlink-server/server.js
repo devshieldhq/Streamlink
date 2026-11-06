@@ -961,5 +961,31 @@ io.on('connection', (socket) => {
   });
 });
 
+// TEMPORARY SAFE META MODEL CATALOG DIAGNOSTIC — remove after checking.
+async function diagnoseMetaModels() {
+  const key = process.env.MODEL_API_KEY;
+  if (!key) { console.error('[Meta model diagnostic] MODEL_API_KEY is missing.'); return; }
+  try {
+    const response = await fetch('https://api.meta.ai/v1/models', {
+      headers: { Authorization: `Bearer ${key}` }
+    });
+    let payload = {};
+    try { payload = await response.json(); } catch (_) {}
+    if (!response.ok) {
+      const code = payload && payload.error && payload.error.code ? payload.error.code : 'unknown_error';
+      console.error('[Meta model diagnostic] HTTP', response.status, 'code:', code);
+      return;
+    }
+    const models = Array.isArray(payload.data) ? payload.data.map(item => item && item.id).filter(Boolean) : [];
+    console.log('[Meta model diagnostic] HTTP', response.status, 'accessible model IDs:', JSON.stringify(models));
+    console.log('[Meta model diagnostic] configured StreamBot model:', STREAMBOT_MODEL, 'listed:', models.includes(STREAMBOT_MODEL));
+  } catch (error) {
+    console.error('[Meta model diagnostic] request failed:', error && error.name ? error.name : 'network_error');
+  }
+}
+
 const PORT = process.env.PORT || 3000;
-server.listen(PORT, () => console.log(`StreamLink server running on port ${PORT} — sign-in ${AUTH_REQUIRED ? 'required' : 'not required'}`));
+server.listen(PORT, () => {
+  console.log(`StreamLink server running on port ${PORT} — sign-in ${AUTH_REQUIRED ? 'required' : 'not required'}`);
+  diagnoseMetaModels();
+});
