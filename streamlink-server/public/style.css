@@ -36,6 +36,9 @@ nav {
 .nav-logo { display: flex; align-items: center; gap: 10px; font-size: 18px; text-decoration: none; color: var(--text); }
 .nav-logo .badge { background: var(--accent); color: #05060b; font-size: 12px; font-weight: 700; padding: 2px 7px; border-radius: 5px; }
 .nav-links { display: flex; gap: 28px; font-size: 14px; }
+.nav-toggle { display: none; border: 1px solid var(--border); background: var(--panel); color: var(--text); border-radius: 8px; width: 42px; height: 42px; padding: 10px; cursor: pointer; }
+.nav-toggle span { display: block; height: 2px; margin: 4px 0; background: currentColor; border-radius: 2px; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
 .nav-links a { color: var(--muted); text-decoration: none; }
 .nav-links a:hover, .nav-links a.active { color: var(--text); }
 .nav-cta {
@@ -96,7 +99,12 @@ footer {
 
 @media (max-width: 768px) {
   nav { padding: 14px 20px; }
-  .nav-links { display: none; }
+  nav { position: sticky; flex-wrap: wrap; gap: 12px; }
+  .nav-toggle { display: inline-flex; flex-direction: column; justify-content: center; order: 2; margin-left: auto; }
+  .nav-cta { order: 3; }
+  .nav-links { display: none; order: 4; flex: 0 0 100%; flex-direction: column; gap: 0; padding: 8px 0 4px; }
+  .nav-links.open { display: flex; }
+  .nav-links a { padding: 11px 4px; border-top: 1px solid var(--border); }
   .section { padding: 56px 20px; }
   footer { padding: 32px 20px; flex-direction: column; text-align: center; }
   .page-header { padding: 48px 20px 40px; }
