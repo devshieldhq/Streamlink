@@ -154,7 +154,7 @@ app.get('/config.js', (req, res) => {
 // Inject the shared StreamBot widget into every public HTML page.
 app.use((req, res, next) => {
   if (req.method !== 'GET') return next();
-  const route = req.path === '/app' ? '/streamlink-xr.html' : req.path === '/live' ? '/go-live.html' : req.path === '/' ? '/index.html' : req.path;
+  const route = req.path === '/app' ? '/streamlink-xr.html' : (req.path === '/live' || req.path === '/gamey') ? '/go-live.html' : req.path === '/' ? '/index.html' : req.path;
   if (!route.endsWith('.html')) return next();
   const filePath = path.resolve(STATIC_ROOT, '.' + route);
   if (!filePath.startsWith(STATIC_ROOT + path.sep)) return next();
@@ -167,6 +167,7 @@ app.use((req, res, next) => {
 app.use(express.static(STATIC_ROOT));
 app.get('/app', (req, res) => res.sendFile(path.join(STATIC_ROOT, 'streamlink-xr.html')));
 app.get('/live', (req, res) => res.sendFile(path.join(STATIC_ROOT, 'go-live.html')));
+app.get('/gamey', (req, res) => res.sendFile(path.join(STATIC_ROOT, 'go-live.html')));
 
 // ─── PLATFORM REGISTRY ─────────────────────────────────────────────────────
 const RTMP_FIXED = {
