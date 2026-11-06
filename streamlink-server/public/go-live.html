@@ -3,8 +3,8 @@
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"/>
-<title>Go Live — StreamLink XR</title>
-<meta name="description" content="Go live to every platform from your phone or laptop — no headset needed."/>
+<title>Gamey & Go Live — StreamLink</title>
+<meta name="description" content="Gamey lets PC gamers stream gameplay, game audio and microphone to multiple platforms — no VR headset required."/>
 <link rel="icon" type="image/svg+xml" href="streamlink-xr-mark.svg"/>
 <link rel="stylesheet" href="style.css"/>
 <style>
@@ -102,8 +102,8 @@
 </nav>
 
 <main>
-  <h1>Go live</h1>
-  <div class="sub">Works from your phone or laptop — no headset required.</div>
+  <h1 id="pageTitle">Go live</h1>
+  <div class="sub" id="pageSubtitle">Works from your phone or laptop — no headset required.</div>
 
   <div class="account-bar" id="accountBar"></div>
 
@@ -178,6 +178,14 @@
 <script src="auth.js"></script>
 <script>
 const API_BASE = window.location.origin;
+const gameMode = window.location.pathname === '/gamey';
+if (gameMode) {
+  document.title = 'Gamey — StreamLink';
+  document.getElementById('pageTitle').textContent = 'Gamey';
+  document.getElementById('pageSubtitle').textContent = 'Go live with your gameplay, game audio and microphone. No VR headset needed.';
+  document.getElementById('enableCameraBtn').textContent = 'Share game / screen';
+  document.getElementById('captureHelp').textContent = 'Choose your game window or entire screen. Enable system audio sharing when offered; your microphone is added separately.';
+}
 /* ---------- sign-in gate: signed-out visitors are sent to /account.html ---------- */
 const apiFetch = (u, o) => (window.SLAuth && SLAuth.enabled ? SLAuth.fetch(u, o) : fetch(u, o));
 const socketOpts = () => (window.SLAuth ? SLAuth.socketOptions() : { transports: ['websocket'] });
@@ -264,13 +272,42 @@ function setPlatformStatus(name, status) {
 /* ---------- camera capture ---------- */
 document.getElementById('enableCameraBtn').addEventListener('click', async () => {
   try {
-    cameraStream = await navigator.mediaDevices.getUserMedia({ video: { width: 1280, height: 720, frameRate: 30 }, audio: true });
-    document.getElementById('preview').srcObject = cameraStream;
+    if (gameMode) {
+      // Capture gameplay from a selected game window, browser tab, or full display.
+      const displayStream = await navigator.mediaDevices.getDisplayMedia({
+        video: { frameRate: { ideal: 30, max: 60 } },
+        audio: true
+      });
+      let microphoneStream = null;
+      try {
+        microphoneStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      } catch (micError) {
+        setCopilot('Gameplay capture is ready. Microphone access was not granted; only shared-source audio will be sent.');
+      }
+      const tracks = [
+        ...displayStream.getVideoTracks(),
+        ...displayStream.getAudioTracks(),
+        ...(microphoneStream ? microphoneStream.getAudioTracks() : [])
+      ];
+      cameraStream = new MediaStream(tracks);
+      document.getElementById('preview').srcObject = displayStream;
+      displayStream.getVideoTracks()[0].addEventListener('ended', () => {
+        if (streamActive) stopStream();
+        cameraStream = null;
+        document.getElementById('cameraPlaceholder').style.display = 'flex';
+        document.getElementById('goBtn').disabled = true;
+        document.getElementById('goBtn').textContent = 'Share game first';
+        document.getElementById('enableCameraBtn').textContent = 'Share game / screen';
+      });
+    } else {
+      cameraStream = await navigator.mediaDevices.getUserMedia({ video: { width: 1280, height: 720, frameRate: 30 }, audio: true });
+      document.getElementById('preview').srcObject = cameraStream;
+    }
     document.getElementById('cameraPlaceholder').style.display = 'none';
     document.getElementById('goBtn').disabled = false;
     document.getElementById('goBtn').textContent = 'Go live';
   } catch (e) {
-    setCopilot(`Camera/mic access was denied or unavailable: ${e.message}`);
+    setCopilot(`${gameMode ? 'Game/screen' : 'Camera/mic'} capture was denied or unavailable: ${e.message}`);
   }
 });
 
