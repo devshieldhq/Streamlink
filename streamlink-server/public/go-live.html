@@ -22,6 +22,7 @@
     border: 1px solid var(--border); border-radius: 10px; overflow: hidden; margin-bottom: 20px;
   }
   .camera-wrap video { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .camera-tools{display:none;gap:10px;flex-wrap:wrap;margin:-8px 0 20px}.camera-tools button{background:#171b2e;color:var(--text);border:1px solid var(--border);border-radius:6px;padding:9px 13px;cursor:pointer;font:inherit;font-size:13px}.camera-tools .remove-webcam{color:#ff8792}
   .camera-placeholder {
     position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center;
     justify-content: center; gap: 14px; text-align: center; padding: 20px;
@@ -114,6 +115,7 @@
       <button class="btn-primary" id="enableCameraBtn">Enable camera</button>
     </div>
   </div>
+  <div class="camera-tools" id="cameraTools"><button type="button" id="addWebcamBtn">＋ Add webcam overlay</button><button type="button" id="removeWebcamBtn" class="remove-webcam" style="display:none">Remove webcam</button></div>
 
   <span class="advanced-toggle" id="advancedToggle">Session ID / advanced</span>
   <div id="advancedFields">
@@ -200,7 +202,8 @@ let currentQuality = 'high';
 let streamActive = false;
 let socket = null;
 
-let cameraStream = null;
+let cameraStream = null, displayStream = null, microphoneStream = null, webcamStream = null;
+let compositorCanvas = null, compositorContext = null, compositorFrame = 0, screenVideo = null, webcamVideo = null, webcamEnabled = false;
 let mediaRecorder = null;
 let uploadQueue = [];
 let uploading = false;
@@ -274,26 +277,22 @@ document.getElementById('enableCameraBtn').addEventListener('click', async () =>
   try {
     if (gameMode) {
       // Capture gameplay from a selected game window, browser tab, or full display.
-      const displayStream = await navigator.mediaDevices.getDisplayMedia({
-        video: { frameRate: { ideal: 30, max: 60 } },
-        audio: true
-      });
-      let microphoneStream = null;
-      try {
-        microphoneStream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      } catch (micError) {
-        setCopilot('Gameplay capture is ready. Microphone access was not granted; only shared-source audio will be sent.');
-      }
-      const tracks = [
-        ...displayStream.getVideoTracks(),
-        ...displayStream.getAudioTracks(),
-        ...(microphoneStream ? microphoneStream.getAudioTracks() : [])
-      ];
-      cameraStream = new MediaStream(tracks);
-      document.getElementById('preview').srcObject = displayStream;
+      displayStream = await navigator.mediaDevices.getDisplayMedia({ video: { frameRate: { ideal: 30, max: 60 } }, audio: true });
+      try { microphoneStream = await navigator.mediaDevices.getUserMedia({ audio: true }); }
+      catch (micError) { setCopilot('Gameplay capture is ready. Microphone access was not granted; shared-source audio will be used if available.'); }
+      screenVideo = document.createElement('video'); screenVideo.autoplay = true; screenVideo.muted = true; screenVideo.playsInline = true; screenVideo.srcObject = displayStream; await screenVideo.play();
+      compositorCanvas = document.createElement('canvas');
+      const dims = displayStream.getVideoTracks()[0].getSettings(); compositorCanvas.width = dims.width || 1280; compositorCanvas.height = dims.height || 720;
+      compositorContext = compositorCanvas.getContext('2d'); drawGameComposition();
+      const composed = compositorCanvas.captureStream(30);
+      cameraStream = new MediaStream([...composed.getVideoTracks(), ...displayStream.getAudioTracks(), ...(microphoneStream ? microphoneStream.getAudioTracks() : [])]);
+      document.getElementById('preview').srcObject = cameraStream;
+      document.getElementById('cameraTools').style.display = 'flex';
       displayStream.getVideoTracks()[0].addEventListener('ended', () => {
         if (streamActive) stopStream();
+        cleanupGameCapture();
         cameraStream = null;
+        document.getElementById('cameraTools').style.display = 'none';
         document.getElementById('cameraPlaceholder').style.display = 'flex';
         document.getElementById('goBtn').disabled = true;
         document.getElementById('goBtn').textContent = 'Share game first';
@@ -310,6 +309,44 @@ document.getElementById('enableCameraBtn').addEventListener('click', async () =>
     setCopilot(`${gameMode ? 'Game/screen' : 'Camera/mic'} capture was denied or unavailable: ${e.message}`);
   }
 });
+
+function drawGameComposition() {
+  if (!compositorContext || !screenVideo) return;
+  const c=compositorContext,w=compositorCanvas.width,h=compositorCanvas.height;
+  if(screenVideo.readyState>=2)c.drawImage(screenVideo,0,0,w,h);else{c.fillStyle='#080b16';c.fillRect(0,0,w,h);}
+  if(webcamEnabled&&webcamVideo&&webcamVideo.readyState>=2){
+    const iw=Math.round(w*.22),ih=Math.round(iw*9/16),m=Math.round(w*.025),x=w-iw-m,y=h-ih-m,r=Math.round(iw*.07);
+    c.save();c.shadowColor='rgba(0,0,0,.55)';c.shadowBlur=18;c.fillStyle='#111827';c.beginPath();c.roundRect(x-3,y-3,iw+6,ih+6,r+3);c.fill();c.shadowBlur=0;c.beginPath();c.roundRect(x,y,iw,ih,r);c.clip();
+    const sw=webcamVideo.videoWidth||640,sh=webcamVideo.videoHeight||480,scale=Math.max(iw/sw,ih/sh),cw=iw/scale,ch=ih/scale;
+    c.drawImage(webcamVideo,(sw-cw)/2,(sh-ch)/2,cw,ch,x,y,iw,ih);c.restore();c.strokeStyle='#7c5cff';c.lineWidth=Math.max(3,w*.003);c.beginPath();c.roundRect(x,y,iw,ih,r);c.stroke();
+  }
+  compositorFrame=requestAnimationFrame(drawGameComposition);
+}
+async function addWebcamOverlay(){
+  if(!gameMode||!displayStream||webcamStream)return;
+  if(streamActive){setCopilot('Stop the stream before changing the webcam overlay.');return;}
+  try{
+    webcamStream=await navigator.mediaDevices.getUserMedia({video:{width:{ideal:1280},height:{ideal:720},facingMode:'user'},audio:false});
+    webcamVideo=document.createElement('video');webcamVideo.autoplay=true;webcamVideo.muted=true;webcamVideo.playsInline=true;webcamVideo.srcObject=webcamStream;await webcamVideo.play();webcamEnabled=true;
+    const old=cameraStream.getVideoTracks(),fresh=compositorCanvas.captureStream(30);
+    cameraStream=new MediaStream([...fresh.getVideoTracks(),...cameraStream.getAudioTracks()]);old.forEach(t=>t.stop());
+    document.getElementById('addWebcamBtn').style.display='none';document.getElementById('removeWebcamBtn').style.display='inline-block';
+    setCopilot('Webcam overlay added. Your face is included in the gameplay stream.');
+  }catch(e){if(webcamStream)webcamStream.getTracks().forEach(t=>t.stop());webcamStream=null;webcamVideo=null;setCopilot('Could not enable webcam: '+e.message);}
+}
+function removeWebcamOverlay(){
+  if(streamActive){setCopilot('Stop the stream before changing the webcam overlay.');return;}
+  webcamEnabled=false;if(webcamStream)webcamStream.getTracks().forEach(t=>t.stop());webcamStream=null;webcamVideo=null;
+  if(compositorCanvas&&cameraStream){const old=cameraStream.getVideoTracks(),fresh=compositorCanvas.captureStream(30);cameraStream=new MediaStream([...fresh.getVideoTracks(),...cameraStream.getAudioTracks()]);old.forEach(t=>t.stop());}
+  document.getElementById('addWebcamBtn').style.display='inline-block';document.getElementById('removeWebcamBtn').style.display='none';setCopilot('Webcam overlay removed.');
+}
+function cleanupGameCapture(){
+  cancelAnimationFrame(compositorFrame);compositorFrame=0;
+  for(const stream of [webcamStream,microphoneStream,displayStream])if(stream)stream.getTracks().forEach(t=>t.stop());
+  webcamStream=null;microphoneStream=null;displayStream=null;webcamVideo=null;screenVideo=null;webcamEnabled=false;compositorCanvas=null;compositorContext=null;
+}
+document.getElementById('addWebcamBtn').addEventListener('click',addWebcamOverlay);
+document.getElementById('removeWebcamBtn').addEventListener('click',removeWebcamOverlay);
 
 function pickSupportedMimeType() {
   const candidates = ['video/webm;codecs=vp8,opus', 'video/webm;codecs=vp9,opus', 'video/webm'];
