@@ -21,17 +21,17 @@ A seated, hands-first virtual workspace for creators who need to manage a live b
 - Camera/microphone tracks released when the immersive session ends or page exits.
 
 ## Demo flow
-1. Sign in and open /app on Meta Quest Browser over HTTPS.
-2. Choose the session and stream quality.
-3. Configure only the destinations used in the demo.
-4. Approve camera and microphone access.
-5. Select ENTER VR.
-6. Pinch a control to select it; pinch and hold a panel to reposition it.
-7. Select VR ARENA. Pinch or point at the five glowing targets to score 10 points per hit during the 45-second round; select EXIT ARENA to stop early.
-7. Start a broadcast and show platform status and telemetry.
-8. Ask StreamBot: “Twitch dropped. Fix it and lower quality if needed.”
-9. Show the agent activity panel and its reported actions.
+1. Open /app on Meta Quest Browser over HTTPS.
+2. Select the session and quality preset.
+3. Configure only the destination(s) used in the demo; do not display or speak stream keys.
+4. Approve camera and microphone access, then select ENTER VR.
+5. Demonstrate hands-first pinch selection and panel repositioning.
+6. Show Seated Comfort mode and its Reset behavior.
+7. Show Focus Mode and explain how it reduces workspace clutter.
+8. Play the VR Arena round, show scoring and the retained final timer, then replay.
+9. Only show live streaming after an end-to-end destination test succeeds on the Quest headset.
 
+StreamBot is intentionally excluded from this competition demo flow while its Meta model integration is being repaired.
 ## Claims and limitations
 - External comments are not automatically imported unless an official platform API/webhook is configured.
 - Cross-platform social moderation is not yet an implemented in-room action.
