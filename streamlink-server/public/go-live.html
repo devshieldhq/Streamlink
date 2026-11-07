@@ -112,7 +112,8 @@
     <video id="preview" autoplay muted playsinline></video>
     <div class="camera-placeholder" id="cameraPlaceholder">
       <p>We'll ask for camera and microphone access — that's what actually gets sent to your platforms.</p>
-      <button type="button" class="btn-primary" id="enableCameraBtn" style="cursor:pointer;position:relative;z-index:10;pointer-events:auto">Enable camera</button>\n      <p id="captureStatus" role="status" aria-live="polite" style="min-height:18px;color:var(--muted);font-size:12px"></p>
+      <button type="button" class="btn-primary" id="enableCameraBtn" style="cursor:pointer;position:relative;z-index:10;pointer-events:auto">Enable camera</button>
+      <p id="captureStatus" role="status" aria-live="polite" style="min-height:18px;color:var(--muted);font-size:12px"></p>
     </div>
   </div>
   <div class="camera-tools" id="cameraTools"><button type="button" id="addWebcamBtn">＋ Add webcam overlay</button><button type="button" id="removeWebcamBtn" class="remove-webcam" style="display:none">Remove webcam</button></div>
@@ -306,7 +307,18 @@ document.getElementById('enableCameraBtn').addEventListener('click', async (even
         document.getElementById('enableCameraBtn').textContent = 'Share game / screen';
       });
     } else {
-      cameraStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+      // Open the webcam separately so a missing microphone cannot block it.
+      const webcamOnly = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+      let microphoneOnly = null;
+      try {
+        microphoneOnly = await navigator.mediaDevices.getUserMedia({ video: false, audio: true });
+      } catch (micError) {
+        setCopilot('Camera is ready. Microphone access is unavailable; camera preview can still work.');
+      }
+      cameraStream = new MediaStream([
+        ...webcamOnly.getVideoTracks(),
+        ...(microphoneOnly ? microphoneOnly.getAudioTracks() : [])
+      ]);
       document.getElementById('preview').srcObject = cameraStream;
     }
     document.getElementById('cameraPlaceholder').style.display = 'none';
