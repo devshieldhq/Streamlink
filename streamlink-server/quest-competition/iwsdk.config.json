@@ -16,6 +16,6 @@
     }
   },
   "dev": {
-    "emulator": { "device": "metaQuest3", "activation": "always", "injectOnBuild": true }
+    "emulator": { "device": "metaQuest3", "activation": "always", "injectOnBuild": false }
   }
 }
