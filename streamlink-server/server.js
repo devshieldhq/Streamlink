@@ -151,7 +151,13 @@ app.get('/config.js', (req, res) => {
   })};`);
 });
 
-// Retire the legacy Three.js VR route: IWSDK is the sole VR experience.\napp.use((req, res, next) => {\n  if (req.path === '/app' || req.path === '/streamlink-xr.html') return res.redirect(308, '/quest/');\n  next();\n});\n\n// Inject the shared StreamBot widget into every public HTML page.
+// Retire the legacy Three.js VR route: IWSDK is the sole VR experience.
+app.use((req, res, next) => {
+  if (req.path === '/app' || req.path === '/streamlink-xr.html') return res.redirect(308, '/quest/');
+  next();
+});
+
+// Inject the shared StreamBot widget into every public HTML page.
 app.use((req, res, next) => {
   if (req.method !== 'GET') return next();
   const route = req.path === '/app' ? '/streamlink-xr.html' : (req.path === '/live' || req.path === '/gamey') ? '/go-live.html' : req.path === '/' ? '/index.html' : req.path;
