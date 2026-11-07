@@ -25,3 +25,21 @@ jobs:
       - run: npm install
       - run: npm run typecheck
       - run: npm run build
+      - name: Build the complete StreamLink Docker image
+        working-directory: streamlink-server
+        run: docker build -t streamlink-xr-ci .
+      - name: Smoke-test the Quest route and legacy redirect
+        working-directory: .
+        shell: bash
+        run: |
+          docker run -d --rm --name streamlink-xr-ci -p 3000:3000 -e PORT=3000 streamlink-xr-ci
+          trap 'docker stop streamlink-xr-ci >/dev/null 2>&1 || true' EXIT
+          for attempt in {1..30}; do
+            if curl -fsS http://localhost:3000/quest/ -o /tmp/quest.html; then break; fi
+            sleep 2
+          done
+          grep -q 'StreamLink XR' /tmp/quest.html
+          code=$(curl -sS -o /dev/null -w '%{http_code}' --max-redirs 0 http://localhost:3000/app)
+          test "$code" = "308"
+          redirect=$(curl -sSI http://localhost:3000/app | awk 'BEGIN{IGNORECASE=1} /^location:/ {print $2}' | tr -d '\r')
+          test "$redirect" = "/quest/"
