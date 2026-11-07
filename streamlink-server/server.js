@@ -173,6 +173,7 @@ app.use((req, res, next) => {
     res.type('html').send(html.includes('</body>') ? html.replace('</body>', assets + '</body>') : html + assets);
   });
 });
+app.get('/desktop-xr', (req, res) => res.sendFile(path.join(STATIC_ROOT, 'desktop-xr.html')));
 app.get('/quest', (req, res, next) => {
   if (req.path === '/quest') return res.redirect(308, '/quest/');
   next();
