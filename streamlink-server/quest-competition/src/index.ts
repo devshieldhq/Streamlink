@@ -194,17 +194,13 @@ function connectSocket() {
   socket.on('recovering', ({ attempt }: { attempt: number }) => statusText(`Auto-recovering stream · attempt ${attempt}`));
   socket.on('recovered', () => statusText('Stream recovered.'));
   socket.on('streamWarning', ({ message }: { message: string }) => statusText(message));
-  socket.on('agentStep', (step: any) => {
-    if (step?.text) statusText(step.text);
-    if (step?.phase === 'result' && step.ok && step.tool === 'stop_stream') setStreamUi(false);
-  });
   socket.on('stopped', () => setStreamUi(false));
 }
 
 async function ensureCapture() {
   if (cameraStream) return;
   if (!navigator.mediaDevices?.getUserMedia || !window.MediaRecorder) {
-    throw new Error('This browser does not support camera streaming. Try Classic VR or Gamey.');
+    throw new Error('This browser does not support camera streaming. Use Gamey on a desktop browser instead.');
   }
   cameraStream = await navigator.mediaDevices.getUserMedia({
     video: { width: { ideal: 1280 }, height: { ideal: 720 }, frameRate: { ideal: 30 } },
