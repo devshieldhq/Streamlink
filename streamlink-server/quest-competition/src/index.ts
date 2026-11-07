@@ -1,7 +1,7 @@
-import { OneHandGrabbable, World } from '@iwsdk/core';
+import { createComponent, createSystem, OneHandGrabbable, PokeInteractable, Pressed, RayInteractable, Types, World } from '@iwsdk/core';
 import {
-  BoxGeometry, DirectionalLight, Mesh, MeshStandardMaterial, PlaneGeometry,
-  SphereGeometry, Vector3
+  BoxGeometry, CanvasTexture, DirectionalLight, Group, Mesh, MeshBasicMaterial, MeshStandardMaterial, PlaneGeometry,
+  SphereGeometry, TorusGeometry, Vector3
 } from 'three';
 import projectOptions from 'virtual:iwsdk-project';
 
@@ -361,3 +361,239 @@ try {
 } catch (error) {
   statusText(error instanceof Error ? error.message : 'Studio setup failed.');
 }
+
+
+// ─── IWSDK HANDS-FIRST CREATOR CONTROLS + VR ARENA ──────────────────────────
+// The controls below are actual 3D scene entities. IWSDK's pointer system
+// handles hand pinch, poke, and controller rays through RayInteractable.
+const QuestButton = createComponent('QuestStudioButton', {
+  action: { type: Types.String, default: '' },
+});
+const ArenaTarget = createComponent('QuestArenaTarget', {
+  active: { type: Types.Boolean, default: true },
+});
+
+let arenaActive = false;
+let arenaScore = 0;
+let arenaSeconds = 45;
+let arenaDeadline = 0;
+let arenaTimer: number | null = null;
+const arenaMeshes = new Set<Mesh>();
+const actionByEntity = new Map<number, string>();
+const actionHandlers = new Map<string, () => void>();
+const pressedButtons = new Set<number>();
+const pressedTargets = new Set<number>();
+
+const panelCanvas = document.createElement('canvas');
+panelCanvas.width = 1024;
+panelCanvas.height = 640;
+const panelCtx = panelCanvas.getContext('2d');
+if (!panelCtx) throw new Error('Could not create Quest Studio panel canvas');
+const panelTexture = new CanvasTexture(panelCanvas);
+const panelMaterial = new MeshBasicMaterial({ map: panelTexture, transparent: true });
+const panelMesh = new Mesh(new PlaneGeometry(1.25, 0.78), panelMaterial);
+panelMesh.position.set(0, 1.52, -1.18);
+panelMesh.userData.label = 'StreamLink Quest Studio control panel';
+world.createTransformEntity(panelMesh).addComponent(OneHandGrabbable, { rotate: true, translate: true });
+
+function drawQuestPanel() {
+  const ctx = panelCtx!;
+  ctx.clearRect(0, 0, 1024, 640);
+  const gradient = ctx.createLinearGradient(0, 0, 1024, 640);
+  gradient.addColorStop(0, '#101b35');
+  gradient.addColorStop(1, '#080d1b');
+  ctx.fillStyle = gradient;
+  ctx.beginPath(); ctx.roundRect(8, 8, 1008, 624, 30); ctx.fill();
+  ctx.strokeStyle = '#49649a'; ctx.lineWidth = 5; ctx.stroke();
+  ctx.fillStyle = '#f4f7ff'; ctx.font = 'bold 46px Inter, sans-serif';
+  ctx.fillText('STREAMLINK XR', 48, 76);
+  ctx.fillStyle = '#9fb2d6'; ctx.font = '24px Inter, sans-serif';
+  ctx.fillText('HANDS-FIRST CREATOR STUDIO', 48, 116);
+  ctx.fillStyle = streamActive ? '#42e6a4' : '#aab8d2';
+  ctx.font = 'bold 28px Inter, sans-serif';
+  ctx.fillText(streamActive ? '● STREAM LIVE' : '● STREAM IDLE', 48, 168);
+  ctx.fillStyle = '#dce6fb'; ctx.font = '25px Inter, sans-serif';
+  ctx.fillText(`Quality: ${currentQuality.toUpperCase()}     Arena: ${arenaActive ? 'PLAYING' : 'READY'}`, 48, 218);
+  ctx.fillStyle = '#42e6a4'; ctx.font = 'bold 30px Inter, sans-serif';
+  ctx.fillText(`ARENA SCORE  ${arenaScore}     TIME  ${arenaSeconds}s`, 48, 276);
+  ctx.fillStyle = '#aab8d2'; ctx.font = '21px Inter, sans-serif';
+  ctx.fillText('Pinch or poke the floating buttons. Grab this panel to reposition it.', 48, 330);
+  ctx.fillText('Use the physical headset menu to exit the immersive session.', 48, 370);
+  panelTexture.needsUpdate = true;
+}
+function refreshQuestPanel() { drawQuestPanel(); }
+
+function makeQuestButton(label: string, action: string, x: number, y: number, color: number) {
+  const canvas = document.createElement('canvas');
+  canvas.width = 512; canvas.height = 180;
+  const ctx = canvas.getContext('2d')!;
+  ctx.fillStyle = '#0c1730';
+  ctx.beginPath(); ctx.roundRect(4, 4, 504, 172, 26); ctx.fill();
+  ctx.strokeStyle = '#' + color.toString(16).padStart(6, '0');
+  ctx.lineWidth = 8; ctx.stroke();
+  ctx.fillStyle = '#f5f8ff'; ctx.font = 'bold 48px Inter, sans-serif';
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.fillText(label, 256, 90);
+  const texture = new CanvasTexture(canvas);
+  const mesh = new Mesh(new PlaneGeometry(0.34, 0.12), new MeshBasicMaterial({ map: texture, transparent: true }));
+  mesh.position.set(x, y, -1.155);
+  mesh.userData.action = action;
+  const entity = world.createTransformEntity(mesh);
+  entity.addComponent(RayInteractable).addComponent(PokeInteractable).addComponent(QuestButton, { action });
+  actionByEntity.set(entity.index, action);
+  return entity;
+}
+
+function spawnArenaTarget() {
+  const color = [0x31d6ff, 0x8b7bff, 0xffb84d, 0x42e6a4, 0xff668c][Math.floor(Math.random() * 5)];
+  const mesh = new Mesh(
+    new SphereGeometry(0.13, 24, 18),
+    new MeshStandardMaterial({ color, emissive: color, emissiveIntensity: 0.8, roughness: 0.22, metalness: 0.25 }),
+  );
+  const angle = Math.random() * Math.PI * 2;
+  const radius = 0.65 + Math.random() * 0.9;
+  mesh.position.set(Math.cos(angle) * radius, 1.15 + Math.random() * 1.15, -2.0 - Math.random() * 0.6);
+  const ring = new Mesh(new TorusGeometry(0.19, 0.014, 8, 32), new MeshBasicMaterial({ color: 0xffffff }));
+  mesh.add(ring);
+  const entity = world.createTransformEntity(mesh);
+  entity.addComponent(RayInteractable).addComponent(PokeInteractable).addComponent(ArenaTarget);
+  arenaMeshes.add(mesh);
+  return entity;
+}
+function clearArena() {
+  for (const mesh of arenaMeshes) {
+    const entity = world.entities?.find?.((candidate: any) => candidate.object3D === mesh);
+    entity?.destroy?.();
+    mesh.parent?.remove(mesh);
+    mesh.geometry.dispose();
+    (mesh.material as MeshStandardMaterial).dispose();
+    mesh.children.forEach(child => {
+      (child as Mesh).geometry?.dispose?.();
+      const material = (child as Mesh).material;
+      if (material && !Array.isArray(material)) material.dispose();
+    });
+  }
+  arenaMeshes.clear();
+}
+function stopArena(message = 'Arena complete') {
+  arenaActive = false;
+  if (arenaTimer !== null) window.clearInterval(arenaTimer);
+  arenaTimer = null;
+  clearArena();
+  statusText(`${message} · final score: ${arenaScore}`);
+  refreshQuestPanel();
+}
+function startArena() {
+  if (arenaActive) { stopArena('Arena stopped'); return; }
+  arenaActive = true;
+  arenaScore = 0;
+  arenaSeconds = 45;
+  arenaDeadline = Date.now() + 45000;
+  clearArena();
+  for (let i = 0; i < 5; i++) spawnArenaTarget();
+  if (arenaTimer !== null) window.clearInterval(arenaTimer);
+  arenaTimer = window.setInterval(() => {
+    arenaSeconds = Math.max(0, Math.ceil((arenaDeadline - Date.now()) / 1000));
+    if (arenaSeconds <= 0) stopArena('Time is up');
+    else refreshQuestPanel();
+  }, 250);
+  statusText('VR Arena started · pinch or poke glowing targets for 10 points each.');
+  refreshQuestPanel();
+}
+function registerQuestAction(action: string, handler: () => void) {
+  actionHandlers.set(action, handler);
+}
+
+registerQuestAction('stream', () => {
+  if (streamActive) void stopStream();
+  else {
+    sessionId = sessionInput?.value.trim() || sessionId;
+    currentQuality = qualityInput?.value || 'high';
+    configuredPlatforms = collectPlatforms();
+    if (window.SLAuth?.enabled && currentUser && configuredPlatforms.length) void window.SLAuth.saveCredentials(configuredPlatforms);
+    void startStream();
+  }
+});
+registerQuestAction('quality', () => {
+  const options = ['ultra', 'high', 'medium', 'low', 'mobile'];
+  const current = options.indexOf(currentQuality);
+  currentQuality = options[(current + 1) % options.length];
+  if (qualityInput) qualityInput.value = currentQuality;
+  void setQuality();
+  refreshQuestPanel();
+});
+registerQuestAction('arena', startArena);
+registerQuestAction('focus', () => {
+  const panel = byId<HTMLDivElement>('studio-panel');
+  panel?.classList.toggle('hidden');
+  statusText(panel?.classList.contains('hidden') ? 'Focus mode on · use the in-world controls.' : 'Focus mode off.');
+});
+registerQuestAction('comfort', () => {
+  statusText('Comfort mode: seated-friendly layout. Keep the studio panel within comfortable reach.');
+  panelMesh.position.set(0, 1.35, -1.15);
+  panelMesh.scale.setScalar(0.92);
+});
+registerQuestAction('reset', () => {
+  panelMesh.position.set(0, 1.52, -1.18);
+  panelMesh.rotation.set(0, 0, 0);
+  panelMesh.scale.setScalar(1);
+  statusText('Studio panel layout reset.');
+});
+registerQuestAction('agent', () => {
+  const input = agentInput;
+  if (input && input.value.trim()) void sendAgentCommand();
+  else statusText('Enter an agent command in the StreamLink panel, then select AGENT.');
+});
+
+makeQuestButton('GO LIVE / STOP', 'stream', -0.32, 1.32, 0x42e6a4);
+makeQuestButton('QUALITY', 'quality', 0.08, 1.32, 0x31d6ff);
+makeQuestButton('VR ARENA', 'arena', 0.48, 1.32, 0xffb84d);
+makeQuestButton('FOCUS', 'focus', -0.32, 1.17, 0x8b7bff);
+makeQuestButton('COMFORT', 'comfort', 0.08, 1.17, 0x42e6a4);
+makeQuestButton('RESET', 'reset', 0.48, 1.17, 0xff668c);
+makeQuestButton('STREAM AGENT', 'agent', 0.08, 1.02, 0x8b7bff);
+
+class QuestInteractionSystem extends createSystem({
+  buttons: { required: [QuestButton, Pressed] },
+  targets: { required: [ArenaTarget, Pressed] },
+}) {
+  update() {
+    this.queries.buttons.entities.forEach((entity: any) => {
+      if (pressedButtons.has(entity.index)) return;
+      pressedButtons.add(entity.index);
+      const action = QuestButton.data.action[entity.index];
+      actionHandlers.get(action)?.();
+    });
+    const currentlyPressed = new Set<number>();
+    this.queries.buttons.entities.forEach((entity: any) => currentlyPressed.add(entity.index));
+    for (const id of pressedButtons) if (!currentlyPressed.has(id)) pressedButtons.delete(id);
+
+    this.queries.targets.entities.forEach((entity: any) => {
+      if (pressedTargets.has(entity.index) || !arenaActive) return;
+      pressedTargets.add(entity.index);
+      const mesh = entity.object3D as Mesh | undefined;
+      if (mesh) {
+        arenaMeshes.delete(mesh);
+        mesh.parent?.remove(mesh);
+        mesh.geometry.dispose();
+        (mesh.material as MeshStandardMaterial).dispose();
+        mesh.children.forEach(child => {
+          (child as Mesh).geometry?.dispose?.();
+          const material = (child as Mesh).material;
+          if (material && !Array.isArray(material)) material.dispose();
+        });
+      }
+      entity.destroy?.();
+      arenaScore += 10;
+      statusText(`Target hit! +10 · Score: ${arenaScore}`);
+      spawnArenaTarget();
+      refreshQuestPanel();
+    });
+    const currentlyHit = new Set<number>();
+    this.queries.targets.entities.forEach((entity: any) => currentlyHit.add(entity.index));
+    for (const id of pressedTargets) if (!currentlyHit.has(id)) pressedTargets.delete(id);
+  }
+}
+world.registerSystem(QuestInteractionSystem);
+drawQuestPanel();
+world.scene.add(panelMesh);
