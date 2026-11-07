@@ -583,6 +583,7 @@ let arenaPanel;
 let arenaActive = false;
 let arenaScore = 0;
 let arenaEndTime = 0;
+let arenaFinalTime = ARENA_ROUND_SECONDS;
 let arenaLastSecond = -1;
 const arenaTargets = new Set();
 const ARENA_ROUND_SECONDS = 45;
@@ -659,7 +660,7 @@ function drawArenaPanel(ctx, w, h, state = {}) {
 
 function updateArenaPanel(message) {
   if (!arenaPanel) return;
-  const remaining = arenaActive ? Math.max(0, Math.ceil((arenaEndTime - performance.now()) / 1000)) : ARENA_ROUND_SECONDS;
+  const remaining = arenaActive ? Math.max(0, Math.ceil((arenaEndTime - performance.now()) / 1000)) : arenaFinalTime;
   arenaPanel.userData.redraw({ score: arenaScore, time: remaining, message: message || (arenaActive ? 'Hit every glowing target before the timer ends!' : 'Round complete. Select VR ARENA to play again.') });
 }
 
@@ -711,6 +712,7 @@ function toggleArena() {
   }
   arenaActive = true;
   arenaScore = 0;
+  arenaFinalTime = ARENA_ROUND_SECONDS;
   arenaEndTime = performance.now() + ARENA_ROUND_SECONDS * 1000;
   arenaLastSecond = -1;
   arenaPanel.visible = true;
@@ -721,6 +723,7 @@ function toggleArena() {
 }
 
 function finishArena(message) {
+  arenaFinalTime = Math.max(0, Math.ceil((arenaEndTime - performance.now()) / 1000));
   arenaActive = false;
   clearArenaTargets();
   arenaBtn.userData.redraw();
