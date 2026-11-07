@@ -548,7 +548,7 @@ makeQuestButton('VR ARENA', 'arena', 0.31, 1.25, 0xffb84d);
 makeQuestButton('FOCUS', 'focus', -0.31, 1.10, 0x8b7bff);
 makeQuestButton('COMFORT', 'comfort', 0, 1.10, 0x42e6a4);
 makeQuestButton('RESET', 'reset', 0.31, 1.10, 0xff668c);
-makeQuestButton('ADD DESTINATION', 'destination', 0, 0.98, 0x31d6ff);
+makeQuestButton('ADD DESTINATION', 'destination', 0, 1.03, 0x31d6ff);
 
 class QuestInteractionSystem extends createSystem({
   buttons: { required: [QuestButton, Pressed] },
