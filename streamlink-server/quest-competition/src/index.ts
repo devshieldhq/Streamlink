@@ -332,8 +332,8 @@ stopButton?.addEventListener('click', () => void stopStream());
 qualityInput?.addEventListener('change', () => void setQuality());
 window.addEventListener('pagehide', () => {
   // Best-effort relay shutdown when the user closes or navigates away from Quest Studio.
+  // stopStream also releases any active camera/microphone tracks.
   if (streamActive || recorder || cameraStream) void stopStream();
-  else if (cameraStream) cameraStream.getTracks().forEach((track) => track.stop());
   if (socket) socket.disconnect();
   if (arenaActive) stopArena('Arena paused');
 });
