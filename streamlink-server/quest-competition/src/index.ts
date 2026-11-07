@@ -359,6 +359,7 @@ const ArenaTarget = createComponent('QuestArenaTarget', {
 });
 
 let arenaActive = false;
+let arenaPaused = false;
 let arenaScore = 0;
 let arenaSeconds = 45;
 let arenaDeadline = 0;
@@ -399,7 +400,7 @@ function drawQuestPanel() {
   ctx.font = 'bold 28px Inter, sans-serif';
   ctx.fillText(streamActive ? '● STREAM LIVE' : '● STREAM IDLE', 48, 168);
   ctx.fillStyle = '#dce6fb'; ctx.font = '25px Inter, sans-serif';
-  ctx.fillText(`Quality: ${currentQuality.toUpperCase()}     Arena: ${arenaActive ? 'PLAYING' : 'READY'}`, 48, 218);
+  ctx.fillText(`Quality: ${currentQuality.toUpperCase()}     Arena: ${arenaActive ? (arenaPaused ? 'PAUSED' : 'PLAYING') : 'READY'}`, 48, 218);
   ctx.fillStyle = '#42e6a4'; ctx.font = 'bold 30px Inter, sans-serif';
   ctx.fillText(`ARENA SCORE  ${arenaScore}     TIME  ${arenaSeconds}s`, 48, 276);
   ctx.fillStyle = '#aab8d2'; ctx.font = '21px Inter, sans-serif';
@@ -463,6 +464,7 @@ function clearArena() {
 }
 function stopArena(message = 'Arena complete') {
   arenaActive = false;
+  arenaPaused = false;
   if (arenaTimer !== null) window.clearInterval(arenaTimer);
   arenaTimer = null;
   clearArena();
@@ -472,6 +474,7 @@ function stopArena(message = 'Arena complete') {
 function startArena() {
   if (arenaActive) { stopArena('Arena stopped'); return; }
   arenaActive = true;
+  arenaPaused = false;
   arenaScore = 0;
   arenaSeconds = 45;
   arenaDeadline = Date.now() + 45000;
@@ -484,6 +487,28 @@ function startArena() {
     else refreshQuestPanel();
   }, 250);
   statusText('VR Arena started · pinch or poke glowing targets for 10 points each.');
+  refreshQuestPanel();
+}
+function pauseArena() {
+  if (!arenaActive) {
+    statusText('Start VR Arena before pausing.');
+    return;
+  }
+  if (!arenaPaused) {
+    arenaPaused = true;
+    if (arenaTimer !== null) window.clearInterval(arenaTimer);
+    arenaTimer = null;
+    statusText(`Arena paused · score ${arenaScore} · ${arenaSeconds}s remaining.`);
+  } else {
+    arenaPaused = false;
+    arenaDeadline = Date.now() + arenaSeconds * 1000;
+    arenaTimer = window.setInterval(() => {
+      arenaSeconds = Math.max(0, Math.ceil((arenaDeadline - Date.now()) / 1000));
+      if (arenaSeconds <= 0) stopArena('Time is up');
+      else refreshQuestPanel();
+    }, 250);
+    statusText('Arena resumed.');
+  }
   refreshQuestPanel();
 }
 function registerQuestAction(action: string, handler: () => void) {
@@ -509,6 +534,7 @@ registerQuestAction('quality', () => {
   refreshQuestPanel();
 });
 registerQuestAction('arena', startArena);
+registerQuestAction('pause', pauseArena);
 registerQuestAction('focus', () => {
   const panel = byId<HTMLDivElement>('studio-panel');
   panel?.classList.toggle('hidden');
@@ -549,7 +575,8 @@ makeQuestButton('VR ARENA', 'arena', 0.31, 1.25, 0xffb84d);
 makeQuestButton('FOCUS', 'focus', -0.31, 1.10, 0x8b7bff);
 makeQuestButton('COMFORT', 'comfort', 0, 1.10, 0x42e6a4);
 makeQuestButton('RESET', 'reset', 0.31, 1.10, 0xff668c);
-makeQuestButton('ADD DESTINATION', 'destination', 0, 1.03, 0x31d6ff);
+makeQuestButton('PAUSE', 'pause', -0.16, 1.03, 0xffb84d);
+makeQuestButton('ADD DEST', 'destination', 0.16, 1.03, 0x31d6ff);
 
 class QuestInteractionSystem extends createSystem({
   buttons: { required: [QuestButton, Pressed] },
@@ -567,7 +594,7 @@ class QuestInteractionSystem extends createSystem({
     for (const id of pressedButtons) if (!currentlyPressed.has(id)) pressedButtons.delete(id);
 
     this.queries.targets.entities.forEach((entity: any) => {
-      if (pressedTargets.has(entity.index) || !arenaActive) return;
+      if (pressedTargets.has(entity.index) || !arenaActive || arenaPaused) return;
       pressedTargets.add(entity.index);
       const mesh = entity.object3D as Mesh | undefined;
       if (mesh) {
