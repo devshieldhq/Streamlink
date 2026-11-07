@@ -36,33 +36,25 @@ jobs:
           trap 'docker rm -f streamlink-xr-ci >/dev/null 2>&1 || true' EXIT
           ready=false
           for attempt in {1..30}; do
-            if curl -fsS http://localhost:3000/quest/ -o /tmp/quest.html; then
-              ready=true
-              break
-            fi
+            quest_code=$(curl -sS -o /tmp/quest.html -w '%{http_code}' http://localhost:3000/quest/ || true)
+            if [ "$quest_code" = "200" ]; then ready=true; break; fi
             running=$(docker inspect -f '{{.State.Running}}' streamlink-xr-ci 2>/dev/null || echo false)
             if [ "$running" != "true" ]; then break; fi
             sleep 2
           done
-          if [ "$ready" != "true" ]; then
-            echo "StreamLink container did not serve /quest/."
-            docker logs streamlink-xr-ci || true
-            exit 1
-          fi
-          grep -q 'StreamLink XR' /tmp/quest.html
-          curl -fsS http://localhost:3000/config.js -o /tmp/config.js
-          grep -q '__SUPABASE__' /tmp/config.js
-          curl -fsS http://localhost:3000/platforms -o /tmp/platforms.json
-          grep -q 'youtube' /tmp/platforms.json
-          echo "--- Server logs after initial route checks ---"
-          docker logs streamlink-xr-ci || true
-          code=$(curl -sv --max-redirs 0 http://localhost:3000/app -o /dev/null 2>&1 | tee /tmp/legacy-curl.log | awk '/^< HTTP\// {print $3}' | tail -1 || true)
-          echo "--- /app curl transcript ---"
-          cat /tmp/legacy-curl.log || true
-          echo "--- Server logs after /app request ---"
+          config_code=$(curl -sS -o /tmp/config.js -w '%{http_code}' http://localhost:3000/config.js || true)
+          platforms_code=$(curl -sS -o /tmp/platforms.json -w '%{http_code}' http://localhost:3000/platforms || true)
+          legacy_code=$(curl -sS -o /dev/null -w '%{http_code}' --max-redirs 0 http://localhost:3000/app || true)
+          redirect=$(curl -sSI http://localhost:3000/app 2>/dev/null | awk 'tolower($1)=="location:" {gsub("\\r", "", $2); print $2}' || true)
+          echo "Quest route: $quest_code; config route: $config_code; platforms route: $platforms_code; legacy route: $legacy_code; redirect: $redirect"
+          echo "--- StreamLink container logs ---"
           docker logs streamlink-xr-ci || true
           docker inspect -f 'container state: {{.State.Status}} exit={{.State.ExitCode}}' streamlink-xr-ci || true
-          test "$code" = "308"
-          test "$code" = "308"
-          redirect=$(curl -sSI http://localhost:3000/app | awk 'tolower($1)=="location:" {gsub("\r", "", $2); print $2}')
+          test "$ready" = "true"
+          grep -q 'StreamLink XR' /tmp/quest.html
+          test "$config_code" = "200"
+          grep -q '__SUPABASE__' /tmp/config.js
+          test "$platforms_code" = "200"
+          grep -q 'youtube' /tmp/platforms.json
+          test "$legacy_code" = "308"
           test "$redirect" = "/quest/"
