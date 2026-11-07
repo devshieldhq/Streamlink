@@ -112,7 +112,7 @@
     <video id="preview" autoplay muted playsinline></video>
     <div class="camera-placeholder" id="cameraPlaceholder">
       <p>We'll ask for camera and microphone access — that's what actually gets sent to your platforms.</p>
-      <button type="button" class="btn-primary" id="enableCameraBtn" style="cursor:pointer;position:relative;z-index:2">Enable camera</button>\n      <p id="captureStatus" role="status" aria-live="polite" style="min-height:18px;color:var(--muted);font-size:12px"></p>
+      <button type="button" class="btn-primary" id="enableCameraBtn" style="cursor:pointer;position:relative;z-index:10;pointer-events:auto">Enable camera</button>\n      <p id="captureStatus" role="status" aria-live="polite" style="min-height:18px;color:var(--muted);font-size:12px"></p>
     </div>
   </div>
   <div class="camera-tools" id="cameraTools"><button type="button" id="addWebcamBtn">＋ Add webcam overlay</button><button type="button" id="removeWebcamBtn" class="remove-webcam" style="display:none">Remove webcam</button></div>
@@ -274,8 +274,14 @@ function setPlatformStatus(name, status) {
 }
 
 /* ---------- camera capture ---------- */
-document.getElementById('enableCameraBtn').addEventListener('click', async () => {
+document.getElementById('enableCameraBtn').addEventListener('click', async (event) => {
+  event.preventDefault();
+  const captureStatus = document.getElementById('captureStatus');
+  captureStatus.textContent = 'Button clicked · requesting browser capture permission…';
+  const captureButton = document.getElementById('enableCameraBtn');
+  captureButton.disabled = true;
   try {
+    if (!navigator.mediaDevices) throw new Error('Media access unavailable. Open this page over HTTPS in a supported browser.');
     if (gameMode) {
       // Capture gameplay from a selected game window, browser tab, or full display.
       displayStream = await navigator.mediaDevices.getDisplayMedia({ video: { frameRate: { ideal: 30, max: 60 } }, audio: true });
@@ -306,8 +312,12 @@ document.getElementById('enableCameraBtn').addEventListener('click', async () =>
     document.getElementById('cameraPlaceholder').style.display = 'none';
     document.getElementById('goBtn').disabled = false;
     document.getElementById('goBtn').textContent = 'Go live';
+    captureStatus.textContent = 'Capture is ready. You can Go live.';
+    captureButton.disabled = false;
   } catch (e) {
+    captureStatus.textContent = `Capture error: ${e.message}`;
     setCopilot(`${gameMode ? 'Game/screen' : 'Camera/mic'} capture was denied or unavailable: ${e.message}`);
+    captureButton.disabled = false;
   }
 });
 
