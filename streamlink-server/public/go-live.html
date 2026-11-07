@@ -306,7 +306,7 @@ document.getElementById('enableCameraBtn').addEventListener('click', async (even
         document.getElementById('enableCameraBtn').textContent = 'Share game / screen';
       });
     } else {
-      cameraStream = await navigator.mediaDevices.getUserMedia({ video: { width: 1280, height: 720, frameRate: 30 }, audio: true });
+      cameraStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
       document.getElementById('preview').srcObject = cameraStream;
     }
     document.getElementById('cameraPlaceholder').style.display = 'none';
@@ -315,8 +315,13 @@ document.getElementById('enableCameraBtn').addEventListener('click', async (even
     captureStatus.textContent = 'Capture is ready. You can Go live.';
     captureButton.disabled = false;
   } catch (e) {
-    captureStatus.textContent = `Capture error: ${e.message}`;
-    setCopilot(`${gameMode ? 'Game/screen' : 'Camera/mic'} capture was denied or unavailable: ${e.message}`);
+    const friendlyError = e.name === 'NotFoundError' || e.name === 'DevicesNotFoundError'
+      ? 'No camera was detected. Connect or enable a camera, then try again. To stream gameplay without a webcam, use Gamey and choose Share screen.'
+      : e.name === 'NotAllowedError' || e.name === 'PermissionDeniedError'
+        ? 'Camera permission is blocked. Allow camera and microphone access in your browser site settings, then retry.'
+        : `Capture failed (${e.name || 'Error'}): ${e.message}`;
+    captureStatus.textContent = friendlyError;
+    setCopilot(friendlyError);
     captureButton.disabled = false;
   }
 });
