@@ -64,5 +64,5 @@ jobs:
           docker inspect -f 'container state: {{.State.Status}} exit={{.State.ExitCode}}' streamlink-xr-ci || true
           test "$code" = "308"
           test "$code" = "308"
-          redirect=$(curl -sSI http://localhost:3000/app | awk 'BEGIN{IGNORECASE=1} /^location:/ {print $2}' | tr -d '\\r')
+          redirect=$(curl -sSI http://localhost:3000/app | awk 'BEGIN{IGNORECASE=1} /^location:/ {gsub("\r", "", $2); print $2}')
           test "$redirect" = "/quest/"
