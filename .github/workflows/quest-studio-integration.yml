@@ -52,7 +52,13 @@ jobs:
           grep -q 'StreamLink XR' /tmp/quest.html
           curl -fsS http://localhost:3000/config.js | grep -q '__SUPABASE__'
           curl -fsS http://localhost:3000/platforms | grep -q 'youtube'
-          code=$(curl -sS -o /dev/null -w '%{http_code}' --max-redirs 0 http://localhost:3000/app)
+          echo "--- Server logs after initial route checks ---"
+          docker logs streamlink-xr-ci || true
+          code=$(curl -sv --max-redirs 0 http://localhost:3000/app -o /dev/null 2>&1 | tee /tmp/legacy-curl.log | awk '/^< HTTP\// {print $3}' | tail -1)
+          echo "--- Server logs after /app request ---"
+          docker logs streamlink-xr-ci || true
+          docker inspect -f 'container state: {{.State.Status}} exit={{.State.ExitCode}}' streamlink-xr-ci || true
+          test "$code" = "308"
           test "$code" = "308"
           redirect=$(curl -sSI http://localhost:3000/app | awk 'BEGIN{IGNORECASE=1} /^location:/ {print $2}' | tr -d '\\r')
           test "$redirect" = "/quest/"
