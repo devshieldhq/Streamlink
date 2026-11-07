@@ -97,6 +97,7 @@ function setStreamUi(active: boolean) {
   if (startButton) startButton.disabled = active;
   if (stopButton) stopButton.disabled = !active;
   setTelemetry();
+  refreshQuestPanel();
 }
 function safeLabel(platform: PlatformMeta) { return platform.label || platform.name; }
 
@@ -296,6 +297,7 @@ async function setQuality() {
   });
   if (!response.ok) statusText('Could not update stream quality.');
   else statusText(`Stream quality changed to ${currentQuality}.`);
+  refreshQuestPanel();
 }
 async function sendAgentCommand() {
   const message = agentInput?.value.trim();
@@ -379,6 +381,7 @@ let arenaSeconds = 45;
 let arenaDeadline = 0;
 let arenaTimer: number | null = null;
 const arenaMeshes = new Set<Mesh>();
+const arenaEntities = new Map<Mesh, any>();
 const actionByEntity = new Map<number, string>();
 const actionHandlers = new Map<string, () => void>();
 const pressedButtons = new Set<number>();
@@ -436,9 +439,10 @@ function makeQuestButton(label: string, action: string, x: number, y: number, co
   ctx.fillText(label, 256, 90);
   const texture = new CanvasTexture(canvas);
   const mesh = new Mesh(new PlaneGeometry(0.34, 0.12), new MeshBasicMaterial({ map: texture, transparent: true }));
-  mesh.position.set(x, y, -1.155);
+  mesh.position.set(x, y - 1.52, 0.025);
   mesh.userData.action = action;
   const entity = world.createTransformEntity(mesh);
+  panelMesh.add(mesh);
   entity.addComponent(RayInteractable).addComponent(PokeInteractable).addComponent(QuestButton, { action });
   actionByEntity.set(entity.index, action);
   return entity;
@@ -458,12 +462,13 @@ function spawnArenaTarget() {
   const entity = world.createTransformEntity(mesh);
   entity.addComponent(RayInteractable).addComponent(PokeInteractable).addComponent(ArenaTarget);
   arenaMeshes.add(mesh);
+  arenaEntities.set(mesh, entity);
   return entity;
 }
 function clearArena() {
   for (const mesh of arenaMeshes) {
-    const entity = world.entities?.find?.((candidate: any) => candidate.object3D === mesh);
-    entity?.destroy?.();
+    arenaEntities.get(mesh)?.destroy?.();
+    arenaEntities.delete(mesh);
     mesh.parent?.remove(mesh);
     mesh.geometry.dispose();
     (mesh.material as MeshStandardMaterial).dispose();
@@ -574,6 +579,7 @@ class QuestInteractionSystem extends createSystem({
       const mesh = entity.object3D as Mesh | undefined;
       if (mesh) {
         arenaMeshes.delete(mesh);
+        arenaEntities.delete(mesh);
         mesh.parent?.remove(mesh);
         mesh.geometry.dispose();
         (mesh.material as MeshStandardMaterial).dispose();
