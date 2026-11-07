@@ -1,0 +1,7 @@
+# Keep local dependencies and generated assets out of the Docker build context.
+node_modules/
+**/node_modules/
+quest-competition/dist/
+public/quest/
+.git/
+*.log
