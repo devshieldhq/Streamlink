@@ -40,6 +40,7 @@ Before submission, the entrant must personally confirm: age requirement, Develop
 - [ ] Existing /config.js, Supabase auth, platform credentials, stream APIs, FFmpeg and Socket.IO remain functional.
 
 ### XR / gameplay checks
+- [ ] Run the IWSDK development server with `cd streamlink-server/quest-competition && npm install && npm run dev`; use the injected IWER Quest 3 emulator to enter XR and test hands / pointers on desktop.
 - [ ] Quest Browser opens the app over HTTPS and enters immersive VR.
 - [ ] Hands are available without pairing controllers.
 - [ ] Pinch and poke operate every in-world control.
