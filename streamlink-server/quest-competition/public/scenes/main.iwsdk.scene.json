@@ -6,9 +6,6 @@
       "sky": [0.025, 0.045, 0.12, 1],
       "equator": [0.06, 0.09, 0.18, 1],
       "ground": [0.015, 0.025, 0.06, 1],
-      "elevationDeg": 25,
-      "azimuthDeg": -35,
-      "dither": true
     },
     "com.iwsdk.components.IBLGradient": {
       "sky": [0.12, 0.16, 0.28, 1],
