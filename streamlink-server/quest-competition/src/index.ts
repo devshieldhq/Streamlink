@@ -332,7 +332,7 @@ agentInput?.addEventListener('keydown', (event) => {
 });
 window.addEventListener('pagehide', () => {
   if (recorder && recorder.state !== 'inactive') recorder.stop();
-  if (cameraStream) cameraStream.getTracks().forEach((track) => track.getTracks().forEach((item) => item.stop()));
+  if (cameraStream) cameraStream.getTracks().forEach((track) => track.stop());
 });
 
 const xr = (navigator as Navigator & { xr?: { isSessionSupported(mode: string): Promise<boolean> } }).xr;
