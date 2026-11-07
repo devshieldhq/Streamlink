@@ -376,8 +376,8 @@ const panelCtx = panelCanvas.getContext('2d');
 if (!panelCtx) throw new Error('Could not create Quest Studio panel canvas');
 const panelTexture = new CanvasTexture(panelCanvas);
 const panelMaterial = new MeshBasicMaterial({ map: panelTexture, transparent: true });
-const panelMesh = new Mesh(new PlaneGeometry(1.25, 0.98), panelMaterial);
-panelMesh.position.set(0, 1.55, -1.18);
+const panelMesh = new Mesh(new PlaneGeometry(0.95, 1.0), panelMaterial);
+panelMesh.position.set(0, 1.45, -0.75);
 panelMesh.userData.label = 'StreamLink Quest Studio control panel';
 world.createTransformEntity(panelMesh).addComponent(OneHandGrabbable, { rotate: true, translate: true });
 
@@ -420,8 +420,8 @@ function makeQuestButton(label: string, action: string, x: number, y: number, co
   ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
   ctx.fillText(label, 256, 90);
   const texture = new CanvasTexture(canvas);
-  const mesh = new Mesh(new PlaneGeometry(0.34, 0.12), new MeshBasicMaterial({ map: texture, transparent: true }));
-  mesh.position.set(x, y - 1.55, 0.025);
+  const mesh = new Mesh(new PlaneGeometry(0.25, 0.10), new MeshBasicMaterial({ map: texture, transparent: true }));
+  mesh.position.set(x, y - 1.45, 0.025);
   mesh.userData.action = action;
   const entity = world.createTransformEntity(mesh);
   panelMesh.add(mesh);
@@ -436,9 +436,7 @@ function spawnArenaTarget() {
     new SphereGeometry(0.13, 24, 18),
     new MeshStandardMaterial({ color, emissive: color, emissiveIntensity: 0.8, roughness: 0.22, metalness: 0.25 }),
   );
-  const angle = Math.random() * Math.PI * 2;
-  const radius = 0.65 + Math.random() * 0.9;
-  mesh.position.set(Math.cos(angle) * radius, 1.15 + Math.random() * 1.15, -2.0 - Math.random() * 0.6);
+  mesh.position.set((Math.random() - 0.5) * 0.4, 1.15 + Math.random() * 0.3, -0.5 - Math.random() * 0.2);
   const ring = new Mesh(new TorusGeometry(0.19, 0.014, 8, 32), new MeshBasicMaterial({ color: 0xffffff }));
   mesh.add(ring);
   const entity = world.createTransformEntity(mesh);
@@ -517,11 +515,11 @@ registerQuestAction('focus', () => {
 });
 registerQuestAction('comfort', () => {
   statusText('Comfort mode: seated-friendly layout. Keep the studio panel within comfortable reach.');
-  panelMesh.position.set(0, 1.4, -1.15);
+  panelMesh.position.set(0, 1.35, -0.7);
   panelMesh.scale.setScalar(0.92);
 });
 registerQuestAction('reset', () => {
-  panelMesh.position.set(0, 1.55, -1.18);
+  panelMesh.position.set(0, 1.45, -0.75);
   panelMesh.rotation.set(0, 0, 0);
   panelMesh.scale.setScalar(1);
   statusText('Studio panel layout reset.');
@@ -544,13 +542,13 @@ registerQuestAction('destination', () => {
   statusText(`${platform.label || platform.name} destination saved for this session.`);
 });
 
-makeQuestButton('GO LIVE / STOP', 'stream', -0.32, 1.32, 0x42e6a4);
-makeQuestButton('QUALITY', 'quality', 0.08, 1.32, 0x31d6ff);
-makeQuestButton('VR ARENA', 'arena', 0.48, 1.32, 0xffb84d);
-makeQuestButton('FOCUS', 'focus', -0.32, 1.17, 0x8b7bff);
-makeQuestButton('COMFORT', 'comfort', 0.08, 1.17, 0x42e6a4);
-makeQuestButton('RESET', 'reset', 0.48, 1.17, 0xff668c);
-makeQuestButton('ADD DESTINATION', 'destination', 0.24, 1.02, 0x31d6ff);
+makeQuestButton('GO LIVE / STOP', 'stream', -0.31, 1.25, 0x42e6a4);
+makeQuestButton('QUALITY', 'quality', 0, 1.25, 0x31d6ff);
+makeQuestButton('VR ARENA', 'arena', 0.31, 1.25, 0xffb84d);
+makeQuestButton('FOCUS', 'focus', -0.31, 1.10, 0x8b7bff);
+makeQuestButton('COMFORT', 'comfort', 0, 1.10, 0x42e6a4);
+makeQuestButton('RESET', 'reset', 0.31, 1.10, 0xff668c);
+makeQuestButton('ADD DESTINATION', 'destination', 0, 0.98, 0x31d6ff);
 
 class QuestInteractionSystem extends createSystem({
   buttons: { required: [QuestButton, Pressed] },
