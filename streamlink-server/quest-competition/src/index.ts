@@ -316,6 +316,7 @@ qualityInput?.addEventListener('change', () => void setQuality());
 window.addEventListener('pagehide', () => {
   if (recorder && recorder.state !== 'inactive') recorder.stop();
   if (cameraStream) cameraStream.getTracks().forEach((track) => track.stop());
+  if (arenaActive) stopArena('Arena paused');
 });
 
 const xr = (navigator as Navigator & { xr?: { isSessionSupported(mode: string): Promise<boolean> } }).xr;
