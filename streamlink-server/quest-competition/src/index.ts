@@ -106,9 +106,12 @@ async function loadAccount() {
     if (accountLine) accountLine.textContent = 'Account sign-in is not configured on this server.';
     return;
   }
-  await window.SLAuth.requireSignIn();
   currentUser = await window.SLAuth.getUser();
-  if (accountLine) accountLine.textContent = currentUser?.email ? `Signed in as ${currentUser.email}` : 'Signed in to StreamLink';
+  if (!currentUser) {
+    if (accountLine) accountLine.textContent = 'Guest mode · VR Arena is available. Sign in to enable streaming.';
+    return;
+  }
+  if (accountLine) accountLine.textContent = currentUser.email ? `Signed in as ${currentUser.email}` : 'Signed in to StreamLink';
   if (passport && currentUser) {
     const [wallet, stats] = await Promise.all([
       window.SLAuth.getWallet().catch(() => null),
@@ -252,6 +255,10 @@ async function endHistory() {
   await loadAccount();
 }
 async function startStream() {
+  if (window.SLAuth?.enabled && !currentUser) {
+    statusText('Sign in to StreamLink before starting a broadcast. VR Arena is available without signing in.');
+    return;
+  }
   if (!configuredPlatforms.length) {
     statusText('Add at least one streaming destination and its key first.');
     return;
