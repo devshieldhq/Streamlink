@@ -1,0 +1,29 @@
+name: StreamLink Quest Studio Integration
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "streamlink-server/quest-competition/**"
+      - "streamlink-server/Dockerfile"
+      - "streamlink-server/server.js"
+      - ".github/workflows/quest-studio-integration.yml"
+  push:
+    branches: [iwsdk-streamlink-integration]
+
+jobs:
+  build-quest-studio:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: streamlink-server/quest-competition
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: streamlink-server/quest-competition/package-lock.json
+      - run: npm install
+      - run: npm run typecheck
+      - run: npm run build
