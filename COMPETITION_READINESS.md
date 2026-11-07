@@ -48,7 +48,7 @@ Before submission, the entrant must personally confirm: age requirement, Develop
 - [ ] Arena starts, spawns five targets, scores +10 per hit, counts down from 45 seconds, stops cleanly, and can restart.
 - [ ] Seated use works within a comfortable reach / narrow field of view.
 - [ ] Focus, Comfort and Reset controls work.
-- [ ] Start / Stop, quality, destination entry, telemetry and agent command are tested end-to-end.
+- [ ] Start / Stop, quality, destination entry and telemetry are tested end-to-end.
 - [ ] Pause / resume and session exit do not leave camera, microphone, stream or timer resources running.
 - [ ] Measure frame rate on Quest; target at least 60 FPS.
 - [ ] Confirm free, reliable judge access without requiring a developer login or private invitation.
