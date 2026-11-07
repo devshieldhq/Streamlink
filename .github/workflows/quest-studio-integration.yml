@@ -2,14 +2,14 @@ name: StreamLink Quest Studio Integration
 
 on:
   pull_request:
-    branches: [main]
+    branches: [main, iwsdk-streamlink-integration]
     paths:
       - "streamlink-server/quest-competition/**"
       - "streamlink-server/Dockerfile"
       - "streamlink-server/server.js"
       - ".github/workflows/quest-studio-integration.yml"
   push:
-    branches: [iwsdk-streamlink-integration]
+    branches: [iwsdk-streamlink-integration, iwsdk-backend-port]
 
 jobs:
   build-quest-studio:
