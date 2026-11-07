@@ -360,6 +360,7 @@ const ArenaTarget = createComponent('QuestArenaTarget', {
 
 let arenaActive = false;
 let arenaPaused = false;
+let focusMode = false;
 let arenaScore = 0;
 let arenaSeconds = 45;
 let arenaDeadline = 0;
@@ -395,7 +396,7 @@ function drawQuestPanel() {
   ctx.fillStyle = '#f4f7ff'; ctx.font = 'bold 46px Inter, sans-serif';
   ctx.fillText('STREAMLINK XR', 48, 76);
   ctx.fillStyle = '#9fb2d6'; ctx.font = '24px Inter, sans-serif';
-  ctx.fillText('HANDS-FIRST CREATOR STUDIO', 48, 116);
+  ctx.fillText(focusMode ? 'FOCUS MODE · CREATOR STUDIO' : 'HANDS-FIRST CREATOR STUDIO', 48, 116);
   ctx.fillStyle = streamActive ? '#42e6a4' : '#aab8d2';
   ctx.font = 'bold 28px Inter, sans-serif';
   ctx.fillText(streamActive ? '● STREAM LIVE' : '● STREAM IDLE', 48, 168);
@@ -536,9 +537,13 @@ registerQuestAction('quality', () => {
 registerQuestAction('arena', startArena);
 registerQuestAction('pause', pauseArena);
 registerQuestAction('focus', () => {
+  focusMode = !focusMode;
+  floor.visible = !focusMode;
+  stage.visible = !focusMode;
   const panel = byId<HTMLDivElement>('studio-panel');
-  panel?.classList.toggle('hidden');
-  statusText(panel?.classList.contains('hidden') ? 'Focus mode on · use the in-world controls.' : 'Focus mode off.');
+  panel?.classList.toggle('hidden', focusMode);
+  statusText(focusMode ? 'Focus mode on · only the creator controls remain in view.' : 'Focus mode off · full studio visible.');
+  refreshQuestPanel();
 });
 registerQuestAction('comfort', () => {
   statusText('Comfort mode: seated-friendly layout. Keep the studio panel within comfortable reach.');
