@@ -380,6 +380,11 @@ let arenaActive = false;
 let arenaPaused = false;
 let focusMode = false;
 let arenaScore = 0;
+let arenaHits = 0;
+let arenaCombo = 0;
+let arenaBestCombo = 0;
+let arenaWave = 1;
+const ARENA_GOAL = 15;
 let arenaSeconds = 45;
 let arenaDeadline = 0;
 let arenaTimer: number | null = null;
@@ -421,9 +426,10 @@ function drawQuestPanel() {
   ctx.fillStyle = '#dce6fb'; ctx.font = '25px Inter, sans-serif';
   ctx.fillText(`Quality: ${currentQuality.toUpperCase()}     Arena: ${arenaActive ? (arenaPaused ? 'PAUSED' : 'PLAYING') : 'READY'}`, 48, 218);
   ctx.fillStyle = '#42e6a4'; ctx.font = 'bold 30px Inter, sans-serif';
-  ctx.fillText(`ARENA SCORE  ${arenaScore}     TIME  ${arenaSeconds}s`, 48, 276);
+  ctx.fillText(`SCORE ${arenaScore}   WAVE ${arenaWave}   COMBO x${Math.min(5, 1 + Math.floor(Math.max(0, arenaCombo - 1) / 3))}   TIME ${arenaSeconds}s`, 48, 276);
   ctx.fillStyle = '#aab8d2'; ctx.font = '21px Inter, sans-serif';
-  ctx.fillText('Pinch or poke the floating buttons. Grab this panel to reposition it.', 48, 330);
+  ctx.fillText(`ARENA OBJECTIVE  ${arenaHits}/${ARENA_GOAL} targets · best combo ${arenaBestCombo}`, 48, 330);
+  ctx.fillText('Pinch or poke targets. Every 5 hits advances the wave and raises the challenge.', 48, 365);
   ctx.fillText('Use the physical headset menu to exit the immersive session.', 48, 370);
   panelTexture.needsUpdate = true;
 }
@@ -453,11 +459,13 @@ function makeQuestButton(label: string, action: string, x: number, y: number, co
 
 function spawnArenaTarget() {
   const color = [0x31d6ff, 0x8b7bff, 0xffb84d, 0x42e6a4, 0xff668c][Math.floor(Math.random() * 5)];
+  const targetRadius = Math.max(0.075, 0.13 - (arenaWave - 1) * 0.012);
+  const spread = Math.min(0.9, 0.4 + (arenaWave - 1) * 0.08);
   const mesh = new Mesh(
-    new SphereGeometry(0.13, 24, 18),
+    new SphereGeometry(targetRadius, 24, 18),
     new MeshStandardMaterial({ color, emissive: color, emissiveIntensity: 0.8, roughness: 0.22, metalness: 0.25 }),
   );
-  mesh.position.set((Math.random() - 0.5) * 0.4, 1.15 + Math.random() * 0.3, -0.5 - Math.random() * 0.2);
+  mesh.position.set((Math.random() - 0.5) * spread * 2, 1.0 + Math.random() * 0.65, -0.42 - Math.random() * 0.45);
   const ring = new Mesh(new TorusGeometry(0.19, 0.014, 8, 32), new MeshBasicMaterial({ color: 0xffffff }));
   mesh.add(ring);
   const entity = world.createTransformEntity(mesh);
@@ -487,7 +495,7 @@ function stopArena(message = 'Arena complete') {
   if (arenaTimer !== null) window.clearInterval(arenaTimer);
   arenaTimer = null;
   clearArena();
-  statusText(`${message} · final score: ${arenaScore}`);
+  statusText(`${message} · score ${arenaScore} · ${arenaHits}/${ARENA_GOAL} targets · best combo ${arenaBestCombo}`);
   refreshQuestPanel();
 }
 function startArena() {
@@ -495,6 +503,10 @@ function startArena() {
   arenaActive = true;
   arenaPaused = false;
   arenaScore = 0;
+  arenaHits = 0;
+  arenaCombo = 0;
+  arenaBestCombo = 0;
+  arenaWave = 1;
   arenaSeconds = 45;
   arenaDeadline = Date.now() + 45000;
   clearArena();
@@ -505,7 +517,7 @@ function startArena() {
     if (arenaSeconds <= 0) stopArena('Time is up');
     else refreshQuestPanel();
   }, 250);
-  statusText('VR Arena started · pinch or poke glowing targets for 10 points each.');
+  statusText(`VR Arena started · hit ${ARENA_GOAL} targets in 45 seconds. Build combos for bonus points.`);
   refreshQuestPanel();
 }
 function pauseArena() {
@@ -633,9 +645,21 @@ class QuestInteractionSystem extends createSystem({
         });
       }
       entity.destroy?.();
-      arenaScore += 10;
-      statusText(`Target hit! +10 · Score: ${arenaScore}`);
-      spawnArenaTarget();
+      arenaHits += 1;
+      arenaCombo += 1;
+      arenaBestCombo = Math.max(arenaBestCombo, arenaCombo);
+      const multiplier = Math.min(5, 1 + Math.floor((arenaCombo - 1) / 3));
+      const points = 10 * multiplier;
+      arenaScore += points;
+      if (arenaHits % 5 === 0 && arenaHits < ARENA_GOAL) {
+        arenaWave += 1;
+        arenaCombo = 0;
+        statusText(`Wave ${arenaWave}! Targets are smaller and more spread out. Score: ${arenaScore}`);
+      } else {
+        statusText(`Target hit! +${points} · combo x${multiplier} · ${arenaHits}/${ARENA_GOAL}`);
+      }
+      if (arenaHits >= ARENA_GOAL) stopArena('Arena cleared');
+      else spawnArenaTarget();
       refreshQuestPanel();
     });
     const currentlyHit = new Set<number>();
