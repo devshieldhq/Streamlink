@@ -281,15 +281,31 @@ async function startStream() {
   }
 }
 async function stopStream() {
+  let stopError: unknown = null;
   try {
     await endRecording();
-    await apiFetch(`/stop/${encodeURIComponent(sessionId)}`, { method: 'POST' });
   } catch (error) {
-    statusText(error instanceof Error ? error.message : 'Could not stop the stream cleanly.');
+    stopError = error;
+    if (cameraStream) cameraStream.getTracks().forEach((track) => track.stop());
+    cameraStream = null;
+    recorder = null;
   }
-  await endHistory();
+  // Always tell the relay to stop, even if browser capture cleanup failed.
+  try {
+    const response = await apiFetch(`/stop/${encodeURIComponent(sessionId)}`, { method: 'POST' });
+    if (!response.ok) throw new Error(`Relay stop failed: ${response.status}`);
+  } catch (error) {
+    stopError ||= error;
+  }
+  try {
+    await endHistory();
+  } catch (error) {
+    stopError ||= error;
+  }
   setStreamUi(false);
-  statusText('Stream stopped.');
+  statusText(stopError
+    ? (stopError instanceof Error ? stopError.message : 'Stream cleanup completed with a warning.')
+    : 'Stream stopped and capture devices released.');
 }
 async function setQuality() {
   currentQuality = qualityInput?.value || 'high';
@@ -315,8 +331,10 @@ startButton?.addEventListener('click', () => {
 stopButton?.addEventListener('click', () => void stopStream());
 qualityInput?.addEventListener('change', () => void setQuality());
 window.addEventListener('pagehide', () => {
-  if (recorder && recorder.state !== 'inactive') recorder.stop();
-  if (cameraStream) cameraStream.getTracks().forEach((track) => track.stop());
+  // Best-effort relay shutdown when the user closes or navigates away from Quest Studio.
+  if (streamActive || recorder || cameraStream) void stopStream();
+  else if (cameraStream) cameraStream.getTracks().forEach((track) => track.stop());
+  if (socket) socket.disconnect();
   if (arenaActive) stopArena('Arena paused');
 });
 
@@ -563,20 +581,15 @@ registerQuestAction('reset', () => {
 });
 
 registerQuestAction('destination', () => {
-  const name = window.prompt(`Choose a destination: ${platformMeta.map(p => p.name).join(', ')}`);
-  if (!name?.trim()) return;
-  const platform = platformMeta.find(p => p.name.toLowerCase() === name.trim().toLowerCase());
-  if (!platform) { statusText('Unknown destination. Check the platform name and try again.'); return; }
-  const url = platform.requiresUrl ? window.prompt(`Enter the ingest URL for ${platform.label || platform.name}`) : null;
-  const key = window.prompt(`Enter the stream key for ${platform.label || platform.name}`);
-  if (!key?.trim()) return;
-  const keyInput = platformList?.querySelector<HTMLInputElement>(`input[data-platform="${CSS.escape(platform.name)}"][data-field="key"]`);
-  const urlInput = platformList?.querySelector<HTMLInputElement>(`input[data-platform="${CSS.escape(platform.name)}"][data-field="url"]`);
-  if (keyInput) keyInput.value = key.trim();
-  if (urlInput && url?.trim()) urlInput.value = url.trim();
+  // Never open browser prompts inside immersive VR: they are not hands-first
+  // and are unreliable in headset browsers. Stream keys stay in the existing
+  // signed-in Account flow and are loaded automatically when Quest Studio opens.
   configuredPlatforms = collectPlatforms();
-  if (window.SLAuth?.enabled && currentUser) void window.SLAuth.saveCredentials(configuredPlatforms);
-  statusText(`${platform.label || platform.name} destination saved for this session.`);
+  const names = configuredPlatforms
+    .map((item) => platformMeta.find((platform) => platform.name === item.name)?.label || item.name);
+  statusText(names.length
+    ? `Saved destinations ready: ${names.join(', ')}. Manage keys from Account outside the VR session.`
+    : 'No saved destinations found. Sign in and add stream keys from Account, then reopen Quest Studio.');
 });
 
 makeQuestButton('GO LIVE / STOP', 'stream', -0.31, 1.25, 0x42e6a4);
