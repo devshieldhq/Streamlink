@@ -17,7 +17,7 @@ Before submission, the entrant must personally confirm: age requirement, Develop
 
 - Project: StreamLink XR — a hands-first spatial creator studio for controlling and monitoring live broadcasts, with an original in-world VR Arena.
 - Track recommendation: Productivity. The primary product is a creator workspace; Arena is an interactive onboarding / engagement mode. The sponsor can reassign track placement.
-- Division recommendation: The repository's earliest visible commit is October 3, 2026, which is inside the September 24–November 18 competition window. If no earlier codebase, prototype, early-access build, or published app existed elsewhere before September 24, choose New Experience. If StreamLink or its underlying code existed before September 24, choose Adapted / Significantly Updated Experience; the IWSDK Quest port, hands-first spatial controls, and Arena are substantial competition-window updates. The sponsor makes the final division determination.
+- Division recommendation: The repository's earliest visible commit is September 28, 2026, which is inside the September 24–November 18 competition window. If no earlier codebase, prototype, early-access build, or published app existed elsewhere before September 24, choose New Experience. If StreamLink or its underlying code existed before September 24, choose Adapted / Significantly Updated Experience; the IWSDK Quest port, hands-first spatial controls, and Arena are substantial competition-window updates. The sponsor makes the final division determination.
 - Originality: The core spatial workspace and Arena remain useful without third-party streaming destinations or the AI agent. Those services extend the project; they are not the entire project.
 
 ## Submission requirements
