@@ -186,7 +186,8 @@ if (gameMode) {
   document.getElementById('pageTitle').textContent = 'Gamey';
   document.getElementById('pageSubtitle').textContent = 'Go live with your gameplay, game audio and microphone. No VR headset needed.';
   document.getElementById('enableCameraBtn').textContent = 'Share game / screen';
-  document.getElementById('captureHelp').textContent = 'Choose your game window or entire screen. Enable system audio sharing when offered; your microphone is added separately.';
+  const captureHelp = document.getElementById('captureHelp');
+  if (captureHelp) captureHelp.textContent = 'Choose your game window or entire screen. Enable system audio sharing when offered; your microphone is added separately.';
 }
 /* ---------- sign-in gate: signed-out visitors are sent to /account.html ---------- */
 const apiFetch = (u, o) => (window.SLAuth && SLAuth.enabled ? SLAuth.fetch(u, o) : fetch(u, o));
