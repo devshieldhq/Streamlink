@@ -1,0 +1,31 @@
+name: Quest competition build
+
+on:
+  pull_request:
+    paths:
+      - 'quest-competition/**'
+      - '.github/workflows/quest-competition.yml'
+  push:
+    branches: [iwsdk-quest-competition]
+    paths:
+      - 'quest-competition/**'
+      - '.github/workflows/quest-competition.yml'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: quest-competition
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm install
+      - run: npm run typecheck
+      - run: npm run build
+      - uses: actions/upload-artifact@v4
+        with:
+          name: streamlink-quest-competition-dist
+          path: quest-competition/dist/
