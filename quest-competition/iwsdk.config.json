@@ -5,54 +5,37 @@
   "assets": {
     "module": "./src/assets"
   },
-  "components": {
-    "module": "./src/components"
-  },
   "world": {
     "xr": {
       "mode": "vr",
-      "offer": "always",
       "features": {
-        "handTracking": true
+        "handTracking": {
+          "required": true
+        }
       }
     },
-    "input": {
-      "canvasPointerEvents": true
-    },
     "render": {
-      "fov": 70,
-      "near": 0.001,
-      "far": 200,
       "camera": {
         "position": [
           0,
-          1.6,
-          2.8
-        ],
-        "lookAt": [
-          0,
-          1.25,
-          -2.2
+          1.3,
+          0
         ]
       }
     },
     "features": {
-      "locomotion": {
-        "useWorker": true
+      "grabbing": {
+        "useHandPinchForGrab": true
       },
-      "grabbing": true,
-      "physics": false,
-      "sceneUnderstanding": false,
-      "environmentRaycast": false,
-      "spatialUI": {
-        "kit": "horizon",
-        "preferredColorScheme": "dark"
-      }
+      "locomotion": true,
+      "spatialUI": true
     }
   },
   "dev": {
     "emulator": {
-      "device": "metaQuest3"
+      "device": "metaQuest3",
+      "activation": "always",
+      "injectOnBuild": true
     }
   }
 }
