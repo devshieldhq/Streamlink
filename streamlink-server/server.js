@@ -173,7 +173,10 @@ app.use((req, res, next) => {
     res.type('html').send(html.includes('</body>') ? html.replace('</body>', assets + '</body>') : html + assets);
   });
 });
-app.get('/quest', (req, res) => res.redirect(308, '/quest/'));
+app.get('/quest', (req, res, next) => {
+  if (req.path === '/quest') return res.redirect(308, '/quest/');
+  next();
+});
 app.get('/quest/', (req, res) => res.sendFile(path.join(STATIC_ROOT, 'quest', 'index.html')));
 app.use(express.static(STATIC_ROOT));
 app.get('/app', (req, res) => res.redirect(308, '/quest/'));
