@@ -68,7 +68,6 @@ const qualityInput = byId<HTMLSelectElement>('quality');
 const platformList = byId<HTMLDivElement>('platform-list');
 const startButton = byId<HTMLButtonElement>('start-stream');
 const stopButton = byId<HTMLButtonElement>('stop-stream');
-const agentInput = byId<HTMLInputElement>('agent-message');
 const telemetryBox = byId<HTMLDivElement>('telemetry');
 const accountLine = byId<HTMLParagraphElement>('account-line');
 const passport = byId<HTMLDivElement>('passport');
@@ -306,23 +305,6 @@ async function setQuality() {
   else statusText(`Stream quality changed to ${currentQuality}.`);
   refreshQuestPanel();
 }
-async function sendAgentCommand() {
-  const message = agentInput?.value.trim();
-  if (!message) return;
-  if (agentInput) agentInput.value = '';
-  try {
-    const response = await apiFetch('/agent', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ sessionId, message }),
-    });
-    const result = await response.json();
-    if (!response.ok) throw new Error(result.error || 'Agent is unavailable.');
-    if (result.reply) statusText(result.reply);
-    else statusText('Command sent. Watch the status for agent updates.');
-  } catch (error) {
-    statusText(error instanceof Error ? error.message : 'Could not reach the agent.');
-  }
-}
 
 startButton?.addEventListener('click', () => {
   sessionId = sessionInput?.value.trim() || sessionId;
@@ -335,10 +317,6 @@ startButton?.addEventListener('click', () => {
 });
 stopButton?.addEventListener('click', () => void stopStream());
 qualityInput?.addEventListener('change', () => void setQuality());
-byId<HTMLButtonElement>('send-agent')?.addEventListener('click', () => void sendAgentCommand());
-agentInput?.addEventListener('keydown', (event) => {
-  if (event.key === 'Enter') void sendAgentCommand();
-});
 window.addEventListener('pagehide', () => {
   if (recorder && recorder.state !== 'inactive') recorder.stop();
   if (cameraStream) cameraStream.getTracks().forEach((track) => track.stop());
@@ -551,12 +529,7 @@ registerQuestAction('reset', () => {
   panelMesh.scale.setScalar(1);
   statusText('Studio panel layout reset.');
 });
-registerQuestAction('agent', () => {
-  const message = window.prompt('What should StreamBot do?');
-  if (!message?.trim()) return;
-  if (agentInput) agentInput.value = message.trim();
-  void sendAgentCommand();
-});
+
 registerQuestAction('destination', () => {
   const name = window.prompt(`Choose a destination: ${platformMeta.map(p => p.name).join(', ')}`);
   if (!name?.trim()) return;
@@ -580,7 +553,6 @@ makeQuestButton('VR ARENA', 'arena', 0.48, 1.32, 0xffb84d);
 makeQuestButton('FOCUS', 'focus', -0.32, 1.17, 0x8b7bff);
 makeQuestButton('COMFORT', 'comfort', 0.08, 1.17, 0x42e6a4);
 makeQuestButton('RESET', 'reset', 0.48, 1.17, 0xff668c);
-makeQuestButton('STREAM AGENT', 'agent', -0.16, 1.02, 0x8b7bff);
 makeQuestButton('ADD DESTINATION', 'destination', 0.24, 1.02, 0x31d6ff);
 
 class QuestInteractionSystem extends createSystem({
