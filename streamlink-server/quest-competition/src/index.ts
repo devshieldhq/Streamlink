@@ -262,6 +262,7 @@ async function startStream() {
     statusText('Requesting camera and microphone access…');
     await ensureCapture();
     connectSocket();
+    if (socket?.connected) socket.emit('join', sessionId);
     const response = await apiFetch('/start', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
