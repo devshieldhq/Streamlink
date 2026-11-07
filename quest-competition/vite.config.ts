@@ -3,7 +3,7 @@ import { defineConfig } from 'vite';
 
 export default defineConfig({
   plugins: [iwsdkDev()],
-  server: { host: '0.0.0.0', port: 8081, open: false },
+  server: { host: '0.0.0.0', port: 8081, strictPort: true },
   build: {
     outDir: 'dist',
     sourcemap: process.env.NODE_ENV !== 'production',
@@ -11,14 +11,7 @@ export default defineConfig({
     rollupOptions: { input: './index.html' },
   },
   esbuild: { target: 'esnext' },
-  resolve: {
-    dedupe: ['three', '@pmndrs/uikit', '@pmndrs/uikit-horizon', '@pmndrs/uikit-lucide'],
-  },
-  optimizeDeps: {
-    exclude: ['@babylonjs/havok'],
-    include: ['three', '@pmndrs/uikit', '@pmndrs/uikit-horizon', '@pmndrs/uikit-lucide', '@drawcall/uikitml'],
-    esbuildOptions: { target: 'esnext' },
-  },
+  optimizeDeps: { esbuildOptions: { target: 'esnext' } },
   publicDir: 'public',
   base: './',
 });
