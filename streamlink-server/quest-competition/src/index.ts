@@ -551,10 +551,15 @@ registerQuestAction('comfort', () => {
   panelMesh.scale.setScalar(0.92);
 });
 registerQuestAction('reset', () => {
+  focusMode = false;
+  floor.visible = true;
+  stage.visible = true;
+  byId<HTMLDivElement>('studio-panel')?.classList.remove('hidden');
   panelMesh.position.set(0, 1.45, -0.75);
   panelMesh.rotation.set(0, 0, 0);
   panelMesh.scale.setScalar(1);
   statusText('Studio panel layout reset.');
+  refreshQuestPanel();
 });
 
 registerQuestAction('destination', () => {
