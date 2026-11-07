@@ -394,8 +394,8 @@ const panelCtx = panelCanvas.getContext('2d');
 if (!panelCtx) throw new Error('Could not create Quest Studio panel canvas');
 const panelTexture = new CanvasTexture(panelCanvas);
 const panelMaterial = new MeshBasicMaterial({ map: panelTexture, transparent: true });
-const panelMesh = new Mesh(new PlaneGeometry(1.25, 0.78), panelMaterial);
-panelMesh.position.set(0, 1.52, -1.18);
+const panelMesh = new Mesh(new PlaneGeometry(1.25, 0.98), panelMaterial);
+panelMesh.position.set(0, 1.55, -1.18);
 panelMesh.userData.label = 'StreamLink Quest Studio control panel';
 world.createTransformEntity(panelMesh).addComponent(OneHandGrabbable, { rotate: true, translate: true });
 
@@ -439,7 +439,7 @@ function makeQuestButton(label: string, action: string, x: number, y: number, co
   ctx.fillText(label, 256, 90);
   const texture = new CanvasTexture(canvas);
   const mesh = new Mesh(new PlaneGeometry(0.34, 0.12), new MeshBasicMaterial({ map: texture, transparent: true }));
-  mesh.position.set(x, y - 1.52, 0.025);
+  mesh.position.set(x, y - 1.55, 0.025);
   mesh.userData.action = action;
   const entity = world.createTransformEntity(mesh);
   panelMesh.add(mesh);
@@ -535,19 +535,36 @@ registerQuestAction('focus', () => {
 });
 registerQuestAction('comfort', () => {
   statusText('Comfort mode: seated-friendly layout. Keep the studio panel within comfortable reach.');
-  panelMesh.position.set(0, 1.35, -1.15);
+  panelMesh.position.set(0, 1.4, -1.15);
   panelMesh.scale.setScalar(0.92);
 });
 registerQuestAction('reset', () => {
-  panelMesh.position.set(0, 1.52, -1.18);
+  panelMesh.position.set(0, 1.55, -1.18);
   panelMesh.rotation.set(0, 0, 0);
   panelMesh.scale.setScalar(1);
   statusText('Studio panel layout reset.');
 });
 registerQuestAction('agent', () => {
-  const input = agentInput;
-  if (input && input.value.trim()) void sendAgentCommand();
-  else statusText('Enter an agent command in the StreamLink panel, then select AGENT.');
+  const message = window.prompt('What should StreamBot do?');
+  if (!message?.trim()) return;
+  if (agentInput) agentInput.value = message.trim();
+  void sendAgentCommand();
+});
+registerQuestAction('destination', () => {
+  const name = window.prompt(`Choose a destination: ${platformMeta.map(p => p.name).join(', ')}`);
+  if (!name?.trim()) return;
+  const platform = platformMeta.find(p => p.name.toLowerCase() === name.trim().toLowerCase());
+  if (!platform) { statusText('Unknown destination. Check the platform name and try again.'); return; }
+  const url = platform.requiresUrl ? window.prompt(`Enter the ingest URL for ${platform.label || platform.name}`) : null;
+  const key = window.prompt(`Enter the stream key for ${platform.label || platform.name}`);
+  if (!key?.trim()) return;
+  const keyInput = platformList?.querySelector<HTMLInputElement>(`input[data-platform="${CSS.escape(platform.name)}"][data-field="key"]`);
+  const urlInput = platformList?.querySelector<HTMLInputElement>(`input[data-platform="${CSS.escape(platform.name)}"][data-field="url"]`);
+  if (keyInput) keyInput.value = key.trim();
+  if (urlInput && url?.trim()) urlInput.value = url.trim();
+  configuredPlatforms = collectPlatforms();
+  if (window.SLAuth?.enabled && currentUser) void window.SLAuth.saveCredentials(configuredPlatforms);
+  statusText(`${platform.label || platform.name} destination saved for this session.`);
 });
 
 makeQuestButton('GO LIVE / STOP', 'stream', -0.32, 1.32, 0x42e6a4);
@@ -556,7 +573,8 @@ makeQuestButton('VR ARENA', 'arena', 0.48, 1.32, 0xffb84d);
 makeQuestButton('FOCUS', 'focus', -0.32, 1.17, 0x8b7bff);
 makeQuestButton('COMFORT', 'comfort', 0.08, 1.17, 0x42e6a4);
 makeQuestButton('RESET', 'reset', 0.48, 1.17, 0xff668c);
-makeQuestButton('STREAM AGENT', 'agent', 0.08, 1.02, 0x8b7bff);
+makeQuestButton('STREAM AGENT', 'agent', -0.16, 1.02, 0x8b7bff);
+makeQuestButton('ADD DESTINATION', 'destination', 0.24, 1.02, 0x31d6ff);
 
 class QuestInteractionSystem extends createSystem({
   buttons: { required: [QuestButton, Pressed] },
