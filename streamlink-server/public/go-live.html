@@ -297,15 +297,17 @@ document.getElementById('enableCameraBtn').addEventListener('click', async (even
       cameraStream = new MediaStream([...composed.getVideoTracks(), ...displayStream.getAudioTracks(), ...(microphoneStream ? microphoneStream.getAudioTracks() : [])]);
       document.getElementById('preview').srcObject = cameraStream;
       document.getElementById('cameraTools').style.display = 'flex';
-      displayStream.getVideoTracks()[0].addEventListener('ended', () => {
-        if (streamActive) stopStream();
+      displayStream.getVideoTracks()[0].addEventListener('ended', async () => {
+        if (streamActive) await stopStream();
         cleanupGameCapture();
-        cameraStream = null;
+        document.getElementById('preview').srcObject = null;
         document.getElementById('cameraTools').style.display = 'none';
         document.getElementById('cameraPlaceholder').style.display = 'flex';
         document.getElementById('goBtn').disabled = true;
         document.getElementById('goBtn').textContent = 'Share game first';
         document.getElementById('enableCameraBtn').textContent = 'Share game / screen';
+        document.getElementById('enableCameraBtn').disabled = false;
+        document.getElementById('captureStatus').textContent = 'Screen sharing ended. Share a game or screen to continue.';
       });
     } else {
       // Open the webcam separately so a missing microphone cannot block it.
@@ -328,6 +330,8 @@ document.getElementById('enableCameraBtn').addEventListener('click', async (even
     captureStatus.textContent = 'Capture is ready. You can Go live.';
     captureButton.disabled = false;
   } catch (e) {
+    if (gameMode) cleanupGameCapture();
+    else if (cameraStream) { cameraStream.getTracks().forEach(track => track.stop()); cameraStream = null; }
     const friendlyError = e.name === 'NotFoundError' || e.name === 'DevicesNotFoundError'
       ? 'No camera was detected. Connect or enable a camera, then try again. To stream gameplay without a webcam, use Gamey and choose Share screen.'
       : e.name === 'NotAllowedError' || e.name === 'PermissionDeniedError'
@@ -371,11 +375,25 @@ function removeWebcamOverlay(){
 }
 function cleanupGameCapture(){
   cancelAnimationFrame(compositorFrame);compositorFrame=0;
-  for(const stream of [webcamStream,microphoneStream,displayStream])if(stream)stream.getTracks().forEach(t=>t.stop());
-  webcamStream=null;microphoneStream=null;displayStream=null;webcamVideo=null;screenVideo=null;webcamEnabled=false;compositorCanvas=null;compositorContext=null;
+  // Stop the composed MediaStream too; its canvas video track is separate
+  // from the underlying display and microphone tracks.
+  if(cameraStream)cameraStream.getTracks().forEach(track=>track.stop());
+  for(const stream of [webcamStream,microphoneStream,displayStream])if(stream)stream.getTracks().forEach(track=>track.stop());
+  cameraStream=null;webcamStream=null;microphoneStream=null;displayStream=null;webcamVideo=null;screenVideo=null;webcamEnabled=false;compositorCanvas=null;compositorContext=null;
 }
 document.getElementById('addWebcamBtn').addEventListener('click',addWebcamOverlay);
 document.getElementById('removeWebcamBtn').addEventListener('click',removeWebcamOverlay);
+
+// Release browser capture devices when the creator leaves or refreshes this page.
+window.addEventListener('pagehide', () => {
+  if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+    try { mediaRecorder.stop(); } catch (error) {}
+  }
+  if (cameraStream) cameraStream.getTracks().forEach(track => track.stop());
+  cleanupGameCapture();
+  if (socket) socket.disconnect();
+  recordEnd();
+});
 
 function pickSupportedMimeType() {
   const candidates = ['video/webm;codecs=vp8,opus', 'video/webm;codecs=vp9,opus', 'video/webm'];
