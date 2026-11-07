@@ -1,11 +1,15 @@
 import {
+  OneHandGrabbable,
+  World,
+} from '@iwsdk/core';
+import {
   BoxGeometry,
+  DirectionalLight,
   Mesh,
   MeshStandardMaterial,
   PlaneGeometry,
   SphereGeometry,
-  World,
-} from '@iwsdk/core';
+} from 'three';
 import projectOptions from 'virtual:iwsdk-project';
 
 const container = document.getElementById('scene-container');
@@ -18,8 +22,13 @@ if (!(container instanceof HTMLDivElement)) {
 
 const world = await World.create(container, projectOptions);
 
-// Register all scene objects as IWSDK transform entities so they participate
-// in the ECS lifecycle, transforms, and runtime interaction systems.
+// Lighting is attached to the IWSDK-managed scene; visible interactive objects
+// are registered as ECS transform entities.
+world.scene.add(new DirectionalLight(0xffffff, 2.2));
+const fillLight = new DirectionalLight(0x6c8cff, 0.8);
+fillLight.position.set(-4, 5, 3);
+world.scene.add(fillLight);
+
 const floor = new Mesh(
   new PlaneGeometry(18, 18),
   new MeshStandardMaterial({ color: 0x101a31, roughness: 0.92, metalness: 0.08 }),
@@ -33,7 +42,8 @@ const stage = new Mesh(
   new MeshStandardMaterial({ color: 0x1c2b4b, roughness: 0.55, metalness: 0.28 }),
 );
 stage.position.set(0, 0.02, -2.2);
-world.createTransformEntity(stage);
+const stageEntity = world.createTransformEntity(stage);
+stageEntity.addComponent(OneHandGrabbable, { rotate: true, translate: true });
 
 const targetColors = [0x31d6ff, 0x8b7bff, 0xffb84d, 0x42e6a4, 0xff668c];
 targetColors.forEach((color, index) => {
@@ -52,8 +62,9 @@ targetColors.forEach((color, index) => {
     1.45 + (index % 2) * 0.48,
     -2.0 - (index % 2) * 0.22,
   );
-  world.createTransformEntity(target);
-}
+  const targetEntity = world.createTransformEntity(target);
+  targetEntity.addComponent(OneHandGrabbable, { rotate: true, translate: true });
+});
 
 const xr = (
   navigator as Navigator & {
@@ -82,6 +93,6 @@ if (enterButton) {
 
 if (status) {
   status.textContent = xrSupported
-    ? 'Studio ready · enter VR from a supported headset'
-    : 'Desktop preview ready · open the hosted HTTPS build in Meta Quest Browser for VR';
+    ? 'Hands-first studio ready · pinch and grab the floating stage and targets'
+    : 'Desktop preview ready · use the IWSDK emulator or open this HTTPS build in Quest Browser';
 }
