@@ -167,7 +167,7 @@ app.use((req, res, next) => {
 app.get('/quest', (req, res) => res.redirect(308, '/quest/'));
 app.get('/quest/', (req, res) => res.sendFile(path.join(STATIC_ROOT, 'quest', 'index.html')));
 app.use(express.static(STATIC_ROOT));
-app.get('/app', (req, res) => res.sendFile(path.join(STATIC_ROOT, 'streamlink-xr.html')));
+app.get('/app', (req, res) => res.redirect(308, '/quest/'));
 app.get('/live', (req, res) => res.sendFile(path.join(STATIC_ROOT, 'go-live.html')));
 app.get('/gamey', (req, res) => res.sendFile(path.join(STATIC_ROOT, 'go-live.html')));
 
