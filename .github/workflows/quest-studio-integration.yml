@@ -50,8 +50,10 @@ jobs:
             exit 1
           fi
           grep -q 'StreamLink XR' /tmp/quest.html
-          curl -fsS http://localhost:3000/config.js | grep -q '__SUPABASE__'
-          curl -fsS http://localhost:3000/platforms | grep -q 'youtube'
+          curl -fsS http://localhost:3000/config.js -o /tmp/config.js
+          grep -q '__SUPABASE__' /tmp/config.js
+          curl -fsS http://localhost:3000/platforms -o /tmp/platforms.json
+          grep -q 'youtube' /tmp/platforms.json
           echo "--- Server logs after initial route checks ---"
           docker logs streamlink-xr-ci || true
           code=$(curl -sv --max-redirs 0 http://localhost:3000/app -o /dev/null 2>&1 | tee /tmp/legacy-curl.log | awk '/^< HTTP\// {print $3}' | tail -1 || true)
