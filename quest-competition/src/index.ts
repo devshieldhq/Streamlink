@@ -53,12 +53,16 @@ targetColors.forEach((color, index) => {
     -2.0 - (index % 2) * 0.22,
   );
   world.createTransformEntity(target);
-});
+}
 
-const xrSupported =
-  typeof navigator !== 'undefined' &&
-  'xr' in navigator &&
-  typeof (navigator as Navigator & { xr?: unknown }).xr !== 'undefined';
+const xr = (
+  navigator as Navigator & {
+    xr?: { isSessionSupported(mode: string): Promise<boolean> };
+  }
+).xr;
+const xrSupported = xr
+  ? await xr.isSessionSupported('immersive-vr').catch(() => false)
+  : false;
 
 if (enterButton) {
   enterButton.disabled = !xrSupported;
