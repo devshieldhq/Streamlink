@@ -1,0 +1,27 @@
+{
+  "name": "streamlink-quest-studio",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "build": "vite build"
+  },
+  "dependencies": {
+    "@iwsdk/core": "1.1.0-rc.1",
+    "three": "npm:super-three@0.185.0"
+  },
+  "devDependencies": {
+    "@iwsdk/cli": "1.1.0-rc.1",
+    "@iwsdk/vite-plugin-dev": "1.1.0-rc.1",
+    "@types/three": "^0.185.0",
+    "typescript": "^5.5.0",
+    "vite": "^7.1.4"
+  },
+  "overrides": {
+    "three": "npm:super-three@0.185.0"
+  },
+  "engines": {
+    "node": ">=20.19.0 <21.0.0-0 || >=22.12.0 <23.0.0-0 || >=24.0.0"
+  }
+}
