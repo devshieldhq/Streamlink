@@ -1,0 +1,60 @@
+name: StreamLink Quest Studio Integration
+
+on:
+  pull_request:
+    branches: [main, iwsdk-streamlink-integration, iwsdk-backend-port]
+    paths:
+      - "streamlink-server/quest-competition/**"
+      - "streamlink-server/Dockerfile"
+      - "streamlink-server/server.js"
+      - ".github/workflows/quest-studio-integration.yml"
+  push:
+    branches: [iwsdk-streamlink-integration, iwsdk-backend-port, iwsdk-full-quest-experience]
+
+jobs:
+  build-quest-studio:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: streamlink-server/quest-competition
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm install
+      - run: npm run typecheck
+      - run: npm run build
+      - name: Build the complete StreamLink Docker image
+        working-directory: streamlink-server
+        run: docker build -t streamlink-xr-ci .
+      - name: Smoke-test the Quest route and legacy redirect
+        working-directory: .
+        shell: bash
+        run: |
+          docker run -d --name streamlink-xr-ci -p 3000:3000 -e PORT=3000 streamlink-xr-ci
+          trap 'docker rm -f streamlink-xr-ci >/dev/null 2>&1 || true' EXIT
+          ready=false
+          for attempt in {1..30}; do
+            quest_code=$(curl -sS -o /tmp/quest.html -w '%{http_code}' http://localhost:3000/quest/ || true)
+            if [ "$quest_code" = "200" ]; then ready=true; break; fi
+            running=$(docker inspect -f '{{.State.Running}}' streamlink-xr-ci 2>/dev/null || echo false)
+            if [ "$running" != "true" ]; then break; fi
+            sleep 2
+          done
+          config_code=$(curl -sS -o /tmp/config.js -w '%{http_code}' http://localhost:3000/config.js || true)
+          platforms_code=$(curl -sS -o /tmp/platforms.json -w '%{http_code}' http://localhost:3000/platforms || true)
+          legacy_code=$(curl -sS -o /dev/null -w '%{http_code}' --max-redirs 0 http://localhost:3000/app || true)
+          redirect=$(curl -sSI http://localhost:3000/app 2>/dev/null | awk 'tolower($1)=="location:" {gsub("\\r", "", $2); print $2}' || true)
+          echo "Quest route: $quest_code; config route: $config_code; platforms route: $platforms_code; legacy route: $legacy_code; redirect: $redirect"
+          echo "--- StreamLink container logs ---"
+          docker logs streamlink-xr-ci || true
+          docker inspect -f 'container state: {{.State.Status}} exit={{.State.ExitCode}}' streamlink-xr-ci || true
+          test "$ready" = "true"
+          grep -q 'StreamLink XR' /tmp/quest.html
+          test "$config_code" = "200"
+          grep -q '__SUPABASE__' /tmp/config.js
+          test "$platforms_code" = "200"
+          grep -q 'youtube' /tmp/platforms.json
+          test "$legacy_code" = "308"
+          test "$redirect" = "/quest/"

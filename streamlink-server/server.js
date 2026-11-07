@@ -151,6 +151,15 @@ app.get('/config.js', (req, res) => {
   })};`);
 });
 
+// Retire the legacy Three.js VR route: IWSDK is the sole VR experience.
+app.use((req, res, next) => {
+  if (req.path === '/app' || req.path === '/app/' || req.path === '/streamlink-xr.html') {
+    res.status(308).set('Location', '/quest/').end();
+    return;
+  }
+  next();
+});
+
 // Inject the shared StreamBot widget into every public HTML page.
 app.use((req, res, next) => {
   if (req.method !== 'GET') return next();
@@ -164,8 +173,13 @@ app.use((req, res, next) => {
     res.type('html').send(html.includes('</body>') ? html.replace('</body>', assets + '</body>') : html + assets);
   });
 });
+app.get('/quest', (req, res, next) => {
+  if (req.path === '/quest') return res.redirect(308, '/quest/');
+  next();
+});
+app.get('/quest/', (req, res) => res.sendFile(path.join(STATIC_ROOT, 'quest', 'index.html')));
 app.use(express.static(STATIC_ROOT));
-app.get('/app', (req, res) => res.sendFile(path.join(STATIC_ROOT, 'streamlink-xr.html')));
+app.get('/app', (req, res) => res.redirect(308, '/quest/'));
 app.get('/live', (req, res) => res.sendFile(path.join(STATIC_ROOT, 'go-live.html')));
 app.get('/gamey', (req, res) => res.sendFile(path.join(STATIC_ROOT, 'go-live.html')));
 
