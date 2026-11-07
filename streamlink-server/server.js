@@ -153,7 +153,10 @@ app.get('/config.js', (req, res) => {
 
 // Retire the legacy Three.js VR route: IWSDK is the sole VR experience.
 app.use((req, res, next) => {
-  if (req.path === '/app' || req.path === '/streamlink-xr.html') return res.redirect(308, '/quest/');
+  if (req.path === '/app' || req.path === '/app/' || req.path === '/streamlink-xr.html') {
+    res.status(308).set('Location', '/quest/').end();
+    return;
+  }
   next();
 });
 
