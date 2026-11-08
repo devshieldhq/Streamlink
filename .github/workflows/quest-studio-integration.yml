@@ -10,11 +10,6 @@ on:
       - ".github/workflows/quest-studio-integration.yml"
   push:
     branches: [main, iwsdk-streamlink-integration, iwsdk-backend-port, iwsdk-full-quest-experience]
-    paths:
-      - "streamlink-server/quest-competition/**"
-      - "streamlink-server/Dockerfile"
-      - "streamlink-server/server.js"
-      - ".github/workflows/quest-studio-integration.yml"
   workflow_dispatch:
 
 concurrency:
