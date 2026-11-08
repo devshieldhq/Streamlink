@@ -73,14 +73,19 @@
     <div class="nav-links" id="primary-navigation">
       <a href="#features">Features</a>
       <a href="#platforms">Platforms</a>
-      <a href="#how">How it works</a>
-      <a href="#pricing">Pricing</a>
       <a href="community.html">Community</a>
-      <a href="profile.html">Profile</a>
-      <a href="messages.html">Messages</a>
       <a href="docs.html">Docs</a>
-      <a href="/quest">Quest Studio</a>
-      <a href="/account.html">Account</a>
+      <details class="nav-more">
+        <summary>More <span aria-hidden="true">⌄</span></summary>
+        <div class="nav-more-menu">
+          <a href="#how">How it works</a>
+          <a href="#pricing">Pricing</a>
+          <a href="profile.html">Profile</a>
+          <a href="messages.html">Messages</a>
+          <a href="/account.html">Account</a>
+        </div>
+      </details>
+      <a href="/quest" class="nav-quest">Quest Studio</a>
     </div>
     <button class="nav-toggle" type="button" aria-label="Open navigation" aria-expanded="false" aria-controls="primary-navigation"><span></span><span></span><span></span></button>
     <a href="/live" class="nav-cta">Go live</a>
@@ -262,6 +267,14 @@
         links.classList.remove('open');
         toggle.setAttribute('aria-expanded', 'false');
         toggle.setAttribute('aria-label', 'Open navigation');
+      }
+    });
+    document.addEventListener('keydown', (event) => {
+      if (event.key === 'Escape') {
+        links.classList.remove('open');
+        toggle.setAttribute('aria-expanded', 'false');
+        toggle.setAttribute('aria-label', 'Open navigation');
+        links.querySelector('.nav-more')?.removeAttribute('open');
       }
     });
   })();
