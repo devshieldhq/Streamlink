@@ -346,34 +346,39 @@ document.getElementById('enableCameraBtn').addEventListener('click', async (even
 function drawGameComposition() {
   if (!compositorContext || !screenVideo) return;
   const c=compositorContext,w=compositorCanvas.width,h=compositorCanvas.height;
-  if(screenVideo.readyState>=2)c.drawImage(screenVideo,0,0,w,h);else{c.fillStyle='#080b16';c.fillRect(0,0,w,h);}
-  if(webcamEnabled&&webcamVideo&&webcamVideo.readyState>=2){
-    const iw=Math.round(w*.22),ih=Math.round(iw*9/16),m=Math.round(w*.025),x=w-iw-m,y=h-ih-m,r=Math.round(iw*.07);
-    c.save();c.shadowColor='rgba(0,0,0,.55)';c.shadowBlur=18;c.fillStyle='#111827';c.beginPath();c.roundRect(x-3,y-3,iw+6,ih+6,r+3);c.fill();c.shadowBlur=0;c.beginPath();c.roundRect(x,y,iw,ih,r);c.clip();
-    const sw=webcamVideo.videoWidth||640,sh=webcamVideo.videoHeight||480,scale=Math.max(iw/sw,ih/sh),cw=iw/scale,ch=ih/scale;
-    c.drawImage(webcamVideo,(sw-cw)/2,(sh-ch)/2,cw,ch,x,y,iw,ih);c.restore();c.strokeStyle='#7c5cff';c.lineWidth=Math.max(3,w*.003);c.beginPath();c.roundRect(x,y,iw,ih,r);c.stroke();
-  }
-  compositorFrame=requestAnimationFrame(drawGameComposition);
+  try {
+    if(screenVideo.readyState>=2)c.drawImage(screenVideo,0,0,w,h);else{c.fillStyle='#080b16';c.fillRect(0,0,w,h);}
+    if(webcamEnabled&&webcamVideo&&webcamVideo.readyState>=2){
+      const iw=Math.round(w*.22),ih=Math.round(iw*9/16),m=Math.round(w*.025),x=w-iw-m,y=h-ih-m;
+      c.save();c.fillStyle='rgba(0,0,0,.55)';c.fillRect(x-3,y-3,iw+6,ih+6);c.beginPath();c.rect(x,y,iw,ih);c.clip();
+      const sw=webcamVideo.videoWidth||640,sh=webcamVideo.videoHeight||480,scale=Math.max(iw/sw,ih/sh),cw=iw/scale,ch=ih/scale;
+      c.drawImage(webcamVideo,(sw-cw)/2,(sh-ch)/2,cw,ch,x,y,iw,ih);c.restore();
+      c.strokeStyle='#7c5cff';c.lineWidth=Math.max(3,w*.003);c.strokeRect(x,y,iw,ih);
+    }
+  } catch(error) { console.warn('Gamey compositor frame failed:',error); }
+  finally { compositorFrame=requestAnimationFrame(drawGameComposition); }
 }
 async function addWebcamOverlay(){
-  if(!gameMode||!displayStream||webcamStream)return;
+  if(!gameMode||!displayStream||!compositorCanvas||!cameraStream||webcamStream)return;
   if(streamActive){setCopilot('Stop the stream before changing the webcam overlay.');return;}
+  let nextWebcamStream=null;
   try{
-    webcamStream=await navigator.mediaDevices.getUserMedia({video:{width:{ideal:1280},height:{ideal:720},facingMode:'user'},audio:false});
-    webcamVideo=document.createElement('video');webcamVideo.autoplay=true;webcamVideo.muted=true;webcamVideo.playsInline=true;webcamVideo.srcObject=webcamStream;await webcamVideo.play();webcamEnabled=true;
-    const previousStream=cameraStream,oldVideoTracks=previousStream.getVideoTracks(),fresh=compositorCanvas.captureStream(30);
-    cameraStream=new MediaStream([...fresh.getVideoTracks(),...previousStream.getAudioTracks()]);
-    // Rebind the preview to the replacement canvas stream before stopping its old video track.
-    const preview=document.getElementById('preview');preview.srcObject=cameraStream;await preview.play();
-    oldVideoTracks.forEach(t=>t.stop());
+    nextWebcamStream=await navigator.mediaDevices.getUserMedia({video:{width:{ideal:1280},height:{ideal:720},facingMode:'user'},audio:false});
+    const nextWebcamVideo=document.createElement('video');nextWebcamVideo.autoplay=true;nextWebcamVideo.muted=true;nextWebcamVideo.playsInline=true;nextWebcamVideo.srcObject=nextWebcamStream;
+    await nextWebcamVideo.play();
+    webcamStream=nextWebcamStream;webcamVideo=nextWebcamVideo;webcamEnabled=true;
+    // Preserve the existing canvas MediaStream and preview track.
     document.getElementById('addWebcamBtn').style.display='none';document.getElementById('removeWebcamBtn').style.display='inline-block';
     setCopilot('Webcam overlay added. Your face is included in the gameplay stream.');
-  }catch(e){if(webcamStream)webcamStream.getTracks().forEach(t=>t.stop());webcamStream=null;webcamVideo=null;setCopilot('Could not enable webcam: '+e.message);}
+  }catch(e){
+    if(nextWebcamStream)nextWebcamStream.getTracks().forEach(t=>t.stop());
+    webcamStream=null;webcamVideo=null;webcamEnabled=false;
+    setCopilot('Could not enable webcam: '+e.message);
+  }
 }
 function removeWebcamOverlay(){
   if(streamActive){setCopilot('Stop the stream before changing the webcam overlay.');return;}
   webcamEnabled=false;if(webcamStream)webcamStream.getTracks().forEach(t=>t.stop());webcamStream=null;webcamVideo=null;
-  if(compositorCanvas&&cameraStream){const previousStream=cameraStream,oldVideoTracks=previousStream.getVideoTracks(),fresh=compositorCanvas.captureStream(30);cameraStream=new MediaStream([...fresh.getVideoTracks(),...previousStream.getAudioTracks()]);const preview=document.getElementById('preview');preview.srcObject=cameraStream;preview.play().catch(()=>{});oldVideoTracks.forEach(t=>t.stop());}
   document.getElementById('addWebcamBtn').style.display='inline-block';document.getElementById('removeWebcamBtn').style.display='none';setCopilot('Webcam overlay removed.');
 }
 function cleanupGameCapture(){
