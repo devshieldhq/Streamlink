@@ -260,7 +260,7 @@ async function startStream() {
     return;
   }
   if (!configuredPlatforms.length) {
-    statusText('Add at least one streaming destination and its key first.');
+    statusText('Select at least one configured destination in the VR destination picker first.');
     return;
   }
   try {
@@ -385,6 +385,7 @@ const ArenaTarget = createComponent('QuestArenaTarget', {
 let arenaActive = false;
 let arenaPaused = false;
 let focusMode = false;
+let comfortMode = false;
 let arenaScore = 0;
 let arenaHits = 0;
 let arenaCombo = 0;
@@ -673,19 +674,19 @@ registerQuestAction('focus', () => {
   refreshQuestPanel();
 });
 registerQuestAction('comfort', () => {
-  const comfortMode = panelMesh.position.y < 1.3;
+  comfortMode = !comfortMode;
   if (comfortMode) {
-    panelMesh.position.set(0, 1.45, -0.75);
-    panelMesh.scale.setScalar(1);
-    destinationPanelGroup.position.set(0.78, 1.35, -0.78);
-    destinationPanelGroup.scale.setScalar(1);
-    statusText('Seated comfort off · standard studio reach restored.');
-  } else {
     panelMesh.position.set(0, 1.18, -0.58);
     panelMesh.scale.setScalar(0.86);
     destinationPanelGroup.position.set(0.66, 1.18, -0.62);
     destinationPanelGroup.scale.setScalar(0.86);
     statusText('Seated comfort on · controls moved closer and lowered for seated reach.');
+  } else {
+    panelMesh.position.set(0, 1.45, -0.75);
+    panelMesh.scale.setScalar(1);
+    destinationPanelGroup.position.set(0.78, 1.35, -0.78);
+    destinationPanelGroup.scale.setScalar(1);
+    statusText('Seated comfort off · standard studio reach restored.');
   }
   refreshQuestPanel();
 });
@@ -697,6 +698,7 @@ registerQuestAction('reset', () => {
   panelMesh.position.set(0, 1.45, -0.75);
   panelMesh.rotation.set(0, 0, 0);
   panelMesh.scale.setScalar(1);
+  comfortMode = false;
   destinationPanelGroup.position.set(0.78, 1.35, -0.78);
   destinationPanelGroup.rotation.set(0, 0, 0);
   destinationPanelGroup.scale.setScalar(1);
