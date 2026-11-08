@@ -77,6 +77,8 @@ if (sessionInput) sessionInput.value = sessionId;
 let currentQuality = qualityInput?.value || 'high';
 let platformMeta: PlatformMeta[] = [];
 let configuredPlatforms: ConfiguredPlatform[] = [];
+let selectedDestinationNames = new Set<string>();
+let knownDestinationNames = new Set<string>();
 let currentUser: any = null;
 let socket: any = null;
 let cameraStream: MediaStream | null = null;
@@ -162,6 +164,9 @@ function collectPlatforms(): ConfiguredPlatform[] {
     values[name][field] = value;
   });
   return Object.values(values);
+}
+function getSelectedPlatforms(): ConfiguredPlatform[] {
+  return collectPlatforms().filter((platform) => selectedDestinationNames.has(platform.name));
 }
 async function loadPlatforms() {
   const response = await fetch('/platforms');
@@ -322,9 +327,10 @@ async function setQuality() {
 startButton?.addEventListener('click', () => {
   sessionId = sessionInput?.value.trim() || sessionId;
   currentQuality = qualityInput?.value || 'high';
-  configuredPlatforms = collectPlatforms();
-  if (window.SLAuth?.enabled && currentUser && configuredPlatforms.length) {
-    void window.SLAuth.saveCredentials(configuredPlatforms);
+  const allPlatforms = collectPlatforms();
+  configuredPlatforms = getSelectedPlatforms();
+  if (window.SLAuth?.enabled && currentUser && allPlatforms.length) {
+    void window.SLAuth.saveCredentials(allPlatforms);
   }
   void startStream();
 });
@@ -407,6 +413,22 @@ panelMesh.position.set(0, 1.45, -0.75);
 panelMesh.userData.label = 'StreamLink Quest Studio control panel';
 world.createTransformEntity(panelMesh).addComponent(OneHandGrabbable, { rotate: true, translate: true });
 
+const destinationPanelGroup = new Group();
+destinationPanelGroup.position.set(0.78, 1.35, -0.78);
+destinationPanelGroup.visible = false;
+const destinationCanvas = document.createElement('canvas');
+destinationCanvas.width = 512;
+destinationCanvas.height = 640;
+const destinationContext = destinationCanvas.getContext('2d');
+if (!destinationContext) throw new Error('Could not create destination picker canvas');
+const destinationTexture = new CanvasTexture(destinationCanvas);
+const destinationBacking = new Mesh(
+  new PlaneGeometry(0.78, 0.92),
+  new MeshBasicMaterial({ map: destinationTexture, transparent: true }),
+);
+destinationPanelGroup.add(destinationBacking);
+world.createTransformEntity(destinationPanelGroup);
+
 function drawQuestPanel() {
   const ctx = panelCtx!;
   ctx.clearRect(0, 0, 1024, 640);
@@ -430,12 +452,13 @@ function drawQuestPanel() {
   ctx.fillStyle = '#aab8d2'; ctx.font = '21px Inter, sans-serif';
   ctx.fillText(`ARENA OBJECTIVE  ${arenaHits}/${ARENA_GOAL} targets · best combo ${arenaBestCombo}`, 48, 330);
   ctx.fillText('Pinch or poke targets. Every 5 hits advances the wave and raises the challenge.', 48, 365);
-  ctx.fillText('Use the physical headset menu to exit the immersive session.', 48, 370);
+  ctx.fillText(`DESTINATIONS  ${selectedDestinationNames.size} selected · use ADD DEST to choose platforms`, 48, 410);
+  ctx.fillText('Use the physical headset menu to exit the immersive session.', 48, 450);
   panelTexture.needsUpdate = true;
 }
 function refreshQuestPanel() { drawQuestPanel(); }
 
-function makeQuestButton(label: string, action: string, x: number, y: number, color: number) {
+function makeQuestButton(label: string, action: string, x: number, y: number, color: number, parent: Group | Mesh = panelMesh) {
   const canvas = document.createElement('canvas');
   canvas.width = 512; canvas.height = 180;
   const ctx = canvas.getContext('2d')!;
@@ -451,12 +474,85 @@ function makeQuestButton(label: string, action: string, x: number, y: number, co
   mesh.position.set(x, y - 1.45, 0.025);
   mesh.userData.action = action;
   const entity = world.createTransformEntity(mesh);
-  panelMesh.add(mesh);
+  parent.add(mesh);
   entity.addComponent(RayInteractable).addComponent(PokeInteractable).addComponent(QuestButton, { action });
   actionByEntity.set(entity.index, action);
   return entity;
 }
 
+type DestinationButton = { mesh: Mesh; context: CanvasRenderingContext2D; texture: CanvasTexture };
+const destinationButtons = new Map<string, DestinationButton>();
+
+function drawDestinationButton(name: string, button: DestinationButton) {
+  const selected = selectedDestinationNames.has(name);
+  const label = platformMeta.find((platform) => platform.name === name)?.label || name;
+  const ctx = button.context;
+  ctx.clearRect(0, 0, 512, 180);
+  ctx.fillStyle = '#0c1730';
+  ctx.beginPath(); ctx.roundRect(4, 4, 504, 172, 24); ctx.fill();
+  ctx.strokeStyle = selected ? '#42e6a4' : '#52658e';
+  ctx.lineWidth = 8; ctx.stroke();
+  ctx.fillStyle = '#f5f8ff'; ctx.font = 'bold 34px Inter, sans-serif';
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  const shortLabel = label.length > 13 ? `${label.slice(0, 11)}…` : label;
+  ctx.fillText(`${shortLabel}  ${selected ? 'ON' : 'OFF'}`, 256, 90);
+  button.texture.needsUpdate = true;
+}
+function refreshDestinationButtons() {
+  const available = collectPlatforms();
+  for (const platform of available) {
+    if (!knownDestinationNames.has(platform.name)) selectedDestinationNames.add(platform.name);
+    knownDestinationNames.add(platform.name);
+    if (destinationButtons.has(platform.name)) {
+      drawDestinationButton(platform.name, destinationButtons.get(platform.name)!);
+      continue;
+    }
+    const index = destinationButtons.size;
+    if (index >= 8) continue;
+    const canvas = document.createElement('canvas');
+    canvas.width = 512; canvas.height = 180;
+    const context = canvas.getContext('2d')!;
+    const texture = new CanvasTexture(canvas);
+    const mesh = new Mesh(
+      new PlaneGeometry(0.34, 0.105),
+      new MeshBasicMaterial({ map: texture, transparent: true }),
+    );
+    const column = index % 2;
+    const row = Math.floor(index / 2);
+    mesh.position.set(column === 0 ? -0.19 : 0.19, 0.25 - row * 0.145, 0.035);
+    destinationPanelGroup.add(mesh);
+    const entity = world.createTransformEntity(mesh);
+    const action = `destination-toggle:${platform.name}`;
+    entity.addComponent(RayInteractable).addComponent(PokeInteractable).addComponent(QuestButton, { action });
+    actionByEntity.set(entity.index, action);
+    actionHandlers.set(action, () => {
+      if (selectedDestinationNames.has(platform.name)) selectedDestinationNames.delete(platform.name);
+      else selectedDestinationNames.add(platform.name);
+      drawDestinationButton(platform.name, destinationButtons.get(platform.name)!);
+      statusText(`${platform.label || platform.name} ${selectedDestinationNames.has(platform.name) ? 'enabled' : 'disabled'} for the next broadcast.`);
+      refreshQuestPanel();
+    });
+    const button = { mesh, context, texture };
+    destinationButtons.set(platform.name, button);
+    drawDestinationButton(platform.name, button);
+  }
+  const ctx = destinationContext!;
+  ctx.clearRect(0, 0, 512, 640);
+  ctx.fillStyle = '#0c1730';
+  ctx.beginPath(); ctx.roundRect(5, 5, 502, 630, 28); ctx.fill();
+  ctx.strokeStyle = '#49649a'; ctx.lineWidth = 5; ctx.stroke();
+  ctx.fillStyle = '#f5f8ff'; ctx.font = 'bold 36px Inter, sans-serif';
+  ctx.textAlign = 'center'; ctx.fillText('STREAM DESTINATIONS', 256, 58);
+  ctx.fillStyle = '#aab8d2'; ctx.font = '22px Inter, sans-serif';
+  ctx.fillText('Pinch a platform to toggle it', 256, 96);
+  if (!available.length) {
+    ctx.fillText('No saved keys found.', 256, 250);
+    ctx.fillText('Add destinations in Account', 256, 286);
+  } else if (available.length > 8) {
+    ctx.fillText('Showing the first 8 saved destinations', 256, 600);
+  }
+  destinationTexture.needsUpdate = true;
+}
 function spawnArenaTarget() {
   const color = [0x31d6ff, 0x8b7bff, 0xffb84d, 0x42e6a4, 0xff668c][Math.floor(Math.random() * 5)];
   const targetRadius = Math.max(0.075, 0.13 - (arenaWave - 1) * 0.012);
@@ -551,8 +647,9 @@ registerQuestAction('stream', () => {
   else {
     sessionId = sessionInput?.value.trim() || sessionId;
     currentQuality = qualityInput?.value || 'high';
-    configuredPlatforms = collectPlatforms();
-    if (window.SLAuth?.enabled && currentUser && configuredPlatforms.length) void window.SLAuth.saveCredentials(configuredPlatforms);
+    const allPlatforms = collectPlatforms();
+    configuredPlatforms = getSelectedPlatforms();
+    if (window.SLAuth?.enabled && currentUser && allPlatforms.length) void window.SLAuth.saveCredentials(allPlatforms);
     void startStream();
   }
 });
@@ -576,9 +673,21 @@ registerQuestAction('focus', () => {
   refreshQuestPanel();
 });
 registerQuestAction('comfort', () => {
-  statusText('Comfort mode: seated-friendly layout. Keep the studio panel within comfortable reach.');
-  panelMesh.position.set(0, 1.35, -0.7);
-  panelMesh.scale.setScalar(0.92);
+  const comfortMode = panelMesh.position.y < 1.3;
+  if (comfortMode) {
+    panelMesh.position.set(0, 1.45, -0.75);
+    panelMesh.scale.setScalar(1);
+    destinationPanelGroup.position.set(0.78, 1.35, -0.78);
+    destinationPanelGroup.scale.setScalar(1);
+    statusText('Seated comfort off · standard studio reach restored.');
+  } else {
+    panelMesh.position.set(0, 1.18, -0.58);
+    panelMesh.scale.setScalar(0.86);
+    destinationPanelGroup.position.set(0.66, 1.18, -0.62);
+    destinationPanelGroup.scale.setScalar(0.86);
+    statusText('Seated comfort on · controls moved closer and lowered for seated reach.');
+  }
+  refreshQuestPanel();
 });
 registerQuestAction('reset', () => {
   focusMode = false;
@@ -588,20 +697,20 @@ registerQuestAction('reset', () => {
   panelMesh.position.set(0, 1.45, -0.75);
   panelMesh.rotation.set(0, 0, 0);
   panelMesh.scale.setScalar(1);
+  destinationPanelGroup.position.set(0.78, 1.35, -0.78);
+  destinationPanelGroup.rotation.set(0, 0, 0);
+  destinationPanelGroup.scale.setScalar(1);
+  destinationPanelGroup.visible = false;
   statusText('Studio panel layout reset.');
   refreshQuestPanel();
 });
 
 registerQuestAction('destination', () => {
-  // Never open browser prompts inside immersive VR: they are not hands-first
-  // and are unreliable in headset browsers. Stream keys stay in the existing
-  // signed-in Account flow and are loaded automatically when Quest Studio opens.
-  configuredPlatforms = collectPlatforms();
-  const names = configuredPlatforms
-    .map((item) => platformMeta.find((platform) => platform.name === item.name)?.label || item.name);
-  statusText(names.length
-    ? `Saved destinations ready: ${names.join(', ')}. Manage keys from Account outside the VR session.`
-    : 'No saved destinations found. Sign in and add stream keys from Account, then reopen Quest Studio.');
+  refreshDestinationButtons();
+  destinationPanelGroup.visible = !destinationPanelGroup.visible;
+  statusText(destinationPanelGroup.visible
+    ? 'Destination picker open · pinch platforms to include or exclude them from your next broadcast.'
+    : 'Destination picker closed.');
 });
 
 makeQuestButton('GO LIVE / STOP', 'stream', -0.31, 1.25, 0x42e6a4);
@@ -610,8 +719,11 @@ makeQuestButton('VR ARENA', 'arena', 0.31, 1.25, 0xffb84d);
 makeQuestButton('FOCUS', 'focus', -0.31, 1.10, 0x8b7bff);
 makeQuestButton('COMFORT', 'comfort', 0, 1.10, 0x42e6a4);
 makeQuestButton('RESET', 'reset', 0.31, 1.10, 0xff668c);
-makeQuestButton('PAUSE', 'pause', -0.16, 1.03, 0xffb84d);
+makeQuestButton('PAUSE / RESUME', 'pause', -0.16, 1.03, 0xffb84d);
 makeQuestButton('ADD DEST', 'destination', 0.16, 1.03, 0x31d6ff);
+makeQuestButton('DONE', 'destination', 0, 1.10, 0x42e6a4, destinationPanelGroup);
+refreshDestinationButtons();
+platformList?.addEventListener('input', refreshDestinationButtons);
 
 class QuestInteractionSystem extends createSystem({
   buttons: { required: [QuestButton, Pressed] },
