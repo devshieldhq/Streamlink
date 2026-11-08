@@ -33,8 +33,6 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-          cache: npm
-          cache-dependency-path: streamlink-server/quest-competition/package-lock.json
       - run: npm install --no-audit --no-fund
       - name: Type-check IWSDK Quest experience
         run: npm run typecheck
