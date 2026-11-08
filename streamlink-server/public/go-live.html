@@ -361,8 +361,11 @@ async function addWebcamOverlay(){
   try{
     webcamStream=await navigator.mediaDevices.getUserMedia({video:{width:{ideal:1280},height:{ideal:720},facingMode:'user'},audio:false});
     webcamVideo=document.createElement('video');webcamVideo.autoplay=true;webcamVideo.muted=true;webcamVideo.playsInline=true;webcamVideo.srcObject=webcamStream;await webcamVideo.play();webcamEnabled=true;
-    const old=cameraStream.getVideoTracks(),fresh=compositorCanvas.captureStream(30);
-    cameraStream=new MediaStream([...fresh.getVideoTracks(),...cameraStream.getAudioTracks()]);old.forEach(t=>t.stop());
+    const previousStream=cameraStream,oldVideoTracks=previousStream.getVideoTracks(),fresh=compositorCanvas.captureStream(30);
+    cameraStream=new MediaStream([...fresh.getVideoTracks(),...previousStream.getAudioTracks()]);
+    // Rebind the preview to the replacement canvas stream before stopping its old video track.
+    const preview=document.getElementById('preview');preview.srcObject=cameraStream;await preview.play();
+    oldVideoTracks.forEach(t=>t.stop());
     document.getElementById('addWebcamBtn').style.display='none';document.getElementById('removeWebcamBtn').style.display='inline-block';
     setCopilot('Webcam overlay added. Your face is included in the gameplay stream.');
   }catch(e){if(webcamStream)webcamStream.getTracks().forEach(t=>t.stop());webcamStream=null;webcamVideo=null;setCopilot('Could not enable webcam: '+e.message);}
@@ -370,7 +373,7 @@ async function addWebcamOverlay(){
 function removeWebcamOverlay(){
   if(streamActive){setCopilot('Stop the stream before changing the webcam overlay.');return;}
   webcamEnabled=false;if(webcamStream)webcamStream.getTracks().forEach(t=>t.stop());webcamStream=null;webcamVideo=null;
-  if(compositorCanvas&&cameraStream){const old=cameraStream.getVideoTracks(),fresh=compositorCanvas.captureStream(30);cameraStream=new MediaStream([...fresh.getVideoTracks(),...cameraStream.getAudioTracks()]);old.forEach(t=>t.stop());}
+  if(compositorCanvas&&cameraStream){const previousStream=cameraStream,oldVideoTracks=previousStream.getVideoTracks(),fresh=compositorCanvas.captureStream(30);cameraStream=new MediaStream([...fresh.getVideoTracks(),...previousStream.getAudioTracks()]);const preview=document.getElementById('preview');preview.srcObject=cameraStream;preview.play().catch(()=>{});oldVideoTracks.forEach(t=>t.stop());}
   document.getElementById('addWebcamBtn').style.display='inline-block';document.getElementById('removeWebcamBtn').style.display='none';setCopilot('Webcam overlay removed.');
 }
 function cleanupGameCapture(){
