@@ -530,7 +530,7 @@ function refreshDestinationButtons() {
       if (selectedDestinationNames.has(platform.name)) selectedDestinationNames.delete(platform.name);
       else selectedDestinationNames.add(platform.name);
       drawDestinationButton(platform.name, destinationButtons.get(platform.name)!);
-      statusText(`${platform.label || platform.name} ${selectedDestinationNames.has(platform.name) ? 'enabled' : 'disabled'} for the next broadcast.`);
+      statusText(`${platformMeta.find((item) => item.name === platform.name)?.label || platform.name} ${selectedDestinationNames.has(platform.name) ? 'enabled' : 'disabled'} for the next broadcast.`);
       refreshQuestPanel();
     });
     const button = { mesh, context, texture };
