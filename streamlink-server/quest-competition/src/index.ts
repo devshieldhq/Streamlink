@@ -381,6 +381,7 @@ const QuestButton = createComponent('QuestStudioButton', {
 const ArenaTarget = createComponent('QuestArenaTarget', {
   active: { type: Types.Boolean, default: true },
 });
+world.registerComponent(QuestButton).registerComponent(ArenaTarget);
 
 let arenaActive = false;
 let arenaPaused = false;
@@ -521,8 +522,7 @@ function refreshDestinationButtons() {
     const column = index % 2;
     const row = Math.floor(index / 2);
     mesh.position.set(column === 0 ? -0.19 : 0.19, 0.25 - row * 0.145, 0.035);
-    destinationPanelGroup.add(mesh);
-    const entity = world.createTransformEntity(mesh);
+    const entity = world.createTransformEntity(mesh, { parent: destinationPanelEntity });
     const action = `destination-toggle:${platform.name}`;
     entity.addComponent(RayInteractable).addComponent(PokeInteractable).addComponent(QuestButton, { action });
     actionByEntity.set(entity.index, action);
