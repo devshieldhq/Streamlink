@@ -1,8 +1,8 @@
-import { createComponent, createSystem, OneHandGrabbable, PokeInteractable, Pressed, RayInteractable, Types, World } from '@iwsdk/core';
 import {
-  BoxGeometry, CanvasTexture, DirectionalLight, Group, Mesh, MeshBasicMaterial, MeshStandardMaterial, PlaneGeometry,
-  SphereGeometry, TorusGeometry, Vector3
-} from 'three';
+  BoxGeometry, CanvasTexture, createComponent, createSystem, DirectionalLight, Group, Mesh, MeshBasicMaterial,
+  MeshStandardMaterial, OneHandGrabbable, PlaneGeometry, PokeInteractable, Pressed, RayInteractable,
+  SphereGeometry, TorusGeometry, Types, Vector3, World
+} from '@iwsdk/core';
 import projectOptions from 'virtual:iwsdk-project';
 
 type PlatformMeta = { name: string; label?: string; requiresUrl?: boolean };
@@ -412,7 +412,8 @@ const panelMaterial = new MeshBasicMaterial({ map: panelTexture, transparent: tr
 const panelMesh = new Mesh(new PlaneGeometry(0.95, 1.0), panelMaterial);
 panelMesh.position.set(0, 1.45, -0.75);
 panelMesh.userData.label = 'StreamLink Quest Studio control panel';
-world.createTransformEntity(panelMesh).addComponent(OneHandGrabbable, { rotate: true, translate: true });
+const panelEntity = world.createTransformEntity(panelMesh);
+panelEntity.addComponent(OneHandGrabbable, { rotate: true, translate: true });
 
 const destinationPanelGroup = new Group();
 destinationPanelGroup.position.set(0.78, 1.35, -0.78);
@@ -428,7 +429,7 @@ const destinationBacking = new Mesh(
   new MeshBasicMaterial({ map: destinationTexture, transparent: true }),
 );
 destinationPanelGroup.add(destinationBacking);
-world.createTransformEntity(destinationPanelGroup);
+const destinationPanelEntity = world.createTransformEntity(destinationPanelGroup);
 
 function drawQuestPanel() {
   const ctx = panelCtx!;
@@ -459,7 +460,7 @@ function drawQuestPanel() {
 }
 function refreshQuestPanel() { drawQuestPanel(); }
 
-function makeQuestButton(label: string, action: string, x: number, y: number, color: number, parent: Group | Mesh = panelMesh) {
+function makeQuestButton(label: string, action: string, x: number, y: number, color: number, parent: any = panelEntity) {
   const canvas = document.createElement('canvas');
   canvas.width = 512; canvas.height = 180;
   const ctx = canvas.getContext('2d')!;
@@ -474,8 +475,7 @@ function makeQuestButton(label: string, action: string, x: number, y: number, co
   const mesh = new Mesh(new PlaneGeometry(0.25, 0.10), new MeshBasicMaterial({ map: texture, transparent: true }));
   mesh.position.set(x, y - 1.45, 0.025);
   mesh.userData.action = action;
-  const entity = world.createTransformEntity(mesh);
-  parent.add(mesh);
+  const entity = world.createTransformEntity(mesh, parent);
   entity.addComponent(RayInteractable).addComponent(PokeInteractable).addComponent(QuestButton, { action });
   actionByEntity.set(entity.index, action);
   return entity;
@@ -723,7 +723,7 @@ makeQuestButton('COMFORT', 'comfort', 0, 1.10, 0x42e6a4);
 makeQuestButton('RESET', 'reset', 0.31, 1.10, 0xff668c);
 makeQuestButton('PAUSE / RESUME', 'pause', -0.16, 1.03, 0xffb84d);
 makeQuestButton('ADD DEST', 'destination', 0.16, 1.03, 0x31d6ff);
-makeQuestButton('DONE', 'destination', 0, 1.10, 0x42e6a4, destinationPanelGroup);
+makeQuestButton('DONE', 'destination', 0, 1.10, 0x42e6a4, destinationPanelEntity);
 refreshDestinationButtons();
 platformList?.addEventListener('input', refreshDestinationButtons);
 
@@ -783,4 +783,3 @@ class QuestInteractionSystem extends createSystem({
 }
 world.registerSystem(QuestInteractionSystem);
 drawQuestPanel();
-world.scene.add(panelMesh);
