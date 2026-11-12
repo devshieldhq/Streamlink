@@ -475,7 +475,7 @@ function makeQuestButton(label: string, action: string, x: number, y: number, co
   const mesh = new Mesh(new PlaneGeometry(0.25, 0.10), new MeshBasicMaterial({ map: texture, transparent: true }));
   mesh.position.set(x, y - 1.45, 0.025);
   mesh.userData.action = action;
-  const entity = world.createTransformEntity(mesh, parent);
+  const entity = world.createTransformEntity(mesh, { parent });
   entity.addComponent(RayInteractable).addComponent(PokeInteractable).addComponent(QuestButton, { action });
   actionByEntity.set(entity.index, action);
   return entity;
