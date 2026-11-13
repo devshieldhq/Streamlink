@@ -46,7 +46,7 @@ const addArenaMesh = (geometry: any, material: any, position: [number, number, n
   if (rotation) mesh.rotation.set(rotation[0], rotation[1], rotation[2]);
   // Attach arena geometry through IWSDK's ECS Transform pipeline so it is
   // included in the active level and synchronized with the runtime renderer.
-  world.createTransformEntity(mesh);
+  world.createTransformEntity(mesh, { persistent: true });
   return mesh;
 };
 
@@ -80,14 +80,14 @@ const floor = new Mesh(
 );
 floor.rotation.x = -Math.PI / 2;
 floor.position.y = -0.025;
-world.createTransformEntity(floor);
+world.createTransformEntity(floor, { persistent: true });
 
 const stage = new Mesh(
   new BoxGeometry(5.2, 0.12, 3.2),
   new MeshStandardMaterial({ color: 0x1c2b4b, roughness: 0.55, metalness: 0.28 }),
 );
 stage.position.set(0, 0.02, -2.2);
-world.createTransformEntity(stage).addComponent(OneHandGrabbable, { rotate: true, translate: true });
+world.createTransformEntity(stage, { persistent: true }).addComponent(OneHandGrabbable, { rotate: true, translate: true });
 
 const colors = [0x31d6ff, 0x8b7bff, 0xffb84d, 0x42e6a4, 0xff668c];
 const arenaTargets: Mesh[] = [];
@@ -97,7 +97,7 @@ colors.forEach((color, index) => {
     new MeshStandardMaterial({ color, emissive: color, emissiveIntensity: 0.22, roughness: 0.28, metalness: 0.35 }),
   );
   target.position.set((index - 2) * 0.92, 1.45 + (index % 2) * 0.48, -2.0 - (index % 2) * 0.22);
-  world.createTransformEntity(target).addComponent(OneHandGrabbable, { rotate: true, translate: true });
+  world.createTransformEntity(target, { persistent: true }).addComponent(OneHandGrabbable, { rotate: true, translate: true });
   arenaTargets.push(target);
 });
 
@@ -452,7 +452,7 @@ const panelMaterial = new MeshBasicMaterial({ map: panelTexture, transparent: tr
 const panelMesh = new Mesh(new PlaneGeometry(0.95, 1.0), panelMaterial);
 panelMesh.position.set(-2.15, 1.45, -0.75);
 panelMesh.userData.label = 'StreamLink Quest Studio control panel';
-const panelEntity = world.createTransformEntity(panelMesh);
+const panelEntity = world.createTransformEntity(panelMesh, { persistent: true });
 panelEntity.addComponent(OneHandGrabbable, { rotate: true, translate: true });
 
 const destinationPanelGroup = new Group();
@@ -469,7 +469,7 @@ const destinationBacking = new Mesh(
   new MeshBasicMaterial({ map: destinationTexture, transparent: true }),
 );
 destinationPanelGroup.add(destinationBacking);
-const destinationPanelEntity = world.createTransformEntity(destinationPanelGroup);
+const destinationPanelEntity = world.createTransformEntity(destinationPanelGroup, { persistent: true });
 
 function drawQuestPanel() {
   const ctx = panelCtx!;
