@@ -734,11 +734,11 @@ registerQuestAction('reset', () => {
   floor.visible = true;
   stage.visible = true;
   byId<HTMLDivElement>('studio-panel')?.classList.remove('hidden');
-  panelMesh.position.set(0, 1.45, -0.75);
+  panelMesh.position.set(-2.15, 1.45, -0.75);
   panelMesh.rotation.set(0, 0, 0);
   panelMesh.scale.setScalar(1);
   comfortMode = false;
-  destinationPanelGroup.position.set(0.78, 1.35, -0.78);
+  destinationPanelGroup.position.set(2.15, 1.35, -0.78);
   destinationPanelGroup.rotation.set(0, 0, 0);
   destinationPanelGroup.scale.setScalar(1);
   destinationPanelGroup.visible = false;
