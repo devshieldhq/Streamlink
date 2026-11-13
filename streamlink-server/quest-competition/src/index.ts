@@ -101,14 +101,21 @@ colors.forEach((color, index) => {
   arenaTargets.push(target);
 });
 
-// TEMPORARY RENDER-PIPELINE ISOLATION: bright magenta sphere, in front of camera.
+// TEMPORARY CAMERA-LOCKED RENDER PROBE.
+// Parenting directly to the active camera removes world-position and level/ECS
+// transforms from the test. If this disappears, the problem is renderer/session
+// lifecycle; if it stays while the Arena disappears, investigate player pose/scene.
 const renderProbe = new Mesh(
-  new SphereGeometry(0.7, 32, 24),
-  new MeshBasicMaterial({ color: 0xff00ff, toneMapped: false }),
+  new SphereGeometry(0.22, 32, 24),
+  new MeshBasicMaterial({ color: 0xff00ff, toneMapped: false, depthTest: false, depthWrite: false }),
 );
-renderProbe.position.set(0, 1.5, -1.35);
-world.createTransformEntity(renderProbe, { persistent: true });
-console.info('[StreamLink XR render probe] bright magenta sphere entity created');
+renderProbe.position.set(0, 0, -1.4);
+renderProbe.renderOrder = 999;
+world.camera.add(renderProbe);
+console.info('[StreamLink XR render probe] camera-locked magenta sphere attached', {
+  cameraParent: world.camera.parent?.name || 'player rig',
+  position: renderProbe.position.toArray(),
+});
 
 // Existing StreamLink auth, Supabase credentials, REST APIs and Socket.IO remain the source of truth.
 const sessionInput = byId<HTMLInputElement>('session-id');
