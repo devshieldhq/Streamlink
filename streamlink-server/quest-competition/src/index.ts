@@ -35,6 +35,43 @@ const fillLight = new DirectionalLight(0x6c8cff, 0.8);
 fillLight.position.set(-4, 5, 3);
 world.scene.add(fillLight);
 
+// Build a lightweight, high-contrast VR Arena shell directly in the IWSDK scene.
+const arenaShellMaterial = new MeshBasicMaterial({ color: 0x101b35 });
+const arenaAccentMaterial = new MeshBasicMaterial({ color: 0x16d9ff });
+const arenaPurpleMaterial = new MeshBasicMaterial({ color: 0x6c55ff });
+const arenaFloorLineMaterial = new MeshBasicMaterial({ color: 0x174c79 });
+const addArenaMesh = (geometry: any, material: any, position: [number, number, number], rotation?: [number, number, number]) => {
+  const mesh = new Mesh(geometry, material);
+  mesh.position.set(position[0], position[1], position[2]);
+  if (rotation) mesh.rotation.set(rotation[0], rotation[1], rotation[2]);
+  world.scene.add(mesh);
+  return mesh;
+};
+
+// Rear wall, side fins, and luminous crown define the arena boundaries.
+addArenaMesh(new BoxGeometry(13.5, 5.2, 0.22), arenaShellMaterial, [0, 2.35, -5.35]);
+addArenaMesh(new BoxGeometry(0.22, 4.4, 7.8), arenaShellMaterial, [-6.55, 2.0, -2.0]);
+addArenaMesh(new BoxGeometry(0.22, 4.4, 7.8), arenaShellMaterial, [6.55, 2.0, -2.0]);
+addArenaMesh(new BoxGeometry(13.8, 0.12, 0.18), arenaAccentMaterial, [0, 4.95, -5.18]);
+addArenaMesh(new BoxGeometry(0.12, 4.5, 0.18), arenaAccentMaterial, [-5.9, 2.15, -5.18]);
+addArenaMesh(new BoxGeometry(0.12, 4.5, 0.18), arenaPurpleMaterial, [5.9, 2.15, -5.18]);
+
+// Floor grid and luminous rings provide depth and orientation cues.
+for (let z = -4.8; z <= 1.2; z += 1.2) {
+  addArenaMesh(new BoxGeometry(12.2, 0.018, 0.025), arenaFloorLineMaterial, [0, 0.012, z]);
+}
+for (let x = -5.4; x <= 5.4; x += 1.8) {
+  addArenaMesh(new BoxGeometry(0.025, 0.018, 6.2), arenaFloorLineMaterial, [x, 0.012, -1.8]);
+}
+addArenaMesh(new TorusGeometry(2.8, 0.035, 8, 64), arenaAccentMaterial, [0, 0.055, -2.2], [Math.PI / 2, 0, 0]);
+addArenaMesh(new TorusGeometry(2.25, 0.022, 8, 64), arenaPurpleMaterial, [0, 0.06, -2.2], [Math.PI / 2, 0, 0]);
+
+// Side pylons frame the play area while keeping the center open.
+for (const x of [-4.8, -3.8, 3.8, 4.8]) {
+  addArenaMesh(new BoxGeometry(0.16, 2.6, 0.16), x < 0 ? arenaAccentMaterial : arenaPurpleMaterial, [x, 1.3, -3.9]);
+  addArenaMesh(new BoxGeometry(0.55, 0.08, 0.55), arenaShellMaterial, [x, 0.08, -3.9]);
+}
+
 const floor = new Mesh(
   new PlaneGeometry(18, 18),
   new MeshStandardMaterial({ color: 0x101a31, roughness: 0.92, metalness: 0.08 }),
