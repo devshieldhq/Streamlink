@@ -450,13 +450,13 @@ if (!panelCtx) throw new Error('Could not create Quest Studio panel canvas');
 const panelTexture = new CanvasTexture(panelCanvas);
 const panelMaterial = new MeshBasicMaterial({ map: panelTexture, transparent: true });
 const panelMesh = new Mesh(new PlaneGeometry(0.95, 1.0), panelMaterial);
-panelMesh.position.set(0, 1.45, -0.75);
+panelMesh.position.set(-2.15, 1.45, -0.75);
 panelMesh.userData.label = 'StreamLink Quest Studio control panel';
 const panelEntity = world.createTransformEntity(panelMesh);
 panelEntity.addComponent(OneHandGrabbable, { rotate: true, translate: true });
 
 const destinationPanelGroup = new Group();
-destinationPanelGroup.position.set(0.78, 1.35, -0.78);
+destinationPanelGroup.position.set(2.15, 1.35, -0.78);
 destinationPanelGroup.visible = false;
 const destinationCanvas = document.createElement('canvas');
 destinationCanvas.width = 512;
@@ -715,15 +715,15 @@ registerQuestAction('focus', () => {
 registerQuestAction('comfort', () => {
   comfortMode = !comfortMode;
   if (comfortMode) {
-    panelMesh.position.set(0, 1.18, -0.58);
+    panelMesh.position.set(-1.9, 1.18, -0.58);
     panelMesh.scale.setScalar(0.86);
-    destinationPanelGroup.position.set(0.66, 1.18, -0.62);
+    destinationPanelGroup.position.set(1.9, 1.18, -0.62);
     destinationPanelGroup.scale.setScalar(0.86);
     statusText('Seated comfort on · controls moved closer and lowered for seated reach.');
   } else {
-    panelMesh.position.set(0, 1.45, -0.75);
+    panelMesh.position.set(-2.15, 1.45, -0.75);
     panelMesh.scale.setScalar(1);
-    destinationPanelGroup.position.set(0.78, 1.35, -0.78);
+    destinationPanelGroup.position.set(2.15, 1.35, -0.78);
     destinationPanelGroup.scale.setScalar(1);
     statusText('Seated comfort off · standard studio reach restored.');
   }
