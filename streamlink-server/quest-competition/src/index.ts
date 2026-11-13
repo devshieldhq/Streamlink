@@ -44,7 +44,9 @@ const addArenaMesh = (geometry: any, material: any, position: [number, number, n
   const mesh = new Mesh(geometry, material);
   mesh.position.set(position[0], position[1], position[2]);
   if (rotation) mesh.rotation.set(rotation[0], rotation[1], rotation[2]);
-  world.scene.add(mesh);
+  // Attach arena geometry through IWSDK's ECS Transform pipeline so it is
+  // included in the active level and synchronized with the runtime renderer.
+  world.createTransformEntity(mesh);
   return mesh;
 };
 
