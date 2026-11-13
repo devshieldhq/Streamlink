@@ -35,70 +35,18 @@ const fillLight = new DirectionalLight(0x6c8cff, 0.8);
 fillLight.position.set(-4, 5, 3);
 world.scene.add(fillLight);
 
-// Build a lightweight, high-contrast VR Arena shell directly in the IWSDK scene.
-const arenaShellMaterial = new MeshBasicMaterial({ color: 0x101b35 });
-const arenaAccentMaterial = new MeshBasicMaterial({ color: 0x16d9ff });
-const arenaPurpleMaterial = new MeshBasicMaterial({ color: 0x6c55ff });
-const arenaFloorLineMaterial = new MeshBasicMaterial({ color: 0x174c79 });
-const addArenaMesh = (geometry: any, material: any, position: [number, number, number], rotation?: [number, number, number]) => {
-  const mesh = new Mesh(geometry, material);
-  mesh.position.set(position[0], position[1], position[2]);
-  if (rotation) mesh.rotation.set(rotation[0], rotation[1], rotation[2]);
-  // Attach arena geometry through IWSDK's ECS Transform pipeline so it is
-  // included in the active level and synchronized with the runtime renderer.
-  world.createTransformEntity(mesh, { persistent: true });
-  return mesh;
-};
-
-// Rear wall, side fins, and luminous crown define the arena boundaries.
-addArenaMesh(new BoxGeometry(13.5, 5.2, 0.22), arenaShellMaterial, [0, 2.35, -5.35]);
-addArenaMesh(new BoxGeometry(0.22, 4.4, 7.8), arenaShellMaterial, [-6.55, 2.0, -2.0]);
-addArenaMesh(new BoxGeometry(0.22, 4.4, 7.8), arenaShellMaterial, [6.55, 2.0, -2.0]);
-addArenaMesh(new BoxGeometry(13.8, 0.12, 0.18), arenaAccentMaterial, [0, 4.95, -5.18]);
-addArenaMesh(new BoxGeometry(0.12, 4.5, 0.18), arenaAccentMaterial, [-5.9, 2.15, -5.18]);
-addArenaMesh(new BoxGeometry(0.12, 4.5, 0.18), arenaPurpleMaterial, [5.9, 2.15, -5.18]);
-
-// Floor grid and luminous rings provide depth and orientation cues.
-for (let z = -4.8; z <= 1.2; z += 1.2) {
-  addArenaMesh(new BoxGeometry(12.2, 0.018, 0.025), arenaFloorLineMaterial, [0, 0.012, z]);
-}
-for (let x = -5.4; x <= 5.4; x += 1.8) {
-  addArenaMesh(new BoxGeometry(0.025, 0.018, 6.2), arenaFloorLineMaterial, [x, 0.012, -1.8]);
-}
-addArenaMesh(new TorusGeometry(2.8, 0.035, 8, 64), arenaAccentMaterial, [0, 0.055, -2.2], [Math.PI / 2, 0, 0]);
-addArenaMesh(new TorusGeometry(2.25, 0.022, 8, 64), arenaPurpleMaterial, [0, 0.06, -2.2], [Math.PI / 2, 0, 0]);
-
-// Side pylons frame the play area while keeping the center open.
-for (const x of [-4.8, -3.8, 3.8, 4.8]) {
-  addArenaMesh(new BoxGeometry(0.16, 2.6, 0.16), x < 0 ? arenaAccentMaterial : arenaPurpleMaterial, [x, 1.3, -3.9]);
-  addArenaMesh(new BoxGeometry(0.55, 0.08, 0.55), arenaShellMaterial, [x, 0.08, -3.9]);
-}
-
-const floor = new Mesh(
-  new PlaneGeometry(18, 18),
-  new MeshStandardMaterial({ color: 0x101a31, roughness: 0.92, metalness: 0.08 }),
+// TEMPORARY RENDER-PIPELINE ISOLATION: replace the Arena with one unmistakable
+// bright sphere directly in the camera's forward view. If this fails to appear,
+// the fault is in IWSDK scene/camera/render lifecycle rather than Arena geometry.
+const renderProbe = new Mesh(
+  new SphereGeometry(0.7, 32, 24),
+  new MeshBasicMaterial({ color: 0xff00ff, toneMapped: false }),
 );
-floor.rotation.x = -Math.PI / 2;
-floor.position.y = -0.025;
-world.createTransformEntity(floor, { persistent: true });
-
-const stage = new Mesh(
-  new BoxGeometry(5.2, 0.12, 3.2),
-  new MeshStandardMaterial({ color: 0x1c2b4b, roughness: 0.55, metalness: 0.28 }),
-);
-stage.position.set(0, 0.02, -2.2);
-world.createTransformEntity(stage, { persistent: true }).addComponent(OneHandGrabbable, { rotate: true, translate: true });
-
-const colors = [0x31d6ff, 0x8b7bff, 0xffb84d, 0x42e6a4, 0xff668c];
-const arenaTargets: Mesh[] = [];
-colors.forEach((color, index) => {
-  const target = new Mesh(
-    new SphereGeometry(0.19, 32, 24),
-    new MeshStandardMaterial({ color, emissive: color, emissiveIntensity: 0.22, roughness: 0.28, metalness: 0.35 }),
-  );
-  target.position.set((index - 2) * 0.92, 1.45 + (index % 2) * 0.48, -2.0 - (index % 2) * 0.22);
-  world.createTransformEntity(target, { persistent: true }).addComponent(OneHandGrabbable, { rotate: true, translate: true });
-  arenaTargets.push(target);
+renderProbe.position.set(0, 1.5, -1.35);
+world.createTransformEntity(renderProbe, { persistent: true });
+console.info('[StreamLink XR render probe] bright magenta sphere entity created', {
+  position: renderProbe.position.toArray(),
+  persistent: true,
 });
 
 // Existing StreamLink auth, Supabase credentials, REST APIs and Socket.IO remain the source of truth.
