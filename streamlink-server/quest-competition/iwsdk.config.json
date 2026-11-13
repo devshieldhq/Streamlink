@@ -8,7 +8,7 @@
       "mode": "vr",
       "features": { "handTracking": { "required": true } }
     },
-    "render": { "camera": { "position": [0, 1.3, 0] } },
+    "render": { "camera": { "position": [0, 1.3, 0], "lookAt": [0, 1.5, -4] } },
     "features": {
       "grabbing": { "useHandPinchForGrab": true },
       "locomotion": true,
