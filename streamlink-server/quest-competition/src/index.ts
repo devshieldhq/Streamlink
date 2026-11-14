@@ -101,6 +101,21 @@ colors.forEach((color, index) => {
   arenaTargets.push(target);
 });
 
+// TEMPORARY SCENE-ROOT RENDER DIAGNOSTIC.
+// Unlike Arena entities, this test bypasses IWSDK Transform/Visibility ECS systems.
+// A cyan panel placed in the camera's forward world view tests direct Scene rendering.
+const sceneRootProbe = new Mesh(
+  new BoxGeometry(1.25, 1.25, 0.12),
+  new MeshBasicMaterial({ color: 0x00ffff, toneMapped: false, depthTest: false, depthWrite: false }),
+);
+sceneRootProbe.position.set(0, 1.7, -1.5);
+sceneRootProbe.renderOrder = 998;
+world.scene.add(sceneRootProbe);
+console.info('[StreamLink XR scene-root probe] cyan panel added directly to world.scene', {
+  position: sceneRootProbe.position.toArray(),
+  sceneChildren: world.scene.children.length,
+});
+
 // TEMPORARY CAMERA-LOCKED RENDER PROBE.
 // Parenting directly to the active camera removes world-position and level/ECS
 // transforms from the test. If this disappears, the problem is renderer/session
