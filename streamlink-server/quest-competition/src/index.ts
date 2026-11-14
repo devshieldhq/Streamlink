@@ -108,20 +108,17 @@ const sceneRootProbe = new Mesh(
   new BoxGeometry(1.25, 1.25, 0.12),
   new MeshBasicMaterial({ color: 0x00ffff, toneMapped: false, depthTest: false, depthWrite: false }),
 );
-// Place the direct-scene probe along the camera's actual world-space forward vector,
-// so headset/emulator camera pose cannot put the diagnostic outside the viewport.
-world.camera.updateWorldMatrix(true, false);
-const probeCameraPosition = new Vector3();
-const probeCameraForward = new Vector3();
-world.camera.getWorldPosition(probeCameraPosition);
-world.camera.getWorldDirection(probeCameraForward);
-sceneRootProbe.position.copy(probeCameraPosition).addScaledVector(probeCameraForward, 1.4);
-sceneRootProbe.quaternion.copy(world.camera.getWorldQuaternion(new Quaternion()));
+// TEMPORARY CAMERA-ATTACHED SCENE DIAGNOSTIC.
+// The XR runtime moves the camera after launch. A world-space probe positioned
+// before launch stays behind at the desktop camera pose, so parent this test
+// to the live camera just like the magenta renderer probe.
+sceneRootProbe.position.set(-0.62, 0, -1.4);
+sceneRootProbe.quaternion.identity();
 sceneRootProbe.renderOrder = 998;
-world.scene.add(sceneRootProbe);
-console.info('[StreamLink XR scene-root probe] cyan panel added directly to world.scene', {
+world.camera.add(sceneRootProbe);
+console.info('[StreamLink XR scene-root probe] cyan panel attached to active camera', {
   position: sceneRootProbe.position.toArray(),
-  sceneChildren: world.scene.children.length,
+  cameraParent: world.camera.parent?.name || 'player rig',
 });
 
 // TEMPORARY CAMERA-LOCKED RENDER PROBE.
