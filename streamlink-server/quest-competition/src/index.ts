@@ -1,7 +1,7 @@
 import {
   BoxGeometry, CanvasTexture, createComponent, createSystem, DirectionalLight, Group, Mesh, MeshBasicMaterial,
   MeshStandardMaterial, OneHandGrabbable, PlaneGeometry, PokeInteractable, Pressed, RayInteractable,
-  SphereGeometry, TorusGeometry, Types, Vector3, World
+  SphereGeometry, TorusGeometry, Types, Vector3, Quaternion, World
 } from '@iwsdk/core';
 import projectOptions from 'virtual:iwsdk-project';
 
@@ -116,7 +116,7 @@ const probeCameraForward = new Vector3();
 world.camera.getWorldPosition(probeCameraPosition);
 world.camera.getWorldDirection(probeCameraForward);
 sceneRootProbe.position.copy(probeCameraPosition).addScaledVector(probeCameraForward, 1.4);
-sceneRootProbe.quaternion.copy(world.camera.getWorldQuaternion(new (await import('@iwsdk/core')).Quaternion()));
+sceneRootProbe.quaternion.copy(world.camera.getWorldQuaternion(new Quaternion()));
 sceneRootProbe.renderOrder = 998;
 world.scene.add(sceneRootProbe);
 console.info('[StreamLink XR scene-root probe] cyan panel added directly to world.scene', {
