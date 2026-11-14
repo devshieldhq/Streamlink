@@ -108,7 +108,15 @@ const sceneRootProbe = new Mesh(
   new BoxGeometry(1.25, 1.25, 0.12),
   new MeshBasicMaterial({ color: 0x00ffff, toneMapped: false, depthTest: false, depthWrite: false }),
 );
-sceneRootProbe.position.set(0, 1.7, -1.5);
+// Place the direct-scene probe along the camera's actual world-space forward vector,
+// so headset/emulator camera pose cannot put the diagnostic outside the viewport.
+world.camera.updateWorldMatrix(true, false);
+const probeCameraPosition = new Vector3();
+const probeCameraForward = new Vector3();
+world.camera.getWorldPosition(probeCameraPosition);
+world.camera.getWorldDirection(probeCameraForward);
+sceneRootProbe.position.copy(probeCameraPosition).addScaledVector(probeCameraForward, 1.4);
+sceneRootProbe.quaternion.copy(world.camera.getWorldQuaternion(new (await import('@iwsdk/core')).Quaternion()));
 sceneRootProbe.renderOrder = 998;
 world.scene.add(sceneRootProbe);
 console.info('[StreamLink XR scene-root probe] cyan panel added directly to world.scene', {
