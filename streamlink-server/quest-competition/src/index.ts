@@ -36,10 +36,10 @@ fillLight.position.set(-4, 5, 3);
 world.scene.add(fillLight);
 
 // Build a lightweight, high-contrast VR Arena shell directly in the IWSDK scene.
-const arenaShellMaterial = new MeshBasicMaterial({ color: 0x1b2e50 });
+const arenaShellMaterial = new MeshBasicMaterial({ color: 0x101b35 });
 const arenaAccentMaterial = new MeshBasicMaterial({ color: 0x16d9ff });
 const arenaPurpleMaterial = new MeshBasicMaterial({ color: 0x6c55ff });
-const arenaFloorLineMaterial = new MeshBasicMaterial({ color: 0x1686c4 });
+const arenaFloorLineMaterial = new MeshBasicMaterial({ color: 0x174c79 });
 const addArenaMesh = (geometry: any, material: any, position: [number, number, number], rotation?: [number, number, number]) => {
   const mesh = new Mesh(geometry, material);
   mesh.position.set(position[0], position[1], position[2]);
@@ -99,6 +99,42 @@ colors.forEach((color, index) => {
   target.position.set((index - 2) * 0.92, 1.45 + (index % 2) * 0.48, -2.0 - (index % 2) * 0.22);
   world.createTransformEntity(target, { persistent: true }).addComponent(OneHandGrabbable, { rotate: true, translate: true });
   arenaTargets.push(target);
+});
+
+// TEMPORARY SCENE-ROOT RENDER DIAGNOSTIC.
+// Unlike Arena entities, this test bypasses IWSDK Transform/Visibility ECS systems.
+// A cyan panel placed in the camera's forward world view tests direct Scene rendering.
+const sceneRootProbe = new Mesh(
+  new BoxGeometry(1.25, 1.25, 0.12),
+  new MeshBasicMaterial({ color: 0x00ffff, toneMapped: false, depthTest: false, depthWrite: false }),
+);
+// TEMPORARY CAMERA-ATTACHED SCENE DIAGNOSTIC.
+// The XR runtime moves the camera after launch. A world-space probe positioned
+// before launch stays behind at the desktop camera pose, so parent this test
+// to the live camera just like the magenta renderer probe.
+sceneRootProbe.position.set(-0.62, 0, -1.4);
+sceneRootProbe.quaternion.identity();
+sceneRootProbe.renderOrder = 998;
+world.camera.add(sceneRootProbe);
+console.info('[StreamLink XR scene-root probe] cyan panel attached to active camera', {
+  position: sceneRootProbe.position.toArray(),
+  cameraParent: world.camera.parent?.name || 'player rig',
+});
+
+// TEMPORARY CAMERA-LOCKED RENDER PROBE.
+// Parenting directly to the active camera removes world-position and level/ECS
+// transforms from the test. If this disappears, the problem is renderer/session
+// lifecycle; if it stays while the Arena disappears, investigate player pose/scene.
+const renderProbe = new Mesh(
+  new SphereGeometry(0.22, 32, 24),
+  new MeshBasicMaterial({ color: 0xff00ff, toneMapped: false, depthTest: false, depthWrite: false }),
+);
+renderProbe.position.set(0, 0, -1.4);
+renderProbe.renderOrder = 999;
+world.camera.add(renderProbe);
+console.info('[StreamLink XR render probe] camera-locked magenta sphere attached', {
+  cameraParent: world.camera.parent?.name || 'player rig',
+  position: renderProbe.position.toArray(),
 });
 
 // Existing StreamLink auth, Supabase credentials, REST APIs and Socket.IO remain the source of truth.
