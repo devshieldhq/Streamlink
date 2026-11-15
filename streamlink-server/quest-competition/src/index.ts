@@ -109,6 +109,21 @@ const sceneRootProbe = new Mesh(
   new BoxGeometry(1.25, 1.25, 0.12),
   new MeshBasicMaterial({ color: 0x00ffff, toneMapped: false, depthTest: false, depthWrite: false }),
 );
+// TEMPORARY SCENE-ROOT DIAGNOSTIC: bypasses ECS Transform/Visibility while
+// staying in the same world scene. This isolates scene-root rendering from ECS attachment.
+const directSceneProbe = new Mesh(
+  new BoxGeometry(0.42, 0.42, 0.08),
+  new MeshBasicMaterial({ color: 0x35ff6b, toneMapped: false, depthTest: false, depthWrite: false }),
+);
+directSceneProbe.position.set(0, 1.5, -1.55);
+directSceneProbe.renderOrder = 997;
+world.scene.add(directSceneProbe);
+console.info('[StreamLink direct scene probe]', {
+  parentIsScene: directSceneProbe.parent === world.scene,
+  sceneChildren: world.scene.children.length,
+  persistentRoot: world.getPersistentRoot?.()?.name || 'available',
+});
+
 // TEMPORARY CAMERA-ATTACHED SCENE DIAGNOSTIC.
 // The XR runtime moves the camera after launch. A world-space probe positioned
 // before launch stays behind at the desktop camera pose, so parent this test
