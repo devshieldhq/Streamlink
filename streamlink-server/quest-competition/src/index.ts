@@ -903,10 +903,30 @@ drawQuestPanel();
 function logQuestCameraAndMeshes() {
   world.scene.updateMatrixWorld(true);
   world.camera.updateMatrixWorld(true);
+  const player = (world as any).player;
+  player?.updateMatrixWorld?.(true);
   const cameraWorldPosition = new Vector3();
   const cameraWorldDirection = new Vector3();
+  const playerWorldPosition = new Vector3();
   world.camera.getWorldPosition(cameraWorldPosition);
   world.camera.getWorldDirection(cameraWorldDirection);
+  player?.getWorldPosition?.(playerWorldPosition);
+  const transformChain = (object: any) => {
+    const chain: any[] = [];
+    let current = object;
+    while (current) {
+      const worldPosition = new Vector3();
+      current.getWorldPosition?.(worldPosition);
+      chain.push({
+        name: current.name || current.type,
+        type: current.type,
+        localPosition: current.position?.toArray?.() ?? null,
+        worldPosition: current.getWorldPosition ? worldPosition.toArray() : null,
+      });
+      current = current.parent;
+    }
+    return chain;
+  };
   const sceneMeshReport: any[] = [];
   world.scene.traverse((object: any) => {
     if (!object.isMesh) return;
@@ -924,7 +944,13 @@ function logQuestCameraAndMeshes() {
     });
   });
   console.info('[StreamLink camera and world-space diagnostic]', {
-    cameraPosition: cameraWorldPosition.toArray(),
+    playerLocalPosition: player?.position?.toArray?.() ?? null,
+    playerWorldPosition: player ? playerWorldPosition.toArray() : null,
+    playerChain: transformChain(player),
+    cameraLocalPosition: world.camera.position.toArray(),
+    cameraWorldPosition: cameraWorldPosition.toArray(),
+    cameraParent: world.camera.parent?.name || world.camera.parent?.type || null,
+    cameraParentChain: transformChain(world.camera),
     cameraDirection: cameraWorldDirection.toArray(),
     cameraNear: world.camera.near,
     cameraFar: world.camera.far,
