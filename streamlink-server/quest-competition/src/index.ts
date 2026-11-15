@@ -895,3 +895,39 @@ class QuestInteractionSystem extends createSystem({
 }
 world.registerSystem(QuestInteractionSystem);
 drawQuestPanel();
+
+// TEMPORARY CAMERA + WORLD-SPACE DIAGNOSTIC.
+// Captures the actual headset camera pose and all visible mesh positions after
+// the studio controls have been created, to distinguish off-screen placement
+// from a rendering/material issue.
+world.scene.updateMatrixWorld(true);
+world.camera.updateMatrixWorld(true);
+const cameraWorldPosition = new Vector3();
+const cameraWorldDirection = new Vector3();
+world.camera.getWorldPosition(cameraWorldPosition);
+world.camera.getWorldDirection(cameraWorldDirection);
+const sceneMeshReport: any[] = [];
+world.scene.traverse((object: any) => {
+  if (!object.isMesh) return;
+  const worldPosition = new Vector3();
+  object.getWorldPosition(worldPosition);
+  sceneMeshReport.push({
+    name: object.name || object.userData?.label || object.type,
+    position: worldPosition.toArray().map((value: number) => Number(value.toFixed(3))),
+    visible: object.visible,
+    parent: object.parent?.name || object.parent?.type || null,
+    geometry: object.geometry?.type || null,
+    materialVisible: Array.isArray(object.material)
+      ? object.material.map((material: any) => material.visible)
+      : object.material?.visible,
+  });
+});
+console.info('[StreamLink camera and world-space diagnostic]', {
+  cameraPosition: cameraWorldPosition.toArray(),
+  cameraDirection: cameraWorldDirection.toArray(),
+  cameraNear: world.camera.near,
+  cameraFar: world.camera.far,
+  sceneMeshCount: sceneMeshReport.length,
+  meshes: sceneMeshReport,
+});
+
