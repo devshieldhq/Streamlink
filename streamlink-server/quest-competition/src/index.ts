@@ -42,11 +42,10 @@ const arenaPurpleMaterial = new MeshBasicMaterial({ color: 0x6c55ff });
 const arenaFloorLineMaterial = new MeshBasicMaterial({ color: 0x174c79 });
 const addArenaMesh = (geometry: any, material: any, position: [number, number, number], rotation?: [number, number, number]) => {
   const mesh = new Mesh(geometry, material);
-  mesh.position.set(position[0], position[1], position[2]);
-  if (rotation) mesh.rotation.set(rotation[0], rotation[1], rotation[2]);
-  // Attach arena geometry through IWSDK's ECS Transform pipeline so it is
-  // included in the active level and synchronized with the runtime renderer.
-  world.createTransformEntity(mesh, { persistent: true });
+  // Register first: IWSDK binds Object3D transforms to ECS storage here.
+  const entity = world.createTransformEntity(mesh, { persistent: true });
+  entity.object3D!.position.set(position[0], position[1], position[2]);
+  if (rotation) entity.object3D!.rotation.set(rotation[0], rotation[1], rotation[2]);
   return mesh;
 };
 
@@ -78,16 +77,17 @@ const floor = new Mesh(
   new PlaneGeometry(18, 18),
   new MeshStandardMaterial({ color: 0x101a31, roughness: 0.92, metalness: 0.08 }),
 );
-floor.rotation.x = -Math.PI / 2;
-floor.position.y = -0.025;
-world.createTransformEntity(floor, { persistent: true });
+const floorEntity = world.createTransformEntity(floor, { persistent: true });
+floorEntity.object3D!.rotation.x = -Math.PI / 2;
+floorEntity.object3D!.position.y = -0.025;
 
 const stage = new Mesh(
   new BoxGeometry(5.2, 0.12, 3.2),
   new MeshStandardMaterial({ color: 0x1c2b4b, roughness: 0.55, metalness: 0.28 }),
 );
-stage.position.set(0, 0.02, -2.2);
-world.createTransformEntity(stage, { persistent: true }).addComponent(OneHandGrabbable, { rotate: true, translate: true });
+const stageEntity = world.createTransformEntity(stage, { persistent: true });
+stageEntity.object3D!.position.set(0, 0.02, -2.2);
+stageEntity.addComponent(OneHandGrabbable, { rotate: true, translate: true });
 
 const colors = [0x31d6ff, 0x8b7bff, 0xffb84d, 0x42e6a4, 0xff668c];
 const arenaTargets: Mesh[] = [];
@@ -96,8 +96,9 @@ colors.forEach((color, index) => {
     new SphereGeometry(0.19, 32, 24),
     new MeshStandardMaterial({ color, emissive: color, emissiveIntensity: 0.22, roughness: 0.28, metalness: 0.35 }),
   );
-  target.position.set((index - 2) * 0.92, 1.45 + (index % 2) * 0.48, -2.0 - (index % 2) * 0.22);
-  world.createTransformEntity(target, { persistent: true }).addComponent(OneHandGrabbable, { rotate: true, translate: true });
+  const targetEntity = world.createTransformEntity(target, { persistent: true });
+  targetEntity.object3D!.position.set((index - 2) * 0.92, 1.45 + (index % 2) * 0.48, -2.0 - (index % 2) * 0.22);
+  targetEntity.addComponent(OneHandGrabbable, { rotate: true, translate: true });
   arenaTargets.push(target);
 });
 
@@ -486,13 +487,12 @@ if (!panelCtx) throw new Error('Could not create Quest Studio panel canvas');
 const panelTexture = new CanvasTexture(panelCanvas);
 const panelMaterial = new MeshBasicMaterial({ map: panelTexture, transparent: true });
 const panelMesh = new Mesh(new PlaneGeometry(0.95, 1.0), panelMaterial);
-panelMesh.position.set(-2.15, 1.45, -0.75);
 panelMesh.userData.label = 'StreamLink Quest Studio control panel';
 const panelEntity = world.createTransformEntity(panelMesh, { persistent: true });
+panelEntity.object3D!.position.set(-2.15, 1.45, -0.75);
 panelEntity.addComponent(OneHandGrabbable, { rotate: true, translate: true });
 
 const destinationPanelGroup = new Group();
-destinationPanelGroup.position.set(2.15, 1.35, -0.78);
 destinationPanelGroup.visible = false;
 const destinationCanvas = document.createElement('canvas');
 destinationCanvas.width = 512;
@@ -506,6 +506,7 @@ const destinationBacking = new Mesh(
 );
 destinationPanelGroup.add(destinationBacking);
 const destinationPanelEntity = world.createTransformEntity(destinationPanelGroup, { persistent: true });
+destinationPanelEntity.object3D!.position.set(2.15, 1.35, -0.78);
 
 function drawQuestPanel() {
   const ctx = panelCtx!;
@@ -549,9 +550,9 @@ function makeQuestButton(label: string, action: string, x: number, y: number, co
   ctx.fillText(label, 256, 90);
   const texture = new CanvasTexture(canvas);
   const mesh = new Mesh(new PlaneGeometry(0.25, 0.10), new MeshBasicMaterial({ map: texture, transparent: true }));
-  mesh.position.set(x, y - 1.45, 0.025);
   mesh.userData.action = action;
   const entity = world.createTransformEntity(mesh, { parent });
+  entity.object3D!.position.set(x, y - 1.45, 0.025);
   entity.addComponent(RayInteractable).addComponent(PokeInteractable).addComponent(QuestButton, { action });
   actionByEntity.set(entity.index, action);
   return entity;
@@ -596,8 +597,8 @@ function refreshDestinationButtons() {
     );
     const column = index % 2;
     const row = Math.floor(index / 2);
-    mesh.position.set(column === 0 ? -0.19 : 0.19, 0.25 - row * 0.145, 0.035);
     const entity = world.createTransformEntity(mesh, { parent: destinationPanelEntity });
+    entity.object3D!.position.set(column === 0 ? -0.19 : 0.19, 0.25 - row * 0.145, 0.035);
     const action = `destination-toggle:${platform.name}`;
     entity.addComponent(RayInteractable).addComponent(PokeInteractable).addComponent(QuestButton, { action });
     actionByEntity.set(entity.index, action);
@@ -637,10 +638,10 @@ function spawnArenaTarget() {
     new SphereGeometry(targetRadius, 24, 18),
     new MeshStandardMaterial({ color, emissive: color, emissiveIntensity: 0.8, roughness: 0.22, metalness: 0.25 }),
   );
-  mesh.position.set((Math.random() - 0.5) * spread * 2, 1.0 + Math.random() * 0.65, -0.42 - Math.random() * 0.45);
   const ring = new Mesh(new TorusGeometry(0.19, 0.014, 8, 32), new MeshBasicMaterial({ color: 0xffffff }));
   mesh.add(ring);
   const entity = world.createTransformEntity(mesh);
+  entity.object3D!.position.set((Math.random() - 0.5) * spread * 2, 1.0 + Math.random() * 0.65, -0.42 - Math.random() * 0.45);
   entity.addComponent(RayInteractable).addComponent(PokeInteractable).addComponent(ArenaTarget);
   arenaMeshes.add(mesh);
   arenaEntities.set(mesh, entity);
