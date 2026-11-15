@@ -46,6 +46,27 @@ const addArenaMesh = (geometry: any, material: any, position: [number, number, n
   const entity = world.createTransformEntity(mesh, { persistent: true });
   entity.object3D!.position.set(position[0], position[1], position[2]);
   if (rotation) entity.object3D!.rotation.set(rotation[0], rotation[1], rotation[2]);
+  if (!window.__streamLinkEcsRootProbe) {
+    (window as any).__streamLinkEcsRootProbe = true;
+    const persistentRoot = world.getPersistentRoot();
+    const chain = (object: any) => {
+      const rows = [];
+      for (let node = object; node; node = node.parent) {
+        rows.push({ name: node.name || node.type, visible: node.visible, isScene: node === world.scene });
+      }
+      return rows;
+    };
+    console.info('[StreamLink ECS attachment diagnostic]', {
+      entityIndex: entity.index,
+      entityParentIsPersistentRoot: entity.object3D?.parent === persistentRoot,
+      persistentRootIsScene: persistentRoot === world.scene,
+      persistentRootVisible: persistentRoot.visible,
+      sceneVisible: world.scene.visible,
+      entityChain: chain(entity.object3D),
+      persistentRootChain: chain(persistentRoot),
+      sceneChildren: world.scene.children.length,
+    });
+  }
   return mesh;
 };
 
