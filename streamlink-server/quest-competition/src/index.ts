@@ -46,7 +46,7 @@ const addArenaMesh = (geometry: any, material: any, position: [number, number, n
   const entity = world.createTransformEntity(mesh, { persistent: true });
   entity.object3D!.position.set(position[0], position[1], position[2]);
   if (rotation) entity.object3D!.rotation.set(rotation[0], rotation[1], rotation[2]);
-  if (!window.__streamLinkEcsRootProbe) {
+  if (!(window as any).__streamLinkEcsRootProbe) {
     (window as any).__streamLinkEcsRootProbe = true;
     const persistentRoot = world.getPersistentRoot();
     const chain = (object: any) => {
