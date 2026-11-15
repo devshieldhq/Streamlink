@@ -489,7 +489,7 @@ const panelMaterial = new MeshBasicMaterial({ map: panelTexture, transparent: tr
 const panelMesh = new Mesh(new PlaneGeometry(0.95, 1.0), panelMaterial);
 panelMesh.userData.label = 'StreamLink Quest Studio control panel';
 const panelEntity = world.createTransformEntity(panelMesh, { persistent: true });
-panelEntity.object3D!.position.set(-2.15, 1.45, -0.75);
+panelEntity.object3D!.position.set(0, 1.5, -1.55);
 panelEntity.addComponent(OneHandGrabbable, { rotate: true, translate: true });
 
 const destinationPanelGroup = new Group();
@@ -506,7 +506,7 @@ const destinationBacking = new Mesh(
 );
 destinationPanelGroup.add(destinationBacking);
 const destinationPanelEntity = world.createTransformEntity(destinationPanelGroup, { persistent: true });
-destinationPanelEntity.object3D!.position.set(2.15, 1.35, -0.78);
+destinationPanelEntity.object3D!.position.set(1.25, 1.45, -1.55);
 
 function drawQuestPanel() {
   const ctx = panelCtx!;
@@ -752,15 +752,15 @@ registerQuestAction('focus', () => {
 registerQuestAction('comfort', () => {
   comfortMode = !comfortMode;
   if (comfortMode) {
-    panelMesh.position.set(-1.9, 1.18, -0.58);
+    panelMesh.position.set(0, 1.35, -1.25);
     panelMesh.scale.setScalar(0.86);
-    destinationPanelGroup.position.set(1.9, 1.18, -0.62);
+    destinationPanelGroup.position.set(1.25, 1.35, -1.25);
     destinationPanelGroup.scale.setScalar(0.86);
     statusText('Seated comfort on · controls moved closer and lowered for seated reach.');
   } else {
-    panelMesh.position.set(-2.15, 1.45, -0.75);
+    panelMesh.position.set(0, 1.5, -1.55);
     panelMesh.scale.setScalar(1);
-    destinationPanelGroup.position.set(2.15, 1.35, -0.78);
+    destinationPanelGroup.position.set(1.25, 1.45, -1.55);
     destinationPanelGroup.scale.setScalar(1);
     statusText('Seated comfort off · standard studio reach restored.');
   }
@@ -771,11 +771,11 @@ registerQuestAction('reset', () => {
   floor.visible = true;
   stage.visible = true;
   byId<HTMLDivElement>('studio-panel')?.classList.remove('hidden');
-  panelMesh.position.set(-2.15, 1.45, -0.75);
+  panelMesh.position.set(0, 1.5, -1.55);
   panelMesh.rotation.set(0, 0, 0);
   panelMesh.scale.setScalar(1);
   comfortMode = false;
-  destinationPanelGroup.position.set(2.15, 1.35, -0.78);
+  destinationPanelGroup.position.set(1.25, 1.45, -1.55);
   destinationPanelGroup.rotation.set(0, 0, 0);
   destinationPanelGroup.scale.setScalar(1);
   destinationPanelGroup.visible = false;
