@@ -1,5 +1,5 @@
 import {
-  BoxGeometry, CanvasTexture, createComponent, createSystem, DirectionalLight, Group, Mesh, MeshBasicMaterial,
+  BoxGeometry, CanvasTexture, createComponent, createSystem, DirectionalLight, EnvironmentType, Group, LocomotionEnvironment, Mesh, MeshBasicMaterial,
   MeshStandardMaterial, OneHandGrabbable, PlaneGeometry, PokeInteractable, Pressed, RayInteractable,
   SphereGeometry, TorusGeometry, Types, Vector3, Quaternion, World
 } from '@iwsdk/core';
@@ -101,6 +101,7 @@ const floor = new Mesh(
 const floorEntity = world.createTransformEntity(floor, { persistent: true });
 floorEntity.object3D!.rotation.x = -Math.PI / 2;
 floorEntity.object3D!.position.y = -0.025;
+floorEntity.addComponent(LocomotionEnvironment, { type: EnvironmentType.STATIC });
 
 const stage = new Mesh(
   new BoxGeometry(5.2, 0.12, 3.2),
