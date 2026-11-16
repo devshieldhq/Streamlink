@@ -638,7 +638,9 @@ function spawnArenaTarget() {
   );
   const ring = new Mesh(new TorusGeometry(0.19, 0.014, 8, 32), new MeshBasicMaterial({ color: 0xffffff }));
   mesh.add(ring);
-  const entity = world.createTransformEntity(mesh);
+  const entity = world.createTransformEntity(mesh, { persistent: true });
+  // Keep runtime-spawned targets on the same persistent scene root as the arena shell.
+  // This prevents ECS root visibility/lifecycle differences from hiding gameplay targets.
   const baseX = (Math.random() - 0.5) * spread * 3.2;
   const baseY = 1.05 + Math.random() * 1.25;
   const baseZ = -2.15 - Math.random() * 2.1;
