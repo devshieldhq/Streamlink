@@ -498,7 +498,7 @@ let raiderModelPromise: Promise<any> | null = null;
 function attachAnimatedHumanRaider(target: Mesh) {
   if (!raiderModelPromise) {
     const loader = new GLTFLoader();
-    raiderModelPromise = loader.loadAsync('https://raw.githubusercontent.com/mrdoob/three.js/dev/examples/models/gltf/Soldier.glb')
+    raiderModelPromise = loader.loadAsync('https://models.codelove.in/models/military-male-03.glb')
       .catch((error) => { console.warn('[StreamLink] Human character model unavailable; using fallback character.', error); return null; });
   }
   void raiderModelPromise.then((gltf) => {
@@ -509,8 +509,9 @@ function attachAnimatedHumanRaider(target: Mesh) {
     const human = cloneSkinnedModel(gltf.scene);
     const bounds = new Box3().setFromObject(human);
     const size = bounds.getSize(new Vector3());
-    human.scale.setScalar(1.55 / Math.max(0.01, size.y));
-    human.position.set(0, -0.92, 0);
+    const modelScale = 1.72 / Math.max(0.01, size.y);
+    human.scale.setScalar(modelScale);
+    human.position.set(0, -bounds.min.y * modelScale, 0);
     human.rotation.y = Math.PI;
     human.traverse((part: any) => {
       if (part.isMesh) { part.castShadow = true; part.frustumCulled = false; }
@@ -522,9 +523,9 @@ function attachAnimatedHumanRaider(target: Mesh) {
     const gunBarrel = new Mesh(new BoxGeometry(0.045, 0.045, 0.34), new MeshStandardMaterial({ color: 0x6d7782, metalness: 0.9, roughness: 0.2 }));
     gunBarrel.position.z = 0.46;
     weapon.add(gunBody, gunBarrel);
-    weapon.position.set(0.22, 0.92, 0.26);
+    weapon.position.set(0.20, 1.02, 0.18);
     human.add(weapon);
-    const walkClip = gltf.animations.find((clip: any) => /walk|run/i.test(clip.name)) || gltf.animations[0];
+    const walkClip = gltf.animations.find((clip: any) => /walk/i.test(clip.name)) || gltf.animations.find((clip: any) => /run/i.test(clip.name)) || gltf.animations[0];
     if (walkClip) {
       const mixer = new AnimationMixer(human);
       mixer.clipAction(walkClip).play();
@@ -1094,12 +1095,12 @@ function startExtraGame(mode: 'phantom-hunt' | 'zero-g-rush' | 'last-stand' | 't
     : mode === 'zero-g-rush'
       ? { goal: 35, seconds: 45, targets: 9, intro: 'ZERO-G RUSH · chase spinning energy gates. Fast movement, wide drift, 35 hits to clear!' }
       : mode === 'last-stand'
-        ? { goal: 25, seconds: 60, targets: 7, intro: 'LAST STAND · armed attackers push your position and shoot back. Take them down before your shields fail!' }
+        ? { goal: 65, seconds: 180, targets: 9, intro: 'LAST STAND · survive a 3-minute assault. Armed raiders push your position in escalating waves. Take them down and dodge incoming fire!' }
         : mode === 'titan-breaker'
           ? { goal: 18, seconds: 50, targets: 4, intro: 'TITAN BREAKER · colossal targets, heavy impact and a 50-second countdown. Land 18 hits!' }
           : mode === 'inferno-run'
             ? { goal: 30, seconds: 45, targets: 8, intro: 'INFERNO RUN · a firestorm is closing in. Intercept 30 blazing meteors before time expires!' }
-            : { goal: 30, seconds: 60, targets: 8, intro: 'NIGHTFALL SURVIVAL · armed raiders advance and fire plasma at you. Eliminate them and dodge incoming shots!' };
+            : { goal: 90, seconds: 180, targets: 10, intro: 'NIGHTFALL SURVIVAL · survive a 3-minute raid. Human soldiers advance in escalating waves and fire at your position. Eliminate 90 hostiles and dodge incoming shots!' };
   arenaShield = 3; arenaGoal = config.goal; arenaActive = true; arenaPaused = false;
   arenaScore = 0; arenaHits = 0; arenaCombo = 0; arenaBestCombo = 0; arenaWave = 1;
   arenaSeconds = config.seconds; arenaDeadline = Date.now() + config.seconds * 1000;
@@ -1342,7 +1343,7 @@ class ArenaMotionSystem extends createSystem({
         if (muzzle) muzzle.visible = Math.sin(time * 16 + motion.phase) > 0.82;
         if (activeGameMode === 'nightfall-survival' || activeGameMode === 'last-stand') {
           motion.attackClock += delta;
-          if (motion.attackClock >= 1.65 + Math.random() * 0.35) {
+          if (motion.attackClock >= 4.0 + Math.random() * 1.0) {
             motion.attackClock = 0;
             const shot = new Mesh(new BoxGeometry(0.22, 0.22, 1.35), new MeshBasicMaterial({ color: 0xffd52a, toneMapped: false }));
             const tracerGlow = new Mesh(new SphereGeometry(0.19, 12, 10), new MeshBasicMaterial({ color: 0xff5a08, transparent: true, opacity: 0.72, toneMapped: false }));
