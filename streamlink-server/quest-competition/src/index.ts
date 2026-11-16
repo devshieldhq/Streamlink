@@ -468,6 +468,7 @@ let arenaDeadline = 0;
 let arenaTimer: number | null = null;
 const arenaMeshes = new Set<Mesh>();
 const arenaEntities = new Map<Mesh, any>();
+const arenaMotion = new Map<number, { x: number; y: number; z: number; phase: number; speed: number; drift: number }>();
 const actionByEntity = new Map<number, string>();
 const actionHandlers = new Map<string, () => void>();
 const pressedTargets = new Set<number>();
@@ -523,11 +524,11 @@ function drawQuestPanel() {
   ctx.fillText(`SCORE ${arenaScore}   WAVE ${arenaWave}   COMBO x${Math.min(5, 1 + Math.floor(Math.max(0, arenaCombo - 1) / 3))}   TIME ${arenaSeconds}s`, 48, 276);
   ctx.fillStyle = '#aab8d2'; ctx.font = '21px Inter, sans-serif';
   ctx.fillText(`ARENA OBJECTIVE  ${arenaHits}/${arenaGoal} targets · best combo ${arenaBestCombo}`, 48, 330);
-  ctx.fillText('Pinch or poke targets. Every 5 hits advances the wave and raises the challenge.', 48, 365);
+  ctx.fillText('Track the moving targets. Pinch or poke to score; every 5 hits advances the wave.', 48, 365);
   ctx.fillText(`DESTINATIONS  ${selectedDestinationNames.size} selected · use ADD DEST to choose platforms`, 48, 410);
   ctx.fillText(activeGameMode === 'drone-defense' ? 'DRONE DEFENSE · stop the incoming drones!' : 'ORB RUSH · pinch or poke glowing targets.', 48, 450);
   ctx.fillStyle = '#8198c4'; ctx.font = '18px Inter, sans-serif';
-  ctx.fillText('Aim with a controller ray or hand pointer, then pinch / press to interact.', 48, 605);
+  ctx.fillText('MOVING TARGETS · hand pinch / controller trigger · combos multiply your score', 48, 605);
   panelTexture.needsUpdate = true;
 }
 function refreshQuestPanel() { drawQuestPanel(); }
@@ -638,15 +639,26 @@ function spawnArenaTarget() {
   const ring = new Mesh(new TorusGeometry(0.19, 0.014, 8, 32), new MeshBasicMaterial({ color: 0xffffff }));
   mesh.add(ring);
   const entity = world.createTransformEntity(mesh);
-  entity.object3D!.position.set((Math.random() - 0.5) * spread * 2, 1.0 + Math.random() * 0.65, -0.42 - Math.random() * 0.45);
+  const baseX = (Math.random() - 0.5) * spread * 3.2;
+  const baseY = 1.05 + Math.random() * 1.25;
+  const baseZ = -2.15 - Math.random() * 2.1;
+  entity.object3D!.position.set(baseX, baseY, baseZ);
   entity.addComponent(RayInteractable).addComponent(PokeInteractable).addComponent(ArenaTarget);
   arenaMeshes.add(mesh);
   arenaEntities.set(mesh, entity);
+  arenaMotion.set(entity.index, {
+    x: baseX, y: baseY, z: baseZ,
+    phase: Math.random() * Math.PI * 2,
+    speed: activeGameMode === 'drone-defense' ? 1.35 + arenaWave * 0.12 : 0.85 + arenaWave * 0.08,
+    drift: activeGameMode === 'drone-defense' ? 0.48 : 0.30,
+  });
   return entity;
 }
 function clearArena() {
   for (const mesh of arenaMeshes) {
-    arenaEntities.get(mesh)?.destroy?.();
+    const entity = arenaEntities.get(mesh);
+    if (entity) arenaMotion.delete(entity.index);
+    entity?.destroy?.();
     arenaEntities.delete(mesh);
     mesh.parent?.remove(mesh);
     mesh.geometry.dispose();
@@ -838,6 +850,7 @@ class QuestInteractionSystem extends createSystem({
       const mesh = entity.object3D as Mesh | undefined;
       if (mesh) {
         arenaMeshes.delete(mesh);
+        arenaMotion.delete(entity.index);
         arenaEntities.delete(mesh);
         mesh.parent?.remove(mesh);
         mesh.geometry.dispose();
@@ -872,6 +885,29 @@ class QuestInteractionSystem extends createSystem({
   }
 }
 world.registerSystem(QuestInteractionSystem);
+
+// Animate every live target so the arena feels like an active arcade game.
+// Targets drift across the play space, bob vertically, rotate and pulse.
+class ArenaMotionSystem extends createSystem({
+  targets: { required: [ArenaTarget] },
+}) {
+  update() {
+    const time = performance.now() / 1000;
+    this.queries.targets.entities.forEach((entity: any) => {
+      const mesh = entity.object3D as Mesh | undefined;
+      const motion = arenaMotion.get(entity.index);
+      if (!mesh || !motion) return;
+      mesh.position.x = motion.x + Math.sin(time * motion.speed + motion.phase) * motion.drift;
+      mesh.position.y = motion.y + Math.sin(time * 1.9 + motion.phase) * 0.16;
+      mesh.position.z = motion.z + Math.cos(time * motion.speed * 0.7 + motion.phase) * 0.12;
+      mesh.rotation.y += 0.025;
+      mesh.rotation.x += 0.012;
+      const pulse = 1 + Math.sin(time * 4 + motion.phase) * 0.07;
+      mesh.scale.setScalar(pulse);
+    });
+  }
+}
+world.registerSystem(ArenaMotionSystem);
 drawQuestPanel();
 
 // TEMPORARY CAMERA + WORLD-SPACE DIAGNOSTIC.
@@ -948,4 +984,3 @@ function logQuestCameraAndMeshes() {
     meshes: sceneMeshReport,
   });
 }
-
