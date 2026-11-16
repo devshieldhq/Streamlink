@@ -16,8 +16,6 @@
     #actions { position: fixed; z-index: 8; right: 16px; top: 16px; max-width: calc(100vw - 32px); display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
     #actions button, #actions a { padding: 9px 11px; font-size: 11px; }
     #desktop-arena { background: #167a63; border-color: #42e6a4; }
-    #environment-select { width: auto; min-width: 125px; padding: 8px; }
-    .environment-control { align-self: center; color: #aebbd4; font-size: 11px; margin: 0; }
     a, button { border: 1px solid #52658e; border-radius: 9px; padding: 10px 13px; background: #263d72; color: white; font: 700 12px system-ui, sans-serif; text-decoration: none; cursor: pointer; }
     a.secondary, button.secondary { background: #121b30; }
     button:disabled { opacity: .45; cursor: not-allowed; }
@@ -36,6 +34,7 @@
     #telemetry { margin-top: 12px; padding: 10px; background: #111c32; border-radius: 8px; color: #aebbd4; font: 11px/1.7 ui-monospace, monospace; }
     #agent-row { display: flex; gap: 6px; margin-top: 8px; }
     .hidden { display: none !important; }
+    .immersive-active #status { display: none !important; }
     @media (max-width: 620px) { #studio-panel { top: 68px; bottom: 56px; } #actions a { padding: 9px; font-size: 10px; } #hud { top: 12px; left: 12px; } }
   </style>
 </head>
@@ -50,8 +49,6 @@
     <button id="desktop-pause" class="secondary" type="button">Pause / Resume</button>
     <button id="desktop-reset" class="secondary" type="button">Reset Studio</button>
     <button id="desktop-defense" class="secondary" type="button">Drone Defense</button>
-    <label class="environment-control" for="environment-select">Room</label>
-    <select id="environment-select" aria-label="Choose 3D room"><option value="neon">Neon Arena</option><option value="office">Office</option><option value="living-room">Living Room</option><option value="space">Space Station</option></select>
     <button id="enter-xr" type="button" disabled>Checking XR…</button>
   </nav>
 
