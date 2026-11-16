@@ -1195,19 +1195,7 @@ class ArenaMotionSystem extends createSystem({
         if (motion.z >= 1.05) { breachArenaTarget(entity); return; }
         return;
       }
-      mesh.position.x = motion.x + Math.sin(time * motion.speed + motion.phase) * motion.drift;
-      mesh.position.y = motion.y + Math.sin(time * 1.9 + motion.phase) * 0.16;
-      if (activeGameMode === 'drone-defense' || activeGameMode === 'meteor-blitz' || activeGameMode === 'inferno-run') {
-        motion.z += motion.approachSpeed * delta;
-        if (motion.z >= -0.95) { if (activeGameMode === 'drone-defense' || activeGameMode === 'last-stand' || activeGameMode === 'nightfall-survival') breachArenaTarget(entity); else { const mesh = entity.object3D as Mesh; arenaMeshes.delete(mesh); arenaMotion.delete(entity.index); arenaEntities.delete(mesh); mesh.parent?.remove(mesh); mesh.geometry.dispose(); (mesh.material as MeshStandardMaterial).dispose(); entity.destroy?.(); arenaCombo = 0; spawnArenaTarget(); } return; }
-        mesh.position.z = motion.z + Math.cos(time * motion.speed * 0.7 + motion.phase) * 0.12;
-      } else {
-        mesh.position.z = motion.z + Math.cos(time * motion.speed * 0.7 + motion.phase) * 0.12;
-      }
-      mesh.rotation.y += 0.025;
-      mesh.rotation.x += 0.012;
-      const pulse = 1 + Math.sin(time * 4 + motion.phase) * 0.07;
-      mesh.scale.setScalar(pulse);
+      // All non-racing modes are handled by the grounded enemy movement above.
     });
   }
 }
