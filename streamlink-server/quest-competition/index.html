@@ -16,6 +16,8 @@
     #actions { position: fixed; z-index: 8; right: 16px; top: 16px; max-width: calc(100vw - 32px); display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
     #actions button, #actions a { padding: 9px 11px; font-size: 11px; }
     #desktop-arena { background: #167a63; border-color: #42e6a4; }
+    #environment-select { width: auto; min-width: 125px; padding: 8px; }
+    .environment-control { align-self: center; color: #aebbd4; font-size: 11px; margin: 0; }
     a, button { border: 1px solid #52658e; border-radius: 9px; padding: 10px 13px; background: #263d72; color: white; font: 700 12px system-ui, sans-serif; text-decoration: none; cursor: pointer; }
     a.secondary, button.secondary { background: #121b30; }
     button:disabled { opacity: .45; cursor: not-allowed; }
@@ -47,6 +49,9 @@
     <button id="desktop-arena" type="button">Start Arena</button>
     <button id="desktop-pause" class="secondary" type="button">Pause / Resume</button>
     <button id="desktop-reset" class="secondary" type="button">Reset Studio</button>
+    <button id="desktop-defense" class="secondary" type="button">Drone Defense</button>
+    <label class="environment-control" for="environment-select">Environment</label>
+    <select id="environment-select" aria-label="Choose arena environment"><option value="neon">Neon Arena</option><option value="sunset">Sunset Base</option><option value="arctic">Arctic Station</option><option value="cosmic">Cosmic Deck</option></select>
     <button id="enter-xr" type="button" disabled>Checking XR…</button>
   </nav>
 
