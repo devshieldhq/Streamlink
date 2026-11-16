@@ -1,7 +1,7 @@
 import {
   BoxGeometry, CanvasTexture, createComponent, createSystem, DirectionalLight, EnvironmentType, Group, LocomotionEnvironment, Mesh, MeshBasicMaterial,
   MeshStandardMaterial, OneHandGrabbable, PlaneGeometry, PokeInteractable, Pressed, RayInteractable,
-  SphereGeometry, TorusGeometry, Types, Vector3, Quaternion, World
+  SphereGeometry, TorusGeometry, Types, Vector2, Vector3, Raycaster, Quaternion, World
 } from '@iwsdk/core';
 import projectOptions from 'virtual:iwsdk-project';
 
@@ -671,6 +671,42 @@ function clearArena() {
   }
   arenaMeshes.clear();
 }
+function hitArenaTarget(entity: any) {
+  if (!arenaActive || arenaPaused || pressedTargets.has(entity.index)) return;
+  pressedTargets.add(entity.index);
+  const mesh = entity.object3D as Mesh | undefined;
+  if (mesh) {
+    arenaMeshes.delete(mesh);
+    arenaMotion.delete(entity.index);
+    arenaEntities.delete(mesh);
+    mesh.parent?.remove(mesh);
+    mesh.geometry.dispose();
+    (mesh.material as MeshStandardMaterial).dispose();
+    mesh.children.forEach(child => {
+      (child as Mesh).geometry?.dispose?.();
+      const material = (child as Mesh).material;
+      if (material && !Array.isArray(material)) material.dispose();
+    });
+  }
+  entity.destroy?.();
+  arenaHits += 1;
+  arenaCombo += 1;
+  arenaBestCombo = Math.max(arenaBestCombo, arenaCombo);
+  const multiplier = Math.min(5, 1 + Math.floor((arenaCombo - 1) / 3));
+  const points = 10 * multiplier;
+  arenaScore += points;
+  if (arenaHits % 5 === 0 && arenaHits < arenaGoal) {
+    arenaWave += 1;
+    arenaCombo = 0;
+    statusText(`Wave ${arenaWave}! Targets are faster and more spread out. Score: ${arenaScore}`);
+  } else {
+    statusText(`Direct hit! +${points} · combo x${multiplier} · ${arenaHits}/${arenaGoal}`);
+  }
+  if (arenaHits >= arenaGoal) stopArena('Arena cleared');
+  else spawnArenaTarget();
+  refreshQuestPanel();
+}
+
 function stopArena(message = 'Arena complete') {
   arenaActive = false;
   arenaPaused = false;
@@ -845,39 +881,7 @@ class QuestInteractionSystem extends createSystem({
 }) {
   update() {
     this.queries.targets.entities.forEach((entity: any) => {
-      if (pressedTargets.has(entity.index) || !arenaActive || arenaPaused) return;
-      pressedTargets.add(entity.index);
-      const mesh = entity.object3D as Mesh | undefined;
-      if (mesh) {
-        arenaMeshes.delete(mesh);
-        arenaMotion.delete(entity.index);
-        arenaEntities.delete(mesh);
-        mesh.parent?.remove(mesh);
-        mesh.geometry.dispose();
-        (mesh.material as MeshStandardMaterial).dispose();
-        mesh.children.forEach(child => {
-          (child as Mesh).geometry?.dispose?.();
-          const material = (child as Mesh).material;
-          if (material && !Array.isArray(material)) material.dispose();
-        });
-      }
-      entity.destroy?.();
-      arenaHits += 1;
-      arenaCombo += 1;
-      arenaBestCombo = Math.max(arenaBestCombo, arenaCombo);
-      const multiplier = Math.min(5, 1 + Math.floor((arenaCombo - 1) / 3));
-      const points = 10 * multiplier;
-      arenaScore += points;
-      if (arenaHits % 5 === 0 && arenaHits < arenaGoal) {
-        arenaWave += 1;
-        arenaCombo = 0;
-        statusText(`Wave ${arenaWave}! Targets are smaller and more spread out. Score: ${arenaScore}`);
-      } else {
-        statusText(`Target hit! +${points} · combo x${multiplier} · ${arenaHits}/${arenaGoal}`);
-      }
-      if (arenaHits >= arenaGoal) stopArena('Arena cleared');
-      else spawnArenaTarget();
-      refreshQuestPanel();
+      hitArenaTarget(entity);
     });
     const currentlyHit = new Set<number>();
     this.queries.targets.entities.forEach((entity: any) => currentlyHit.add(entity.index));
@@ -885,6 +889,30 @@ class QuestInteractionSystem extends createSystem({
   }
 }
 world.registerSystem(QuestInteractionSystem);
+
+// Desktop mouse fallback: aim with the pointer and click directly on a glowing target.
+// This uses the same scoring and target cleanup as Quest hand/controller interaction.
+const desktopRaycaster = new Raycaster();
+const desktopPointer = new Vector2();
+container.addEventListener('pointerdown', (event: PointerEvent) => {
+  if (event.button !== 0 || !arenaActive || arenaPaused) return;
+  const canvas = container.querySelector('canvas');
+  if (!canvas) return;
+  const bounds = canvas.getBoundingClientRect();
+  desktopPointer.set(
+    ((event.clientX - bounds.left) / bounds.width) * 2 - 1,
+    -((event.clientY - bounds.top) / bounds.height) * 2 + 1,
+  );
+  desktopRaycaster.setFromCamera(desktopPointer, world.camera);
+  const intersections = desktopRaycaster.intersectObjects([...arenaMeshes], true);
+  if (!intersections.length) return;
+  let target: any = intersections[0].object;
+  while (target && !arenaEntities.has(target)) target = target.parent;
+  if (!target) return;
+  const entity = arenaEntities.get(target as Mesh);
+  if (entity) hitArenaTarget(entity);
+});
+container.style.cursor = 'crosshair';
 
 // Animate every live target so the arena feels like an active arcade game.
 // Targets drift across the play space, bob vertically, rotate and pulse.
