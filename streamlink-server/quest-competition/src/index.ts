@@ -711,7 +711,7 @@ function spawnArenaTarget() {
       const nose = new Mesh(new ConeGeometry(0.12, 0.48, 8), new MeshStandardMaterial({ color: 0x9a173b, emissive: 0x5a061e, metalness: 0.7, roughness: 0.22 }));
       nose.rotation.x = -Math.PI / 2; nose.position.z = -0.27; mesh.add(nose);
       for (const side of [-1, 1]) {
-        const engine = new Mesh(new CylinderGeometry(0.055, 0.08, 0.28, 10), new MeshBasicMaterial({ color: 0xff5a35 }));
+        const engine = new Mesh(new BoxGeometry(0.11, 0.11, 0.28), new MeshBasicMaterial({ color: 0xff5a35 }));
         engine.rotation.x = Math.PI / 2; engine.position.set(side * 0.2, -0.02, 0.22); mesh.add(engine);
       }
     }
