@@ -3,6 +3,9 @@ import {
   MeshStandardMaterial, OneHandGrabbable, PlaneGeometry, PokeInteractable, Pressed, RayInteractable,
   SphereGeometry, TorusGeometry, Types, Vector2, Vector3, Raycaster, Quaternion, World
 } from '@iwsdk/core';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { clone as cloneSkinnedModel } from 'three/addons/utils/SkeletonUtils.js';
+import { AnimationMixer, Box3 } from 'three';
 import projectOptions from 'virtual:iwsdk-project';
 
 type PlatformMeta = { name: string; label?: string; requiresUrl?: boolean };
@@ -490,6 +493,45 @@ const arenaMeshes = new Set<Mesh>();
 const arenaEntities = new Map<Mesh, any>();
 const arenaMotion = new Map<number, { x: number; y: number; z: number; phase: number; speed: number; drift: number; approachSpeed: number; attackClock: number }>();
 const hostileShots: { mesh: Mesh; entity: any; speed: number }[] = [];
+const raiderMixers = new Map<Mesh, AnimationMixer>();
+let raiderModelPromise: Promise<any> | null = null;
+function attachAnimatedHumanRaider(target: Mesh) {
+  if (!raiderModelPromise) {
+    const loader = new GLTFLoader();
+    raiderModelPromise = loader.loadAsync('https://raw.githubusercontent.com/mrdoob/three.js/dev/examples/models/gltf/Soldier.glb')
+      .catch((error) => { console.warn('[StreamLink] Human character model unavailable; using fallback character.', error); return null; });
+  }
+  void raiderModelPromise.then((gltf) => {
+    if (!gltf || !arenaMeshes.has(target) || !target.parent) return;
+    target.children.forEach((child) => { child.visible = false; });
+    target.geometry.dispose();
+    target.geometry = new SphereGeometry(0.001, 4, 4);
+    const human = cloneSkinnedModel(gltf.scene);
+    const bounds = new Box3().setFromObject(human);
+    const size = bounds.getSize(new Vector3());
+    human.scale.setScalar(1.55 / Math.max(0.01, size.y));
+    human.position.set(0, -0.92, 0);
+    human.rotation.y = Math.PI;
+    human.traverse((part: any) => {
+      if (part.isMesh) { part.castShadow = true; part.frustumCulled = false; }
+    });
+    target.add(human);
+    const weapon = new Group();
+    const gunMaterial = new MeshStandardMaterial({ color: 0x202832, metalness: 0.82, roughness: 0.28 });
+    const gunBody = new Mesh(new BoxGeometry(0.105, 0.105, 0.62), gunMaterial);
+    const gunBarrel = new Mesh(new BoxGeometry(0.045, 0.045, 0.34), new MeshStandardMaterial({ color: 0x6d7782, metalness: 0.9, roughness: 0.2 }));
+    gunBarrel.position.z = 0.46;
+    weapon.add(gunBody, gunBarrel);
+    weapon.position.set(0.22, 0.92, 0.26);
+    human.add(weapon);
+    const walkClip = gltf.animations.find((clip: any) => /walk|run/i.test(clip.name)) || gltf.animations[0];
+    if (walkClip) {
+      const mixer = new AnimationMixer(human);
+      mixer.clipAction(walkClip).play();
+      raiderMixers.set(target, mixer);
+    }
+  });
+}
 let arenaAudio: AudioContext | null = null;
 function playArenaSound(kind: 'shot' | 'hit' | 'damage' | 'start') {
   try {
@@ -832,6 +874,7 @@ function spawnArenaTarget() {
     mesh.add(ring);
   }
   const entity = world.createTransformEntity(mesh, { persistent: true });
+  if (isGroundCombat) attachAnimatedHumanRaider(mesh);
   // Keep runtime-spawned targets on the same persistent scene root as the arena shell.
   // This prevents ECS root visibility/lifecycle differences from hiding gameplay targets.
   const baseX = isGroundCombat ? (Math.floor(Math.random() * 3) - 1) * 1.65 : (Math.random() - 0.5) * spread * 3.2;
@@ -903,6 +946,8 @@ function hitArenaTarget(entity: any) {
   const mesh = entity.object3D as Mesh | undefined;
   if (mesh) {
     arenaMeshes.delete(mesh);
+    raiderMixers.get(mesh)?.stopAllAction();
+    raiderMixers.delete(mesh);
     arenaMotion.delete(entity.index);
     arenaEntities.delete(mesh);
     mesh.parent?.remove(mesh);
@@ -940,6 +985,8 @@ function breachArenaTarget(entity: any) {
   const mesh = entity.object3D as Mesh | undefined;
   if (mesh) {
     arenaMeshes.delete(mesh);
+    raiderMixers.get(mesh)?.stopAllAction();
+    raiderMixers.delete(mesh);
     arenaMotion.delete(entity.index);
     arenaEntities.delete(mesh);
     mesh.parent?.remove(mesh);
@@ -1273,6 +1320,7 @@ class ArenaMotionSystem extends createSystem({
   update() {
     const time = performance.now() / 1000;
     const delta = Math.min(0.05, Math.max(0, time - arenaLastFrameTime));
+    for (const mixer of raiderMixers.values()) mixer.update(delta);
     arenaLastFrameTime = time;
     if (!arenaActive || arenaPaused) return;
     if(activeGameMode==='rift-racer'&&raceTrackActive){raceDistance+=delta*68;raceSpawnClock+=delta;if(raceSpawnClock>1.05){raceSpawnClock=0;spawnRaceObstacle();}if(raceCar)raceCar.rotation.z+=((raceLane-1)*-.11-raceCar.rotation.z)*Math.min(1,delta*7);for(let i=raceObjects.length-1;i>=0;i--){const item=raceObjects[i];item.mesh.position.z+=item.speed*delta;if(!item.passed&&item.mesh.position.z>.9){item.passed=true;if(item.lane===raceLane){arenaShield=Math.max(0,arenaShield-1);statusText(`CRASH! Shield ${arenaShield}/3 · change lanes!`);if(arenaShield<=0){stopArena('RACE WRECKED');return;}}else{arenaScore+=100;arenaHits++;}item.entity?.destroy?.();item.mesh.parent?.remove(item.mesh);item.mesh.geometry.dispose();(item.mesh.material as MeshStandardMaterial).dispose();raceObjects.splice(i,1);}}refreshQuestPanel();return;}
@@ -1296,7 +1344,9 @@ class ArenaMotionSystem extends createSystem({
           motion.attackClock += delta;
           if (motion.attackClock >= 1.65 + Math.random() * 0.35) {
             motion.attackClock = 0;
-            const shot = new Mesh(new BoxGeometry(0.12, 0.12, 0.72), new MeshBasicMaterial({ color: 0xff5a18 }));
+            const shot = new Mesh(new BoxGeometry(0.22, 0.22, 1.35), new MeshBasicMaterial({ color: 0xffd52a, toneMapped: false }));
+            const tracerGlow = new Mesh(new SphereGeometry(0.19, 12, 10), new MeshBasicMaterial({ color: 0xff5a08, transparent: true, opacity: 0.72, toneMapped: false }));
+            shot.add(tracerGlow);
             const shotEntity = world.createTransformEntity(shot, { persistent: true });
             shotEntity.object3D!.position.set(mesh.position.x + 0.42, 1.02, mesh.position.z + 0.42);
             hostileShots.push({ mesh: shot, entity: shotEntity, speed: 7.0 + arenaWave * 0.3 });
