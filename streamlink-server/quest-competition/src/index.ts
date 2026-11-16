@@ -697,15 +697,24 @@ function spawnArenaTarget() {
     mesh.add(aura);
   }
   if (isDrone) {
+    if (activeGameMode === 'nightfall-survival') mesh.scale.setScalar(1.9);
     const wingMaterial = new MeshStandardMaterial({ color: 0xffb84d, emissive: 0xff4d6d, emissiveIntensity: 0.65, metalness: 0.45, roughness: 0.25 });
     for (const side of [-1, 1]) {
       const wing = new Mesh(new BoxGeometry(0.16, 0.045, 0.42), wingMaterial);
       wing.position.set(side * 0.22, 0, 0);
       mesh.add(wing);
     }
-    const core = new Mesh(new SphereGeometry(0.105, 16, 12), new MeshBasicMaterial({ color: 0xffffff }));
+    const core = new Mesh(new SphereGeometry(activeGameMode === 'nightfall-survival' ? 0.13 : 0.105, 16, 12), new MeshBasicMaterial({ color: 0xffffff }));
     core.position.set(0, 0.015, 0.14);
     mesh.add(core);
+    if (activeGameMode === 'nightfall-survival') {
+      const nose = new Mesh(new ConeGeometry(0.12, 0.48, 8), new MeshStandardMaterial({ color: 0x9a173b, emissive: 0x5a061e, metalness: 0.7, roughness: 0.22 }));
+      nose.rotation.x = -Math.PI / 2; nose.position.z = -0.27; mesh.add(nose);
+      for (const side of [-1, 1]) {
+        const engine = new Mesh(new CylinderGeometry(0.055, 0.08, 0.28, 10), new MeshBasicMaterial({ color: 0xff5a35 }));
+        engine.rotation.x = Math.PI / 2; engine.position.set(side * 0.2, -0.02, 0.22); mesh.add(engine);
+      }
+    }
   }
   const ring = new Mesh(new TorusGeometry(isDrone ? 0.34 : 0.30, 0.018, 8, 40), new MeshBasicMaterial({ color: 0xffffff }));
   mesh.add(ring);
@@ -744,7 +753,7 @@ function buildRaceTrack(){
  const cockpit=new Mesh(new BoxGeometry(.62,.34,.68),new MeshStandardMaterial({color:0x101a32,metalness:.7,roughness:.12}));cockpit.position.set(0,.67,-.12);car.add(cockpit);
  const nose=new Mesh(new BoxGeometry(.72,.12,.42),new MeshStandardMaterial({color:0xffb84d,metalness:.5,roughness:.25,emissive:0x8a3b00}));nose.position.set(0,.42,-.88);car.add(nose);
  const wheels=new MeshStandardMaterial({color:0x080b12,roughness:.95});for(const x of [-.52,.52])for(const z of [-.52,.52]){const w=new Mesh(new TorusGeometry(.17,.07,8,16),wheels);w.rotation.y=Math.PI/2;w.position.set(x,.22,z);car.add(w);}
- raceCar=car;raceCarEntity=world.createTransformEntity(car,{persistent:true});car.position.set(0,.03,1.8);
+ raceCar=car;raceCarEntity=world.createTransformEntity(car,{persistent:true});raceCarEntity.addComponent(ArenaTarget);car.position.set(0,.03,1.8);
 }
 function spawnRaceObstacle(){if(!raceTrackActive)return;const lane=Math.floor(Math.random()*3),isCar=Math.random()>.42;const color=isCar?[0xff3b5c,0xffa52e,0x9b6bff][Math.floor(Math.random()*3)]:0xffd34e;const mesh=new Mesh(isCar?new BoxGeometry(.95,.9,1.45):new BoxGeometry(1.15,.65,.5),new MeshStandardMaterial({color,emissive:color,emissiveIntensity:.22,metalness:.58,roughness:.28}));mesh.position.set((lane-1)*2.85,isCar?.48:.34,-27);const entity=world.createTransformEntity(mesh,{persistent:true});raceObjects.push({mesh,entity,lane,speed:13+Math.random()*4,passed:false});}
 function steerRace(direction:number){if(!arenaActive||activeGameMode!=='rift-racer'||arenaPaused)return;raceLane=Math.max(0,Math.min(2,raceLane+direction));if(raceCar)raceCar.position.x=(raceLane-1)*2.85;refreshQuestPanel();}
@@ -1132,7 +1141,7 @@ container.addEventListener('pointerdown', (event: PointerEvent) => {
   if (entity) hitArenaTarget(entity);
 });
 container.style.cursor = 'crosshair';
-window.addEventListener('keydown',(event)=>{if(event.key==='ArrowLeft'||event.key.toLowerCase()==='a')steerRace(-1);if(event.key==='ArrowRight'||event.key.toLowerCase()==='d')steerRace(1);});
+
 
 // Animate every live target so the arena feels like an active arcade game.
 // Targets drift across the play space, bob vertically, rotate and pulse.
