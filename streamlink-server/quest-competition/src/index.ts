@@ -656,6 +656,7 @@ function spawnArenaTarget() {
   const isSiege = activeGameMode === 'drone-defense' || activeGameMode === 'last-stand' || activeGameMode === 'nightfall-survival';
   const color = isSiege ? [0xff4d6d, 0xff8a3d, 0xffd166][Math.floor(Math.random() * 3)] : activeGameMode === 'meteor-blitz' ? [0xff5b35, 0xffc247, 0xff3d81][Math.floor(Math.random() * 3)] : activeGameMode === 'phantom-hunt' ? [0x9b5cff, 0xe45bff, 0x5d7cff][Math.floor(Math.random() * 3)] : activeGameMode === 'zero-g-rush' ? [0x19e6d2, 0x39a7ff, 0xf3e65c][Math.floor(Math.random() * 3)] : activeGameMode === 'titan-breaker' ? [0xffb000, 0xff542e, 0xffdf65][Math.floor(Math.random() * 3)] : activeGameMode === 'inferno-run' ? [0xff3b1f, 0xff8a24, 0xffd34e][Math.floor(Math.random() * 3)] : [0x31d6ff, 0x8b7bff, 0xffb84d, 0x42e6a4, 0xff668c][Math.floor(Math.random() * 5)];
   const isDrone = isSiege;
+  const isGroundCombat = activeGameMode === 'phantom-hunt' || activeGameMode === 'zero-g-rush' || activeGameMode === 'last-stand' || activeGameMode === 'nightfall-survival';
   const targetRadius = activeGameMode === 'titan-breaker' ? 0.34 : activeGameMode === 'meteor-blitz' || activeGameMode === 'inferno-run' ? 0.135 : activeGameMode === 'phantom-hunt' ? 0.105 : Math.max(0.14, 0.24 - (arenaWave - 1) * 0.012);
   const spread = Math.min(1.35, 0.72 + (arenaWave - 1) * 0.08);
   const droneMaterial = new MeshStandardMaterial({ color, emissive: color, emissiveIntensity: 1.15, roughness: 0.2, metalness: 0.32 });
@@ -665,9 +666,10 @@ function spawnArenaTarget() {
       ? new IcosahedronGeometry(targetRadius * 1.55, 1)
       : activeGameMode === 'phantom-hunt'
         ? new OctahedronGeometry(targetRadius * 1.65, 0)
-        : isDrone ? new BoxGeometry(0.34, 0.14, 0.24)
-          : activeGameMode === 'zero-g-rush' ? new TorusGeometry(0.19, 0.065, 12, 28)
-            : new SphereGeometry(targetRadius, 28, 20);
+        : isGroundCombat ? new BoxGeometry(0.48, 0.82, 0.34)
+          : isDrone ? new BoxGeometry(0.34, 0.14, 0.24)
+            : activeGameMode === 'zero-g-rush' ? new TorusGeometry(0.19, 0.065, 12, 28)
+              : new SphereGeometry(targetRadius, 28, 20);
   const mesh = new Mesh(geometry, droneMaterial);
   if (activeGameMode === 'titan-breaker') {
     const armor = new MeshStandardMaterial({ color: 0x4c5268, metalness: 0.88, roughness: 0.22 });
@@ -696,6 +698,29 @@ function spawnArenaTarget() {
     const aura = new Mesh(new TorusGeometry(targetRadius * 1.8, 0.012, 6, 24), new MeshBasicMaterial({ color: 0xe45bff }));
     mesh.add(aura);
   }
+  if (isGroundCombat) {
+    // Ground-based hostile units: a torso, helmet, shoulders, arms and legs.
+    // These are physical combatants on the arena floor, not floating target props.
+    const armor = new MeshStandardMaterial({ color: activeGameMode === 'nightfall-survival' ? 0x351a2b : 0x26364a, metalness: 0.62, roughness: 0.34 });
+    const trim = new MeshStandardMaterial({ color: 0xff633d, emissive: 0x65120b, emissiveIntensity: 0.55, metalness: 0.5, roughness: 0.3 });
+    const helmet = new Mesh(new SphereGeometry(0.22, 16, 12), armor);
+    helmet.position.set(0, 0.57, 0.015); mesh.add(helmet);
+    const visor = new Mesh(new BoxGeometry(0.27, 0.075, 0.055), new MeshBasicMaterial({ color: 0xffb84d }));
+    visor.position.set(0, 0.59, 0.19); mesh.add(visor);
+    for (const side of [-1, 1]) {
+      const shoulder = new Mesh(new BoxGeometry(0.23, 0.22, 0.28), armor);
+      shoulder.position.set(side * 0.34, 0.25, 0); mesh.add(shoulder);
+      const arm = new Mesh(new BoxGeometry(0.15, 0.48, 0.17), armor);
+      arm.position.set(side * 0.37, -0.03, 0.02); arm.rotation.z = side * -0.10; mesh.add(arm);
+      const leg = new Mesh(new BoxGeometry(0.18, 0.48, 0.22), armor);
+      leg.position.set(side * 0.14, -0.62, 0); mesh.add(leg);
+      const boot = new Mesh(new BoxGeometry(0.2, 0.12, 0.32), trim);
+      boot.position.set(side * 0.14, -0.89, 0.045); mesh.add(boot);
+    }
+    const chest = new Mesh(new BoxGeometry(0.31, 0.24, 0.07), trim);
+    chest.position.set(0, 0.08, 0.19); mesh.add(chest);
+    mesh.scale.setScalar(activeGameMode === 'nightfall-survival' || activeGameMode === 'last-stand' ? 1.18 : 1.0);
+  }
   if (isDrone) {
     if (activeGameMode === 'nightfall-survival') mesh.scale.setScalar(1.9);
     const wingMaterial = new MeshStandardMaterial({ color: 0xffb84d, emissive: 0xff4d6d, emissiveIntensity: 0.65, metalness: 0.45, roughness: 0.25 });
@@ -721,9 +746,9 @@ function spawnArenaTarget() {
   const entity = world.createTransformEntity(mesh, { persistent: true });
   // Keep runtime-spawned targets on the same persistent scene root as the arena shell.
   // This prevents ECS root visibility/lifecycle differences from hiding gameplay targets.
-  const baseX = (Math.random() - 0.5) * spread * 3.2;
-  const baseY = 1.15 + Math.random() * 1.45;
-  const baseZ = -3.0 - Math.random() * 1.55;
+  const baseX = isGroundCombat ? (Math.floor(Math.random() * 3) - 1) * 1.65 : (Math.random() - 0.5) * spread * 3.2;
+  const baseY = isGroundCombat ? 0.93 : 1.15 + Math.random() * 1.45;
+  const baseZ = isGroundCombat ? -4.2 - Math.random() * 1.35 : -3.0 - Math.random() * 1.55;
   entity.object3D!.position.set(baseX, baseY, baseZ);
   entity.addComponent(RayInteractable).addComponent(PokeInteractable).addComponent(ArenaTarget);
   arenaMeshes.add(mesh);
@@ -732,8 +757,8 @@ function spawnArenaTarget() {
     x: baseX, y: baseY, z: baseZ,
     phase: Math.random() * Math.PI * 2,
     speed: isSiege ? 1.35 + arenaWave * 0.12 : activeGameMode === 'meteor-blitz' || activeGameMode === 'inferno-run' ? 2.0 + arenaWave * 0.16 : activeGameMode === 'titan-breaker' ? 1.7 + arenaWave * 0.14 : activeGameMode === 'phantom-hunt' ? 2.65 + arenaWave * 0.20 : activeGameMode === 'zero-g-rush' ? 2.35 + arenaWave * 0.18 : 0.85 + arenaWave * 0.08,
-    drift: isSiege ? 0.48 : activeGameMode === 'meteor-blitz' || activeGameMode === 'inferno-run' ? 0.62 : activeGameMode === 'titan-breaker' ? 0.35 : activeGameMode === 'phantom-hunt' ? 0.72 : activeGameMode === 'zero-g-rush' ? 0.88 : 0.30,
-    approachSpeed: isSiege ? 0.34 + arenaWave * 0.035 : activeGameMode === 'meteor-blitz' ? 0.10 + arenaWave * 0.012 : activeGameMode === 'inferno-run' ? 0.19 + arenaWave * 0.022 : activeGameMode === 'phantom-hunt' ? 0.04 : activeGameMode === 'zero-g-rush' ? 0.06 : 0,
+    drift: isGroundCombat ? 0.12 : isSiege ? 0.48 : activeGameMode === 'meteor-blitz' || activeGameMode === 'inferno-run' ? 0.62 : activeGameMode === 'titan-breaker' ? 0.35 : 0.30,
+    approachSpeed: isGroundCombat ? 0.72 + arenaWave * 0.10 : isSiege ? 0.34 + arenaWave * 0.035 : activeGameMode === 'meteor-blitz' ? 0.10 + arenaWave * 0.012 : activeGameMode === 'inferno-run' ? 0.19 + arenaWave * 0.022 : 0,
   });
   return entity;
 }
@@ -819,7 +844,7 @@ function hitArenaTarget(entity: any) {
 }
 
 function breachArenaTarget(entity: any) {
-  if (!arenaActive || arenaPaused || (activeGameMode !== 'drone-defense' && activeGameMode !== 'last-stand' && activeGameMode !== 'nightfall-survival')) return;
+  if (!arenaActive || arenaPaused || (activeGameMode !== 'drone-defense' && activeGameMode !== 'phantom-hunt' && activeGameMode !== 'zero-g-rush' && activeGameMode !== 'last-stand' && activeGameMode !== 'nightfall-survival')) return;
   const mesh = entity.object3D as Mesh | undefined;
   if (mesh) {
     arenaMeshes.delete(mesh);
@@ -1158,9 +1183,19 @@ class ArenaMotionSystem extends createSystem({
       const mesh = entity.object3D as Mesh | undefined;
       const motion = arenaMotion.get(entity.index);
       if (!mesh || !motion) return;
+      const groundCombat = activeGameMode === 'phantom-hunt' || activeGameMode === 'zero-g-rush' || activeGameMode === 'last-stand' || activeGameMode === 'nightfall-survival';
+      if (groundCombat) {
+        // Enemies advance along the floor toward the player. Their feet stay planted;
+        // no bobbing, hovering or orbiting target motion is used in these modes.
+        motion.z += motion.approachSpeed * delta;
+        mesh.position.set(motion.x + Math.sin(time * 1.25 + motion.phase) * motion.drift, motion.y, motion.z);
+        mesh.rotation.y = Math.sin(time * 1.7 + motion.phase) * 0.09;
+        if (motion.z >= 1.05) { breachArenaTarget(entity); return; }
+        return;
+      }
       mesh.position.x = motion.x + Math.sin(time * motion.speed + motion.phase) * motion.drift;
       mesh.position.y = motion.y + Math.sin(time * 1.9 + motion.phase) * 0.16;
-      if (activeGameMode === 'drone-defense' || activeGameMode === 'meteor-blitz' || activeGameMode === 'last-stand' || activeGameMode === 'inferno-run' || activeGameMode === 'nightfall-survival') {
+      if (activeGameMode === 'drone-defense' || activeGameMode === 'meteor-blitz' || activeGameMode === 'inferno-run') {
         motion.z += motion.approachSpeed * delta;
         if (motion.z >= -0.95) { if (activeGameMode === 'drone-defense' || activeGameMode === 'last-stand' || activeGameMode === 'nightfall-survival') breachArenaTarget(entity); else { const mesh = entity.object3D as Mesh; arenaMeshes.delete(mesh); arenaMotion.delete(entity.index); arenaEntities.delete(mesh); mesh.parent?.remove(mesh); mesh.geometry.dispose(); (mesh.material as MeshStandardMaterial).dispose(); entity.destroy?.(); arenaCombo = 0; spawnArenaTarget(); } return; }
         mesh.position.z = motion.z + Math.cos(time * motion.speed * 0.7 + motion.phase) * 0.12;
