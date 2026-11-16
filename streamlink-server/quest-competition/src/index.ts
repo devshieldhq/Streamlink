@@ -1185,7 +1185,7 @@ class ArenaMotionSystem extends createSystem({
       const mesh = entity.object3D as Mesh | undefined;
       const motion = arenaMotion.get(entity.index);
       if (!mesh || !motion) return;
-      const groundCombat = activeGameMode === 'phantom-hunt' || activeGameMode === 'zero-g-rush' || activeGameMode === 'last-stand' || activeGameMode === 'nightfall-survival';
+      const groundCombat = activeGameMode !== 'rift-racer';
       if (groundCombat) {
         // Enemies advance along the floor toward the player. Their feet stay planted;
         // no bobbing, hovering or orbiting target motion is used in these modes.
