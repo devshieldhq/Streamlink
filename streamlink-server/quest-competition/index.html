@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <meta name="theme-color" content="#090d18" />
   <meta name="description" content="StreamLink XR hands-first Meta Quest creator studio." />
-  <title>StreamLink XR — Quest Studio</title>
+  <title>StreamLink XR — Rift Guard</title>
   <style>
     * { box-sizing: border-box; }
     html, body, #scene-container { width: 100%; height: 100%; margin: 0; overflow: hidden; background: #090d18; color: #f4f7ff; font-family: Inter, system-ui, sans-serif; }
@@ -42,15 +42,15 @@
 </head>
 <body>
   <div id="scene-container"></div>
-  <div id="hud"><strong>STREAMLINK XR</strong><span>MOUSE: AIM + CLICK TO SHOOT · QUEST: PINCH / POKE</span></div>
+  <div id="hud"><strong>STREAMLINK XR · RIFT GUARD</strong><span>DEFEND THE CORE · DESKTOP: AIM + CLICK · QUEST: PINCH / POKE</span></div>
   <nav id="actions">
     <a class="secondary" href="/">Website</a>
     <a class="secondary" href="/account.html">Account</a>
     <a class="secondary" href="/gamey">Gamey</a>
-    <button id="desktop-arena" type="button">Start Arena</button>
+    <button id="desktop-arena" type="button">Orb Rush</button>
     <button id="desktop-pause" class="secondary" type="button">Pause / Resume</button>
     <button id="desktop-reset" class="secondary" type="button">Reset Studio</button>
-    <button id="desktop-defense" class="secondary" type="button">Drone Defense</button>
+    <button id="desktop-defense" class="secondary" type="button">Play Rift Guard</button>
     <button id="enter-xr" type="button" disabled>Checking XR…</button>
   </nav>
 
@@ -70,7 +70,7 @@
     <p><small>Sign in and manage saved stream keys in your account. Credentials are saved through your existing Supabase account and are never sent to the AI agent.</small></p>
     <div id="passport" class="hidden"></div>
   </aside>
-  <div id="mouse-tip">DESKTOP PLAY: Start Arena or Drone Defense, move your mouse over a glowing target, then click to shoot.</div>
+  <div id="mouse-tip">RIFT GUARD: Launch the mission. Intercept the red attack craft before they reach the glowing core. Aim and click to fire.</div>
   <div id="status" role="status">Preparing the IWSDK Quest experience…</div>
 
   <script src="/config.js"></script>
