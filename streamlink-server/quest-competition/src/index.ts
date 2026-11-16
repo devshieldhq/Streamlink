@@ -481,8 +481,8 @@ let arenaWave = 1;
 let arenaGoal = 15;
 let arenaShield = 3;
 let arenaLastFrameTime = performance.now() / 1000;
-let raceLane=1, raceDistance=0, raceSpawnClock=0;
-const raceObjects: {mesh:Mesh;entity:any;lane:number;speed:number;passed:boolean}[]=[];
+let raceLane=1, raceDistance=0, raceSpawnClock=0, racePoliceLevel=1;
+const raceObjects: {mesh:Mesh;entity:any;lane:number;speed:number;passed:boolean;kind:'traffic'|'police'|'roadblock'}[]=[];
 const raceTrackMeshes:{mesh:Mesh;entity:any}[]=[];
 let raceCar:Group|null=null, raceCarEntity:any=null, raceTrackActive=false;
 let activeGameMode: 'orb-rush' | 'drone-defense' | 'meteor-blitz' | 'phantom-hunt' | 'zero-g-rush' | 'last-stand' | 'titan-breaker' | 'inferno-run' | 'nightfall-survival' | 'rift-racer' = 'orb-rush';
@@ -618,15 +618,15 @@ function drawQuestPanel() {
   ctx.fillStyle = '#dce6fb'; ctx.font = '25px Inter, sans-serif';
   ctx.fillText(`Quality: ${currentQuality.toUpperCase()}     Arena: ${arenaActive ? (arenaPaused ? 'PAUSED' : 'PLAYING') : 'READY'}`, 48, 218);
   ctx.fillStyle = '#42e6a4'; ctx.font = 'bold 30px Inter, sans-serif';
-  ctx.fillText(activeGameMode === 'rift-racer' ? `DISTANCE ${Math.floor(raceDistance)}m   LANE ${raceLane+1}/3   TIME ${arenaSeconds}s` : `SCORE ${arenaScore}   WAVE ${arenaWave}   COMBO x${Math.min(5, 1 + Math.floor(Math.max(0, arenaCombo - 1) / 3))}   TIME ${arenaSeconds}s`, 48, 276);
+  ctx.fillText(activeGameMode === 'rift-racer' ? `DISTANCE ${Math.floor(raceDistance)}m   FBI LEVEL ${racePoliceLevel}   DAMAGE ${3-arenaShield}/3   TIME ${arenaSeconds}s` : `SCORE ${arenaScore}   WAVE ${arenaWave}   COMBO x${Math.min(5, 1 + Math.floor(Math.max(0, arenaCombo - 1) / 3))}   TIME ${arenaSeconds}s`, 48, 276);
   ctx.fillStyle = activeGameMode === 'drone-defense' || activeGameMode === 'last-stand' || activeGameMode === 'nightfall-survival' ? (arenaShield > 1 ? '#42e6a4' : '#ff668c') : '#8198c4';
   ctx.font = 'bold 22px Inter, sans-serif';
   ctx.fillText(activeGameMode === 'drone-defense' || activeGameMode === 'last-stand' || activeGameMode === 'nightfall-survival' ? `SHIELD INTEGRITY  ${'◆ '.repeat(arenaShield)}${'◇ '.repeat(3 - arenaShield)}` : 'ARCADE CHALLENGE · HIT TARGETS TO BUILD YOUR COMBO', 48, 306);
   ctx.fillStyle = '#aab8d2'; ctx.font = '21px Inter, sans-serif';
   ctx.fillText(`ARENA OBJECTIVE  ${arenaHits}/${arenaGoal} targets · best combo ${arenaBestCombo}`, 48, 330);
-  ctx.fillText(activeGameMode==='rift-racer' ? 'ARROWS / A-D to steer · drag left/right · avoid rival cars and roadblocks.' : (activeGameMode === 'nightfall-survival' || activeGameMode === 'last-stand') ? 'HOSTILES FIRE BACK · dodge red plasma shots and eliminate attackers with hand pinch.' : 'Track the enemies. Pinch or poke to strike; every 5 hits advances the wave.', 48, 365);
+  ctx.fillText(activeGameMode==='rift-racer' ? 'FBI PURSUIT · A/D or arrows to change lanes · dodge police interceptors, traffic and roadblocks.' : (activeGameMode === 'nightfall-survival' || activeGameMode === 'last-stand') ? 'HOSTILES FIRE BACK · dodge red plasma shots and eliminate attackers with hand pinch.' : 'Track the enemies. Pinch or poke to strike; every 5 hits advances the wave.', 48, 365);
   ctx.fillText(`DESTINATIONS  ${selectedDestinationNames.size} selected · use ADD DEST to choose platforms`, 48, 410);
-  const gameLabel = ({ 'rift-racer': 'RIFT RACER · dodge traffic and roadblocks on a neon highway.', 'orb-rush': 'ORB RUSH · warm-up arcade challenge.', 'drone-defense': 'RIFT GUARD · protect the core from incoming attack craft.', 'meteor-blitz': 'METEOR BLITZ · smash the incoming meteor storm.', 'phantom-hunt': 'PHANTOM HUNT · precision shots on unstable spectres.', 'zero-g-rush': 'ZERO-G RUSH · chase spinning energy gates.', 'last-stand': 'LAST STAND · defend the core through enemy waves.', 'titan-breaker': 'TITAN BREAKER · smash the colossal targets before time runs out.', 'inferno-run': 'INFERNO RUN · intercept the firestorm before it reaches you.', 'nightfall-survival': 'NIGHTFALL SURVIVAL · hold the line against relentless night drones.' } as Record<string, string>)[activeGameMode];
+  const gameLabel = ({ 'rift-racer': 'FBI PURSUIT · survive a five-minute highway chase with escalating police units.', 'orb-rush': 'ORB RUSH · warm-up arcade challenge.', 'drone-defense': 'RIFT GUARD · protect the core from incoming attack craft.', 'meteor-blitz': 'METEOR BLITZ · smash the incoming meteor storm.', 'phantom-hunt': 'PHANTOM HUNT · precision shots on unstable spectres.', 'zero-g-rush': 'ZERO-G RUSH · chase spinning energy gates.', 'last-stand': 'LAST STAND · defend the core through enemy waves.', 'titan-breaker': 'TITAN BREAKER · smash the colossal targets before time runs out.', 'inferno-run': 'INFERNO RUN · intercept the firestorm before it reaches you.', 'nightfall-survival': 'NIGHTFALL SURVIVAL · hold the line against relentless night drones.' } as Record<string, string>)[activeGameMode];
   ctx.fillText(gameLabel, 48, 450);
   ctx.fillStyle = '#8198c4'; ctx.font = '18px Inter, sans-serif';
   ctx.fillText('MOVING TARGETS · hand pinch / controller trigger · combos multiply your score', 48, 605);
@@ -896,31 +896,30 @@ function spawnArenaTarget() {
   return entity;
 }
 function clearRaceTrack(){
- for(const item of raceObjects){item.entity?.destroy?.();item.mesh.parent?.remove(item.mesh);item.mesh.geometry?.dispose?.();(item.mesh.material as any)?.dispose?.();} raceObjects.length=0;
- for(const item of raceTrackMeshes){item.entity?.destroy?.();item.mesh.parent?.remove(item.mesh);item.mesh.geometry?.dispose?.();(item.mesh.material as any)?.dispose?.();} raceTrackMeshes.length=0;
+ for(const item of raceObjects){item.entity?.destroy?.();item.mesh.parent?.remove(item.mesh);item.mesh.traverse((o:any)=>{if(o.isMesh){o.geometry?.dispose?.();if(Array.isArray(o.material))o.material.forEach((m:any)=>m.dispose());else o.material?.dispose?.();}});} raceObjects.length=0;
+ for(const item of raceTrackMeshes){item.entity?.destroy?.();item.mesh.parent?.remove(item.mesh);item.mesh.traverse((o:any)=>{if(o.isMesh){o.geometry?.dispose?.();if(Array.isArray(o.material))o.material.forEach((m:any)=>m.dispose());else o.material?.dispose?.();}});} raceTrackMeshes.length=0;
  if(raceCarEntity)raceCarEntity.destroy?.(); if(raceCar){raceCar.parent?.remove(raceCar);raceCar.traverse((o:any)=>{if(o.isMesh){o.geometry?.dispose?.();(o.material as any)?.dispose?.();}});} raceCar=null;raceCarEntity=null;raceTrackActive=false;
 }
 function addRaceMesh(geometry:any,material:any,position:[number,number,number]){const mesh=new Mesh(geometry,material);const entity=world.createTransformEntity(mesh,{persistent:true});entity.object3D!.position.set(...position);raceTrackMeshes.push({mesh,entity});return mesh;}
+function makeRoadCar(color:number,police=false){
+ const car=new Group();const paint=new MeshStandardMaterial({color,metalness:.72,roughness:.24});const dark=new MeshStandardMaterial({color:0x101722,metalness:.35,roughness:.16});const glass=new MeshStandardMaterial({color:0x172b40,metalness:.45,roughness:.12});const rubber=new MeshStandardMaterial({color:0x090c11,roughness:.92});const chrome=new MeshStandardMaterial({color:0xb9c6d1,metalness:.9,roughness:.18});
+ const body=new Mesh(new BoxGeometry(1.28,.34,2.45),paint);body.position.y=.48;car.add(body);const hood=new Mesh(new BoxGeometry(1.18,.12,.72),paint);hood.position.set(0,.69,-.78);car.add(hood);const cabin=new Mesh(new BoxGeometry(1.02,.48,1.12),glass);cabin.position.set(0,.88,.08);car.add(cabin);const roof=new Mesh(new BoxGeometry(.98,.08,.82),paint);roof.position.set(0,1.14,.08);car.add(roof);
+ const bumperF=new Mesh(new BoxGeometry(1.3,.13,.16),chrome);bumperF.position.set(0,.34,-1.22);car.add(bumperF);const bumperR=new Mesh(new BoxGeometry(1.3,.13,.16),chrome);bumperR.position.set(0,.34,1.22);car.add(bumperR);
+ const headMat=new MeshBasicMaterial({color:0xfff1bd,toneMapped:false});for(const x of [-.43,.43]){const head=new Mesh(new BoxGeometry(.22,.11,.035),headMat);head.position.set(x,.57,-1.245);car.add(head);const tail=new Mesh(new BoxGeometry(.2,.1,.035),new MeshBasicMaterial({color:0xff2020,toneMapped:false}));tail.position.set(x,.55,1.245);car.add(tail);}
+ for(const x of [-.69,.69])for(const z of [-.82,.82]){const wheel=new Mesh(new TorusGeometry(.235,.095,10,20),rubber);wheel.rotation.y=Math.PI/2;wheel.position.set(x,.31,z);car.add(wheel);const hub=new Mesh(new TorusGeometry(.105,.025,8,16),chrome);hub.rotation.y=Math.PI/2;hub.position.set(x*1.005,.31,z);car.add(hub);}
+ if(police){const bar=new Mesh(new BoxGeometry(.76,.1,.2),dark);bar.position.set(0,1.22,.12);car.add(bar);const red=new Mesh(new BoxGeometry(.31,.12,.17),new MeshBasicMaterial({color:0xff142b,toneMapped:false}));red.position.set(-.2,1.3,.12);red.userData.siren='red';car.add(red);const blue=new Mesh(new BoxGeometry(.31,.12,.17),new MeshBasicMaterial({color:0x167bff,toneMapped:false}));blue.position.set(.2,1.3,.12);blue.userData.siren='blue';car.add(blue);}
+ car.userData.police=police;return car;
+}
 function buildRaceTrack(){
- clearRaceTrack();raceTrackActive=true;
- addRaceMesh(new BoxGeometry(8.8,.12,34),new MeshStandardMaterial({color:0x171d2b,roughness:.88}),[0,-.12,-11]);
- const cyan=new MeshBasicMaterial({color:0x20dfff}), white=new MeshBasicMaterial({color:0xe8f7ff});
- addRaceMesh(new BoxGeometry(.22,.45,34),cyan,[-4.45,.12,-11]);addRaceMesh(new BoxGeometry(.22,.45,34),cyan,[4.45,.12,-11]);
- for(let z=3;z>-29;z-=4){addRaceMesh(new BoxGeometry(.055,.025,1.7),white,[-1.47,0,z]);addRaceMesh(new BoxGeometry(.055,.025,1.7),white,[1.47,0,z]);}
- const car=new Group();const body=new Mesh(new BoxGeometry(.95,.28,1.65),new MeshStandardMaterial({color:0x11b8ff,metalness:.75,roughness:.2,emissive:0x063a66}));body.position.y=.38;car.add(body);
- const cockpit=new Mesh(new BoxGeometry(.62,.34,.68),new MeshStandardMaterial({color:0x101a32,metalness:.7,roughness:.12}));cockpit.position.set(0,.67,-.12);car.add(cockpit);
- const nose=new Mesh(new BoxGeometry(.72,.12,.42),new MeshStandardMaterial({color:0xffb84d,metalness:.5,roughness:.25,emissive:0x8a3b00}));nose.position.set(0,.42,-.88);car.add(nose);
- const wheels=new MeshStandardMaterial({color:0x080b12,roughness:.95});for(const x of [-.52,.52])for(const z of [-.52,.52]){const w=new Mesh(new TorusGeometry(.17,.07,8,16),wheels);w.rotation.y=Math.PI/2;w.position.set(x,.22,z);car.add(w);}
- raceCar=car;raceCarEntity=world.createTransformEntity(car,{persistent:true});raceCarEntity.addComponent(ArenaTarget);car.position.set(0,.03,1.8);
+ clearRaceTrack();raceTrackActive=true;const asphalt=new MeshStandardMaterial({color:0x292e35,roughness:.96});const concrete=new MeshStandardMaterial({color:0x929aa3,roughness:.88});const lanePaint=new MeshBasicMaterial({color:0xf4f0d9});const barrier=new MeshStandardMaterial({color:0xb9c1c9,metalness:.25,roughness:.8});
+ addRaceMesh(new BoxGeometry(10.8,.16,52),asphalt,[0,-.14,-15]);addRaceMesh(new BoxGeometry(1.3,.12,52),concrete,[-6.05,-.19,-15]);addRaceMesh(new BoxGeometry(1.3,.12,52),concrete,[6.05,-.19,-15]);addRaceMesh(new BoxGeometry(.18,.62,52),barrier,[-5.35,.12,-15]);addRaceMesh(new BoxGeometry(.18,.62,52),barrier,[5.35,.12,-15]);
+ for(let z=4;z>-54;z-=5){for(const x of [-1.8,1.8]){const dash=addRaceMesh(new BoxGeometry(.12,.025,2.2),lanePaint,[x,-.045,z]);dash.userData.scroll=true;}for(const x of [-6.3,6.3]){const post=addRaceMesh(new BoxGeometry(.14,1.25,.14),barrier,[x,.58,z]);post.userData.scroll=true;}}
+ for(const side of [-1,1]){for(let z=-4;z>-52;z-=12){const trunk=addRaceMesh(new BoxGeometry(.24,2.1,.24),new MeshStandardMaterial({color:0x554b3e}),[side*8.4,1,z]);trunk.userData.scroll=true;const crown=addRaceMesh(new ConeGeometry(1.15,2.8,7),new MeshStandardMaterial({color:0x234b36,roughness:1}),[side*8.4,3.25,z]);crown.userData.scroll=true;}}
+ const car=makeRoadCar(0x087fe8);raceCar=car;raceCarEntity=world.createTransformEntity(car,{persistent:true});raceCarEntity.addComponent(ArenaTarget);car.position.set(0,.02,1.8);
 }
-function spawnRaceObstacle(){if(!raceTrackActive)return;const lane=Math.floor(Math.random()*3),isCar=Math.random()>.42;const color=isCar?[0xff3b5c,0xffa52e,0x9b6bff][Math.floor(Math.random()*3)]:0xffd34e;const mesh=new Mesh(isCar?new BoxGeometry(.95,.9,1.45):new BoxGeometry(1.15,.65,.5),new MeshStandardMaterial({color,emissive:color,emissiveIntensity:.22,metalness:.58,roughness:.28}));mesh.position.set((lane-1)*2.85,isCar?.48:.34,-27);const entity=world.createTransformEntity(mesh,{persistent:true});raceObjects.push({mesh,entity,lane,speed:13+Math.random()*4,passed:false});}
-function steerRace(direction:number){if(!arenaActive||activeGameMode!=='rift-racer'||arenaPaused)return;raceLane=Math.max(0,Math.min(2,raceLane+direction));if(raceCar)raceCar.position.x=(raceLane-1)*2.85;refreshQuestPanel();}
-function startRiftRacer(){
- if(arenaActive)stopArena('Previous game ended');activeGameMode='rift-racer';arenaActive=true;arenaPaused=false;arenaScore=0;arenaHits=0;arenaCombo=0;arenaBestCombo=0;arenaWave=1;arenaShield=3;arenaGoal=999;arenaSeconds=75;arenaDeadline=Date.now()+75000;raceLane=1;raceDistance=0;raceSpawnClock=0;clearArena();buildRaceTrack();
- for(let i=0;i<4;i++){spawnRaceObstacle();raceObjects[raceObjects.length-1].mesh.position.z=-12-i*5;}
- if(arenaTimer!==null)window.clearInterval(arenaTimer);arenaTimer=window.setInterval(()=>{arenaSeconds=Math.max(0,Math.ceil((arenaDeadline-Date.now())/1000));if(arenaSeconds<=0)stopArena('RIFT RACER · FINISH LINE');else refreshQuestPanel();},250);
- playArenaSound('start');statusText('RIFT RACER START · Arrow keys / A-D or drag to steer. Avoid rival cars and roadblocks. Three crashes and it is over!');refreshQuestPanel();
-}
+function spawnRaceObstacle(){if(!raceTrackActive)return;const policeChance=Math.min(.58,.18+racePoliceLevel*.045);const roll=Math.random();const kind: 'traffic'|'police'|'roadblock'=roll<policeChance?'police':roll>.91?'roadblock':'traffic';const lane=Math.floor(Math.random()*3);const color=kind==='police'?0xe9edf2:[0xb82d35,0x222d3c,0xd9dce0,0x1e765e,0xd18a27][Math.floor(Math.random()*5)];const mesh=kind==='roadblock'?new Group():makeRoadCar(color,kind==='police');if(kind==='roadblock'){const block=new Mesh(new BoxGeometry(2.4,.75,.6),new MeshStandardMaterial({color:0xf3a21b,roughness:.7}));block.position.y=.42;mesh.add(block);for(let x=-.8;x<=.8;x+=.8){const stripe=new Mesh(new BoxGeometry(.34,.78,.63),new MeshBasicMaterial({color:0x20252d}));stripe.position.x=x;mesh.add(stripe);}}mesh.position.set((lane-1)*3.6,.02,-42);const entity=world.createTransformEntity(mesh,{persistent:true});raceObjects.push({mesh,entity,lane,speed:kind==='police'?16+racePoliceLevel*1.3:kind==='roadblock'?15:12+Math.random()*3,passed:false,kind});}
+function steerRace(direction:number){if(!arenaActive||activeGameMode!=='rift-racer'||arenaPaused)return;raceLane=Math.max(0,Math.min(2,raceLane+direction));if(raceCar)raceCar.position.x=(raceLane-1)*3.6;refreshQuestPanel();}
+function startRiftRacer(){if(arenaActive)stopArena('Previous game ended');activeGameMode='rift-racer';arenaActive=true;arenaPaused=false;arenaScore=0;arenaHits=0;arenaCombo=0;arenaBestCombo=0;arenaWave=1;arenaShield=3;arenaGoal=999;arenaSeconds=300;arenaDeadline=Date.now()+300000;raceLane=1;raceDistance=0;raceSpawnClock=0;racePoliceLevel=1;clearArena();buildRaceTrack();for(let i=0;i<5;i++){spawnRaceObstacle();raceObjects[raceObjects.length-1].mesh.position.z=-12-i*6;}if(arenaTimer!==null)window.clearInterval(arenaTimer);arenaTimer=window.setInterval(()=>{arenaSeconds=Math.max(0,Math.ceil((arenaDeadline-Date.now())/1000));if(arenaSeconds<=0)stopArena('FIVE-MINUTE PURSUIT SURVIVED');else refreshQuestPanel();},250);playArenaSound('start');statusText('FBI PURSUIT · 5 MINUTES · Arrow keys / A-D or drag to change lanes. Dodge traffic, roadblocks and flashing FBI interceptors. Three collisions end the chase.');refreshQuestPanel();}
 function clearArena() {
   for (const mesh of arenaMeshes) {
     const entity = arenaEntities.get(mesh);
@@ -1324,7 +1323,14 @@ class ArenaMotionSystem extends createSystem({
     for (const mixer of raiderMixers.values()) mixer.update(delta);
     arenaLastFrameTime = time;
     if (!arenaActive || arenaPaused) return;
-    if(activeGameMode==='rift-racer'&&raceTrackActive){raceDistance+=delta*68;raceSpawnClock+=delta;if(raceSpawnClock>1.05){raceSpawnClock=0;spawnRaceObstacle();}if(raceCar)raceCar.rotation.z+=((raceLane-1)*-.11-raceCar.rotation.z)*Math.min(1,delta*7);for(let i=raceObjects.length-1;i>=0;i--){const item=raceObjects[i];item.mesh.position.z+=item.speed*delta;if(!item.passed&&item.mesh.position.z>.9){item.passed=true;if(item.lane===raceLane){arenaShield=Math.max(0,arenaShield-1);statusText(`CRASH! Shield ${arenaShield}/3 · change lanes!`);if(arenaShield<=0){stopArena('RACE WRECKED');return;}}else{arenaScore+=100;arenaHits++;}item.entity?.destroy?.();item.mesh.parent?.remove(item.mesh);item.mesh.geometry.dispose();(item.mesh.material as MeshStandardMaterial).dispose();raceObjects.splice(i,1);}}refreshQuestPanel();return;}
+    if(activeGameMode==='rift-racer'&&raceTrackActive){
+ raceDistance+=delta*(42+racePoliceLevel*3);raceSpawnClock+=delta;racePoliceLevel=1+Math.floor(raceDistance/850);if(raceSpawnClock>Math.max(.62,1.35-racePoliceLevel*.075)){raceSpawnClock=0;spawnRaceObstacle();}
+ for(const part of raceTrackMeshes){if(part.mesh.userData.scroll){part.mesh.position.z+=delta*(14+racePoliceLevel*1.2);if(part.mesh.position.z>7)part.mesh.position.z-=58;}}
+ if(raceCar){raceCar.position.x+=(raceLane-1)*3.6;raceCar.rotation.z+=((raceLane-1)*-.09-raceCar.rotation.z)*Math.min(1,delta*6);}
+ for(let i=raceObjects.length-1;i>=0;i--){const item=raceObjects[i];item.mesh.position.z+=item.speed*delta;if(item.kind==='police'){item.mesh.children.forEach((part:any)=>{if(part.userData.siren)part.visible=part.userData.siren==='red'?Math.sin(time*18)>0:Math.sin(time*18)<=0;});}
+ if(!item.passed&&item.mesh.position.z>1.05){item.passed=true;if(item.lane===raceLane){arenaShield=Math.max(0,arenaShield-1);arenaCombo=0;playArenaSound('damage');statusText((item.kind==='police'?'FBI INTERCEPTOR HIT':'COLLISION')+' · damage '+(3-arenaShield)+'/3');if(arenaShield<=0){stopArena('PURSUIT ENDED · VEHICLE WRECKED');return;}}else{arenaScore+=item.kind==='police'?350:item.kind==='roadblock'?250:150;arenaHits++;arenaCombo++;arenaBestCombo=Math.max(arenaBestCombo,arenaCombo);if(item.kind==='police')statusText('FBI INTERCEPTOR DODGED · +350');}item.entity?.destroy?.();item.mesh.parent?.remove(item.mesh);item.mesh.traverse((o:any)=>{if(o.isMesh){o.geometry?.dispose?.();if(Array.isArray(o.material))o.material.forEach((m:any)=>m.dispose());else o.material?.dispose?.();}});raceObjects.splice(i,1);}else if(item.mesh.position.z>5){item.entity?.destroy?.();item.mesh.parent?.remove(item.mesh);raceObjects.splice(i,1);}}
+ if(Math.floor(raceDistance/850)+1>arenaWave){arenaWave=Math.floor(raceDistance/850)+1;statusText('PURSUIT ESCALATING · FBI units increasing · survive!');}refreshQuestPanel();return;
+}
     this.queries.targets.entities.forEach((entity: any) => {
       const mesh = entity.object3D as Mesh | undefined;
       const motion = arenaMotion.get(entity.index);
