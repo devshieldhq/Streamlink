@@ -839,13 +839,13 @@ registerQuestAction('destination', () => {
 makeQuestButton('GO LIVE / STOP', 'stream', -0.42, 1.25, 0x42e6a4);
 makeQuestButton('QUALITY', 'quality', 0, 1.25, 0x31d6ff);
 makeQuestButton('ORB RUSH', 'arena', 0.42, 1.25, 0xffb84d);
-makeQuestButton('DRONE DEFENSE', 'drone-defense', 0, 0.88, 0xff668c);
-makeQuestButton('CHANGE ENV', 'environment', 0, 0.73, 0x31d6ff);
 makeQuestButton('FOCUS', 'focus', -0.42, 1.10, 0x8b7bff);
 makeQuestButton('COMFORT', 'comfort', 0, 1.10, 0x42e6a4);
 makeQuestButton('RESET', 'reset', 0.42, 1.10, 0xff668c);
-makeQuestButton('PAUSE / RESUME', 'pause', -0.23, 1.03, 0xffb84d);
-makeQuestButton('ADD DEST', 'destination', 0.23, 1.03, 0x31d6ff);
+makeQuestButton('PAUSE', 'pause', -0.51, 1.00, 0xffb84d);
+makeQuestButton('DEST', 'destination', -0.17, 1.00, 0x31d6ff);
+makeQuestButton('DRONES', 'drone-defense', 0.17, 1.00, 0xff668c);
+makeQuestButton('ENV', 'environment', 0.51, 1.00, 0x31d6ff);
 makeQuestButton('DONE', 'destination', 0, 1.10, 0x42e6a4, destinationPanelEntity);
 
 // Desktop preview controls provide mouse-accessible equivalents to the 3D hand buttons.
