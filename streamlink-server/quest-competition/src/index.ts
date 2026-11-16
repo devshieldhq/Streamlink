@@ -962,7 +962,7 @@ registerQuestAction('next-game', () => {
   else if (next === 'drone-defense') startDroneDefense();
   else if (next === 'meteor-blitz') startMeteorBlitz();
   else startExtraGame(next);
-  statusText(`GAME SELECTED · ${next.replaceAll('-', ' ').toUpperCase()} · use the game dropdown on desktop to jump directly to any mode.`);
+  statusText(`GAME SELECTED · ${next.replace(/-/g, ' ').toUpperCase()} · use the game dropdown on desktop to jump directly to any mode.`);
 });
 registerQuestAction('drone-defense', startDroneDefense);
 registerQuestAction('meteor-blitz', startMeteorBlitz);
