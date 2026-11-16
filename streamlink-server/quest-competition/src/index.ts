@@ -486,7 +486,6 @@ const arenaMeshes = new Set<Mesh>();
 const arenaEntities = new Map<Mesh, any>();
 const actionByEntity = new Map<number, string>();
 const actionHandlers = new Map<string, () => void>();
-const pressedButtons = new Set<number>();
 const pressedTargets = new Set<number>();
 
 const panelCanvas = document.createElement('canvas');
@@ -570,6 +569,7 @@ function makeQuestButton(label: string, action: string, x: number, y: number, co
   const entity = world.createTransformEntity(mesh, { parent });
   entity.object3D!.position.set(x, y - 1.45, 0.025);
   entity.addComponent(RayInteractable).addComponent(PokeInteractable).addComponent(QuestButton, { action });
+  mesh.addEventListener('click', () => actionHandlers.get(action)?.());
   actionByEntity.set(entity.index, action);
   return entity;
 }
@@ -618,6 +618,7 @@ function refreshDestinationButtons() {
     const action = `destination-toggle:${platform.name}`;
     entity.addComponent(RayInteractable).addComponent(PokeInteractable).addComponent(QuestButton, { action });
     actionByEntity.set(entity.index, action);
+    mesh.addEventListener('click', () => actionHandlers.get(action)?.());
     actionHandlers.set(action, () => {
       if (selectedDestinationNames.has(platform.name)) selectedDestinationNames.delete(platform.name);
       else selectedDestinationNames.add(platform.name);
@@ -774,6 +775,13 @@ registerQuestAction('quality', () => {
   void setQuality();
   refreshQuestPanel();
 });
+registerQuestAction('environment', () => {
+  const names = Object.keys(arenaEnvironmentPalettes);
+  const current = Math.max(0, names.indexOf(arenaEnvironmentSelect?.value || 'neon'));
+  const next = names[(current + 1) % names.length];
+  if (arenaEnvironmentSelect) arenaEnvironmentSelect.value = next;
+  setArenaEnvironment(next);
+});
 registerQuestAction('arena', startArena);
 registerQuestAction('drone-defense', startDroneDefense);
 registerQuestAction('pause', pauseArena);
@@ -832,6 +840,7 @@ makeQuestButton('GO LIVE / STOP', 'stream', -0.42, 1.25, 0x42e6a4);
 makeQuestButton('QUALITY', 'quality', 0, 1.25, 0x31d6ff);
 makeQuestButton('ORB RUSH', 'arena', 0.42, 1.25, 0xffb84d);
 makeQuestButton('DRONE DEFENSE', 'drone-defense', 0, 0.88, 0xff668c);
+makeQuestButton('CHANGE ENV', 'environment', 0, 0.73, 0x31d6ff);
 makeQuestButton('FOCUS', 'focus', -0.42, 1.10, 0x8b7bff);
 makeQuestButton('COMFORT', 'comfort', 0, 1.10, 0x42e6a4);
 makeQuestButton('RESET', 'reset', 0.42, 1.10, 0xff668c);
@@ -848,20 +857,9 @@ refreshDestinationButtons();
 platformList?.addEventListener('input', refreshDestinationButtons);
 
 class QuestInteractionSystem extends createSystem({
-  buttons: { required: [QuestButton, Pressed] },
   targets: { required: [ArenaTarget, Pressed] },
 }) {
   update() {
-    this.queries.buttons.entities.forEach((entity: any) => {
-      if (pressedButtons.has(entity.index)) return;
-      pressedButtons.add(entity.index);
-      const action = QuestButton.data.action[entity.index];
-      actionHandlers.get(action)?.();
-    });
-    const currentlyPressed = new Set<number>();
-    this.queries.buttons.entities.forEach((entity: any) => currentlyPressed.add(entity.index));
-    for (const id of pressedButtons) if (!currentlyPressed.has(id)) pressedButtons.delete(id);
-
     this.queries.targets.entities.forEach((entity: any) => {
       if (pressedTargets.has(entity.index) || !arenaActive || arenaPaused) return;
       pressedTargets.add(entity.index);
