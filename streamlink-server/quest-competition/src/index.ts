@@ -1085,10 +1085,10 @@ function breachArenaTarget(entity: any) {
   playArenaSound('damage');
   arenaCombo = 0;
   if (arenaShield <= 0) {
-    stopArena('MISSION FAILED · shield breached');
-    return;
+    statusText('SHIELDS DOWN · keep fighting until the full 2-minute round ends!');
+  } else {
+    statusText(`DRONE BREACH · shield ${arenaShield}/3 · intercept the next wave!`);
   }
-  statusText(`DRONE BREACH · shield ${arenaShield}/3 · intercept the next wave!`);
   spawnArenaTarget();
   refreshQuestPanel();
 }
@@ -1414,7 +1414,7 @@ class ArenaMotionSystem extends createSystem({
  for(const part of raceTrackMeshes){if(part.mesh.userData.scroll){part.mesh.position.z+=delta*(14+racePoliceLevel*1.2);if(part.mesh.position.z>7)part.mesh.position.z-=58;}}
  if(raceCar){raceCar.position.x+=(raceLane-1)*3.6;raceCar.rotation.z+=((raceLane-1)*-.09-raceCar.rotation.z)*Math.min(1,delta*6);}
  for(let i=raceObjects.length-1;i>=0;i--){const item=raceObjects[i];item.mesh.position.z+=item.speed*delta;if(item.kind==='police'){item.mesh.children.forEach((part:any)=>{if(part.userData.siren)part.visible=part.userData.siren==='red'?Math.sin(time*18)>0:Math.sin(time*18)<=0;});}
- if(!item.passed&&item.mesh.position.z>1.05){item.passed=true;if(item.lane===raceLane){arenaShield=Math.max(0,arenaShield-1);arenaCombo=0;playArenaSound('damage');statusText((item.kind==='police'?'FBI INTERCEPTOR HIT':'COLLISION')+' · damage '+(3-arenaShield)+'/3');if(arenaShield<=0){stopArena('PURSUIT ENDED · VEHICLE WRECKED');return;}}else{arenaScore+=item.kind==='police'?350:item.kind==='roadblock'?250:150;arenaHits++;arenaCombo++;arenaBestCombo=Math.max(arenaBestCombo,arenaCombo);if(item.kind==='police')statusText('FBI INTERCEPTOR DODGED · +350');}item.entity?.destroy?.();item.mesh.parent?.remove(item.mesh);item.mesh.traverse((o:any)=>{if(o.isMesh){o.geometry?.dispose?.();if(Array.isArray(o.material))o.material.forEach((m:any)=>m.dispose());else o.material?.dispose?.();}});raceObjects.splice(i,1);}else if(item.mesh.position.z>5){item.entity?.destroy?.();item.mesh.parent?.remove(item.mesh);item.mesh.traverse((o:any)=>{if(o.isMesh){o.geometry?.dispose?.();if(Array.isArray(o.material))o.material.forEach((m:any)=>m.dispose());else o.material?.dispose?.();}});raceObjects.splice(i,1);}}
+ if(!item.passed&&item.mesh.position.z>1.05){item.passed=true;if(item.lane===raceLane){arenaShield=Math.max(0,arenaShield-1);arenaCombo=0;playArenaSound('damage');statusText((item.kind==='police'?'FBI INTERCEPTOR HIT':'COLLISION')+' · damage '+(3-arenaShield)+'/3');if(arenaShield<=0){statusText('VEHICLE CRITICAL · keep driving! The full 5-minute pursuit continues.');}}else{arenaScore+=item.kind==='police'?350:item.kind==='roadblock'?250:150;arenaHits++;arenaCombo++;arenaBestCombo=Math.max(arenaBestCombo,arenaCombo);if(item.kind==='police')statusText('FBI INTERCEPTOR DODGED · +350');}item.entity?.destroy?.();item.mesh.parent?.remove(item.mesh);item.mesh.traverse((o:any)=>{if(o.isMesh){o.geometry?.dispose?.();if(Array.isArray(o.material))o.material.forEach((m:any)=>m.dispose());else o.material?.dispose?.();}});raceObjects.splice(i,1);}else if(item.mesh.position.z>5){item.entity?.destroy?.();item.mesh.parent?.remove(item.mesh);item.mesh.traverse((o:any)=>{if(o.isMesh){o.geometry?.dispose?.();if(Array.isArray(o.material))o.material.forEach((m:any)=>m.dispose());else o.material?.dispose?.();}});raceObjects.splice(i,1);}}
  if(Math.floor(raceDistance/850)+1>arenaWave){arenaWave=Math.floor(raceDistance/850)+1;statusText('PURSUIT ESCALATING · FBI units increasing · survive!');}refreshQuestPanel();return;
 }
     this.queries.targets.entities.forEach((entity: any) => {
@@ -1460,7 +1460,7 @@ class ArenaMotionSystem extends createSystem({
         playArenaSound('damage');
         statusText(`INCOMING FIRE HIT · shield ${arenaShield}/3 · eliminate the shooters!`);
         shot.entity?.destroy?.(); shot.mesh.parent?.remove(shot.mesh); shot.mesh.geometry.dispose(); (shot.mesh.material as MeshBasicMaterial).dispose(); hostileShots.splice(i, 1);
-        if (arenaShield <= 0) { stopArena('OVERWHELMED · SURVIVAL FAILED'); return; }
+        if (arenaShield <= 0) statusText('SHIELDS DOWN · stay in the fight until the full survival round ends!');
         refreshQuestPanel();
       } else if (shot.mesh.position.z > 2.2) {
         shot.entity?.destroy?.(); shot.mesh.parent?.remove(shot.mesh); shot.mesh.geometry.dispose(); (shot.mesh.material as MeshBasicMaterial).dispose(); hostileShots.splice(i, 1);
