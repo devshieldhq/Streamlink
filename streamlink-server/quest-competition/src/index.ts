@@ -436,7 +436,7 @@ if (enterButton) {
     try {
       await world.launchXR();
       // Wait for the XR runtime to apply the headset pose before sampling the camera.
-      requestAnimationFrame(() => requestAnimationFrame(() => logQuestCameraAndMeshes()));
+      requestAnimationFrame(() => requestAnimationFrame(() => { placeStudioInFrontOfCamera(); logQuestCameraAndMeshes(); }));
       statusText('Quest session active · use hand pinch to grab and arrange the studio objects.');
     } catch (error) {
       console.error('Unable to start immersive session:', error);
@@ -684,7 +684,7 @@ function stopArena(message = 'Arena complete') {
   if (arenaTimer !== null) window.clearInterval(arenaTimer);
   arenaTimer = null;
   clearArena();
-  statusText(`${message} · score ${arenaScore} · ${arenaHits}/${ARENA_GOAL} targets · best combo ${arenaBestCombo}`);
+  statusText(`${message} · score ${arenaScore} · ${arenaHits}/${arenaGoal} targets · best combo ${arenaBestCombo}`);
   refreshQuestPanel();
 }
 function startArena() {
@@ -708,7 +708,7 @@ function startArena() {
     if (arenaSeconds <= 0) stopArena('Time is up');
     else refreshQuestPanel();
   }, 250);
-  statusText(`VR Arena started · hit ${ARENA_GOAL} targets in 45 seconds. Build combos for bonus points.`);
+  statusText(`VR Arena started · hit ${arenaGoal} targets in 45 seconds. Build combos for bonus points.`);
   refreshQuestPanel();
 }
 function startDroneDefense() {
@@ -890,7 +890,7 @@ class QuestInteractionSystem extends createSystem({
         arenaCombo = 0;
         statusText(`Wave ${arenaWave}! Targets are smaller and more spread out. Score: ${arenaScore}`);
       } else {
-        statusText(`Target hit! +${points} · combo x${multiplier} · ${arenaHits}/${ARENA_GOAL}`);
+        statusText(`Target hit! +${points} · combo x${multiplier} · ${arenaHits}/${arenaGoal}`);
       }
       if (arenaHits >= arenaGoal) stopArena('Arena cleared');
       else spawnArenaTarget();
@@ -906,6 +906,20 @@ drawQuestPanel();
 
 // TEMPORARY CAMERA + WORLD-SPACE DIAGNOSTIC.
 // Run only after immersive XR has started so the camera pose reflects the headset.
+function placeStudioInFrontOfCamera() {
+  world.scene.updateMatrixWorld(true);
+  world.camera.updateMatrixWorld(true);
+  const cameraPosition = new Vector3();
+  const cameraDirection = new Vector3();
+  world.camera.getWorldPosition(cameraPosition);
+  world.camera.getWorldDirection(cameraDirection);
+  panelMesh.position.copy(cameraPosition).addScaledVector(cameraDirection, 1.35);
+  panelMesh.position.y -= 0.08;
+  panelMesh.lookAt(cameraPosition);
+  destinationPanelGroup.position.copy(panelMesh.position).add(new Vector3(0.95, -0.05, 0));
+  destinationPanelGroup.quaternion.copy(panelMesh.quaternion);
+  refreshQuestPanel();
+}
 function logQuestCameraAndMeshes() {
   world.scene.updateMatrixWorld(true);
   world.camera.updateMatrixWorld(true);
