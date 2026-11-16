@@ -462,13 +462,15 @@ let arenaCombo = 0;
 let arenaBestCombo = 0;
 let arenaWave = 1;
 let arenaGoal = 15;
+let arenaShield = 3;
+let arenaLastFrameTime = performance.now() / 1000;
 let activeGameMode: 'orb-rush' | 'drone-defense' = 'orb-rush';
 let arenaSeconds = 45;
 let arenaDeadline = 0;
 let arenaTimer: number | null = null;
 const arenaMeshes = new Set<Mesh>();
 const arenaEntities = new Map<Mesh, any>();
-const arenaMotion = new Map<number, { x: number; y: number; z: number; phase: number; speed: number; drift: number }>();
+const arenaMotion = new Map<number, { x: number; y: number; z: number; phase: number; speed: number; drift: number; approachSpeed: number }>();
 const actionByEntity = new Map<number, string>();
 const actionHandlers = new Map<string, () => void>();
 const pressedTargets = new Set<number>();
@@ -522,6 +524,9 @@ function drawQuestPanel() {
   ctx.fillText(`Quality: ${currentQuality.toUpperCase()}     Arena: ${arenaActive ? (arenaPaused ? 'PAUSED' : 'PLAYING') : 'READY'}`, 48, 218);
   ctx.fillStyle = '#42e6a4'; ctx.font = 'bold 30px Inter, sans-serif';
   ctx.fillText(`SCORE ${arenaScore}   WAVE ${arenaWave}   COMBO x${Math.min(5, 1 + Math.floor(Math.max(0, arenaCombo - 1) / 3))}   TIME ${arenaSeconds}s`, 48, 276);
+  ctx.fillStyle = activeGameMode === 'drone-defense' ? (arenaShield > 1 ? '#42e6a4' : '#ff668c') : '#8198c4';
+  ctx.font = 'bold 22px Inter, sans-serif';
+  ctx.fillText(activeGameMode === 'drone-defense' ? `SHIELD INTEGRITY  ${'◆ '.repeat(arenaShield)}${'◇ '.repeat(3 - arenaShield)}` : 'ARCADE TRAINING · HIT TARGETS TO BUILD YOUR COMBO', 48, 306);
   ctx.fillStyle = '#aab8d2'; ctx.font = '21px Inter, sans-serif';
   ctx.fillText(`ARENA OBJECTIVE  ${arenaHits}/${arenaGoal} targets · best combo ${arenaBestCombo}`, 48, 330);
   ctx.fillText('Track the moving targets. Pinch or poke to score; every 5 hits advances the wave.', 48, 365);
@@ -653,6 +658,7 @@ function spawnArenaTarget() {
     phase: Math.random() * Math.PI * 2,
     speed: activeGameMode === 'drone-defense' ? 1.35 + arenaWave * 0.12 : 0.85 + arenaWave * 0.08,
     drift: activeGameMode === 'drone-defense' ? 0.48 : 0.30,
+    approachSpeed: activeGameMode === 'drone-defense' ? 0.20 + arenaWave * 0.025 : 0,
   });
   return entity;
 }
@@ -709,6 +715,34 @@ function hitArenaTarget(entity: any) {
   refreshQuestPanel();
 }
 
+function breachArenaTarget(entity: any) {
+  if (!arenaActive || arenaPaused || activeGameMode !== 'drone-defense') return;
+  const mesh = entity.object3D as Mesh | undefined;
+  if (mesh) {
+    arenaMeshes.delete(mesh);
+    arenaMotion.delete(entity.index);
+    arenaEntities.delete(mesh);
+    mesh.parent?.remove(mesh);
+    mesh.geometry.dispose();
+    (mesh.material as MeshStandardMaterial).dispose();
+    mesh.children.forEach(child => {
+      (child as Mesh).geometry?.dispose?.();
+      const material = (child as Mesh).material;
+      if (material && !Array.isArray(material)) material.dispose();
+    });
+  }
+  entity.destroy?.();
+  arenaShield = Math.max(0, arenaShield - 1);
+  arenaCombo = 0;
+  if (arenaShield <= 0) {
+    stopArena('MISSION FAILED · shield breached');
+    return;
+  }
+  statusText(`DRONE BREACH · shield ${arenaShield}/3 · intercept the next wave!`);
+  spawnArenaTarget();
+  refreshQuestPanel();
+}
+
 function stopArena(message = 'Arena complete') {
   arenaActive = false;
   arenaPaused = false;
@@ -721,6 +755,7 @@ function stopArena(message = 'Arena complete') {
 function startArena() {
   if (arenaActive) { stopArena('Arena stopped'); return; }
   activeGameMode = 'orb-rush';
+  arenaShield = 3;
   arenaGoal = 15;
   arenaActive = true;
   arenaPaused = false;
@@ -745,6 +780,7 @@ function startArena() {
 function startDroneDefense() {
   if (arenaActive) stopArena('Previous game ended');
   activeGameMode = 'drone-defense';
+  arenaShield = 3;
   arenaGoal = 20;
   arenaActive = true;
   arenaPaused = false;
@@ -923,13 +959,22 @@ class ArenaMotionSystem extends createSystem({
 }) {
   update() {
     const time = performance.now() / 1000;
+    const delta = Math.min(0.05, Math.max(0, time - arenaLastFrameTime));
+    arenaLastFrameTime = time;
+    if (!arenaActive || arenaPaused) return;
     this.queries.targets.entities.forEach((entity: any) => {
       const mesh = entity.object3D as Mesh | undefined;
       const motion = arenaMotion.get(entity.index);
       if (!mesh || !motion) return;
       mesh.position.x = motion.x + Math.sin(time * motion.speed + motion.phase) * motion.drift;
       mesh.position.y = motion.y + Math.sin(time * 1.9 + motion.phase) * 0.16;
-      mesh.position.z = motion.z + Math.cos(time * motion.speed * 0.7 + motion.phase) * 0.12;
+      if (activeGameMode === 'drone-defense') {
+        motion.z += motion.approachSpeed * delta;
+        if (motion.z >= -0.95) { breachArenaTarget(entity); return; }
+        mesh.position.z = motion.z + Math.cos(time * motion.speed * 0.7 + motion.phase) * 0.12;
+      } else {
+        mesh.position.z = motion.z + Math.cos(time * motion.speed * 0.7 + motion.phase) * 0.12;
+      }
       mesh.rotation.y += 0.025;
       mesh.rotation.x += 0.012;
       const pulse = 1 + Math.sin(time * 4 + motion.phase) * 0.07;
