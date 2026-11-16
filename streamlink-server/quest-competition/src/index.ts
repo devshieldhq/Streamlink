@@ -478,7 +478,11 @@ let arenaWave = 1;
 let arenaGoal = 15;
 let arenaShield = 3;
 let arenaLastFrameTime = performance.now() / 1000;
-let activeGameMode: 'orb-rush' | 'drone-defense' | 'meteor-blitz' | 'phantom-hunt' | 'zero-g-rush' | 'last-stand' | 'titan-breaker' | 'inferno-run' | 'nightfall-survival' = 'orb-rush';
+let raceLane=1, raceDistance=0, raceSpawnClock=0;
+const raceObjects: {mesh:Mesh;entity:any;lane:number;speed:number;passed:boolean}[]=[];
+const raceTrackMeshes:{mesh:Mesh;entity:any}[]=[];
+let raceCar:Group|null=null, raceCarEntity:any=null, raceTrackActive=false;
+let activeGameMode: 'orb-rush' | 'drone-defense' | 'meteor-blitz' | 'phantom-hunt' | 'zero-g-rush' | 'last-stand' | 'titan-breaker' | 'inferno-run' | 'nightfall-survival' | 'rift-racer' = 'orb-rush';
 let arenaSeconds = 45;
 let arenaDeadline = 0;
 let arenaTimer: number | null = null;
@@ -537,15 +541,15 @@ function drawQuestPanel() {
   ctx.fillStyle = '#dce6fb'; ctx.font = '25px Inter, sans-serif';
   ctx.fillText(`Quality: ${currentQuality.toUpperCase()}     Arena: ${arenaActive ? (arenaPaused ? 'PAUSED' : 'PLAYING') : 'READY'}`, 48, 218);
   ctx.fillStyle = '#42e6a4'; ctx.font = 'bold 30px Inter, sans-serif';
-  ctx.fillText(`SCORE ${arenaScore}   WAVE ${arenaWave}   COMBO x${Math.min(5, 1 + Math.floor(Math.max(0, arenaCombo - 1) / 3))}   TIME ${arenaSeconds}s`, 48, 276);
+  ctx.fillText(activeGameMode === 'rift-racer' ? `DISTANCE ${Math.floor(raceDistance)}m   LANE ${raceLane+1}/3   TIME ${arenaSeconds}s` : `SCORE ${arenaScore}   WAVE ${arenaWave}   COMBO x${Math.min(5, 1 + Math.floor(Math.max(0, arenaCombo - 1) / 3))}   TIME ${arenaSeconds}s`, 48, 276);
   ctx.fillStyle = activeGameMode === 'drone-defense' || activeGameMode === 'last-stand' || activeGameMode === 'nightfall-survival' ? (arenaShield > 1 ? '#42e6a4' : '#ff668c') : '#8198c4';
   ctx.font = 'bold 22px Inter, sans-serif';
   ctx.fillText(activeGameMode === 'drone-defense' || activeGameMode === 'last-stand' || activeGameMode === 'nightfall-survival' ? `SHIELD INTEGRITY  ${'◆ '.repeat(arenaShield)}${'◇ '.repeat(3 - arenaShield)}` : 'ARCADE CHALLENGE · HIT TARGETS TO BUILD YOUR COMBO', 48, 306);
   ctx.fillStyle = '#aab8d2'; ctx.font = '21px Inter, sans-serif';
   ctx.fillText(`ARENA OBJECTIVE  ${arenaHits}/${arenaGoal} targets · best combo ${arenaBestCombo}`, 48, 330);
-  ctx.fillText('Track the moving targets. Pinch or poke to score; every 5 hits advances the wave.', 48, 365);
+  ctx.fillText(activeGameMode==='rift-racer' ? 'ARROWS / A-D to steer · drag left/right · avoid rival cars and roadblocks.' : 'Track the moving targets. Pinch or poke to score; every 5 hits advances the wave.', 48, 365);
   ctx.fillText(`DESTINATIONS  ${selectedDestinationNames.size} selected · use ADD DEST to choose platforms`, 48, 410);
-  const gameLabel = ({ 'orb-rush': 'ORB RUSH · warm-up arcade challenge.', 'drone-defense': 'RIFT GUARD · protect the core from incoming attack craft.', 'meteor-blitz': 'METEOR BLITZ · smash the incoming meteor storm.', 'phantom-hunt': 'PHANTOM HUNT · precision shots on unstable spectres.', 'zero-g-rush': 'ZERO-G RUSH · chase spinning energy gates.', 'last-stand': 'LAST STAND · defend the core through enemy waves.', 'titan-breaker': 'TITAN BREAKER · smash the colossal targets before time runs out.', 'inferno-run': 'INFERNO RUN · intercept the firestorm before it reaches you.', 'nightfall-survival': 'NIGHTFALL SURVIVAL · hold the line against relentless night drones.' } as Record<string, string>)[activeGameMode];
+  const gameLabel = ({ 'rift-racer': 'RIFT RACER · dodge traffic and roadblocks on a neon highway.', 'orb-rush': 'ORB RUSH · warm-up arcade challenge.', 'drone-defense': 'RIFT GUARD · protect the core from incoming attack craft.', 'meteor-blitz': 'METEOR BLITZ · smash the incoming meteor storm.', 'phantom-hunt': 'PHANTOM HUNT · precision shots on unstable spectres.', 'zero-g-rush': 'ZERO-G RUSH · chase spinning energy gates.', 'last-stand': 'LAST STAND · defend the core through enemy waves.', 'titan-breaker': 'TITAN BREAKER · smash the colossal targets before time runs out.', 'inferno-run': 'INFERNO RUN · intercept the firestorm before it reaches you.', 'nightfall-survival': 'NIGHTFALL SURVIVAL · hold the line against relentless night drones.' } as Record<string, string>)[activeGameMode];
   ctx.fillText(gameLabel, 48, 450);
   ctx.fillStyle = '#8198c4'; ctx.font = '18px Inter, sans-serif';
   ctx.fillText('MOVING TARGETS · hand pinch / controller trigger · combos multiply your score', 48, 605);
@@ -724,6 +728,32 @@ function spawnArenaTarget() {
   });
   return entity;
 }
+function clearRaceTrack(){
+ for(const item of raceObjects){item.entity?.destroy?.();item.mesh.parent?.remove(item.mesh);item.mesh.geometry?.dispose?.();(item.mesh.material as any)?.dispose?.();} raceObjects.length=0;
+ for(const item of raceTrackMeshes){item.entity?.destroy?.();item.mesh.parent?.remove(item.mesh);item.mesh.geometry?.dispose?.();(item.mesh.material as any)?.dispose?.();} raceTrackMeshes.length=0;
+ if(raceCarEntity)raceCarEntity.destroy?.(); if(raceCar){raceCar.parent?.remove(raceCar);raceCar.traverse((o:any)=>{if(o.isMesh){o.geometry?.dispose?.();(o.material as any)?.dispose?.();}});} raceCar=null;raceCarEntity=null;raceTrackActive=false;
+}
+function addRaceMesh(geometry:any,material:any,position:[number,number,number]){const mesh=new Mesh(geometry,material);const entity=world.createTransformEntity(mesh,{persistent:true});entity.object3D!.position.set(...position);raceTrackMeshes.push({mesh,entity});return mesh;}
+function buildRaceTrack(){
+ clearRaceTrack();raceTrackActive=true;
+ addRaceMesh(new BoxGeometry(8.8,.12,34),new MeshStandardMaterial({color:0x171d2b,roughness:.88}),[0,-.12,-11]);
+ const cyan=new MeshBasicMaterial({color:0x20dfff}), white=new MeshBasicMaterial({color:0xe8f7ff});
+ addRaceMesh(new BoxGeometry(.22,.45,34),cyan,[-4.45,.12,-11]);addRaceMesh(new BoxGeometry(.22,.45,34),cyan,[4.45,.12,-11]);
+ for(let z=3;z>-29;z-=4){addRaceMesh(new BoxGeometry(.055,.025,1.7),white,[-1.47,0,z]);addRaceMesh(new BoxGeometry(.055,.025,1.7),white,[1.47,0,z]);}
+ const car=new Group();const body=new Mesh(new BoxGeometry(.95,.28,1.65),new MeshStandardMaterial({color:0x11b8ff,metalness:.75,roughness:.2,emissive:0x063a66}));body.position.y=.38;car.add(body);
+ const cockpit=new Mesh(new BoxGeometry(.62,.34,.68),new MeshStandardMaterial({color:0x101a32,metalness:.7,roughness:.12}));cockpit.position.set(0,.67,-.12);car.add(cockpit);
+ const nose=new Mesh(new BoxGeometry(.72,.12,.42),new MeshStandardMaterial({color:0xffb84d,metalness:.5,roughness:.25,emissive:0x8a3b00}));nose.position.set(0,.42,-.88);car.add(nose);
+ const wheels=new MeshStandardMaterial({color:0x080b12,roughness:.95});for(const x of [-.52,.52])for(const z of [-.52,.52]){const w=new Mesh(new TorusGeometry(.17,.07,8,16),wheels);w.rotation.y=Math.PI/2;w.position.set(x,.22,z);car.add(w);}
+ raceCar=car;raceCarEntity=world.createTransformEntity(car,{persistent:true});car.position.set(0,.03,1.8);
+}
+function spawnRaceObstacle(){if(!raceTrackActive)return;const lane=Math.floor(Math.random()*3),isCar=Math.random()>.42;const color=isCar?[0xff3b5c,0xffa52e,0x9b6bff][Math.floor(Math.random()*3)]:0xffd34e;const mesh=new Mesh(isCar?new BoxGeometry(.95,.9,1.45):new BoxGeometry(1.15,.65,.5),new MeshStandardMaterial({color,emissive:color,emissiveIntensity:.22,metalness:.58,roughness:.28}));mesh.position.set((lane-1)*2.85,isCar?.48:.34,-27);const entity=world.createTransformEntity(mesh,{persistent:true});raceObjects.push({mesh,entity,lane,speed:13+Math.random()*4,passed:false});}
+function steerRace(direction:number){if(!arenaActive||activeGameMode!=='rift-racer'||arenaPaused)return;raceLane=Math.max(0,Math.min(2,raceLane+direction));if(raceCar)raceCar.position.x=(raceLane-1)*2.85;refreshQuestPanel();}
+function startRiftRacer(){
+ if(arenaActive)stopArena('Previous game ended');activeGameMode='rift-racer';arenaActive=true;arenaPaused=false;arenaScore=0;arenaHits=0;arenaCombo=0;arenaBestCombo=0;arenaWave=1;arenaShield=3;arenaGoal=999;arenaSeconds=75;arenaDeadline=Date.now()+75000;raceLane=1;raceDistance=0;raceSpawnClock=0;clearArena();buildRaceTrack();
+ for(let i=0;i<4;i++){spawnRaceObstacle();raceObjects[raceObjects.length-1].mesh.position.z=-12-i*5;}
+ if(arenaTimer!==null)window.clearInterval(arenaTimer);arenaTimer=window.setInterval(()=>{arenaSeconds=Math.max(0,Math.ceil((arenaDeadline-Date.now())/1000));if(arenaSeconds<=0)stopArena('RIFT RACER · FINISH LINE');else refreshQuestPanel();},250);
+ statusText('RIFT RACER START · Arrow keys / A-D or drag to steer. Avoid rival cars and roadblocks. Three crashes and it is over!');refreshQuestPanel();
+}
 function clearArena() {
   for (const mesh of arenaMeshes) {
     const entity = arenaEntities.get(mesh);
@@ -740,6 +770,7 @@ function clearArena() {
     });
   }
   arenaMeshes.clear();
+  clearRaceTrack();
 }
 function hitArenaTarget(entity: any) {
   if (!arenaActive || arenaPaused || pressedTargets.has(entity.index)) return;
@@ -952,13 +983,17 @@ registerQuestAction('quality', () => {
   refreshQuestPanel();
 });
 registerQuestAction('arena', startArena);
-const gameModes = ['orb-rush','drone-defense','meteor-blitz','phantom-hunt','zero-g-rush','last-stand','titan-breaker','inferno-run','nightfall-survival'] as const;
+registerQuestAction('rift-racer',startRiftRacer);
+registerQuestAction('race-left',()=>steerRace(-1));
+registerQuestAction('race-right',()=>steerRace(1));
+const gameModes = ['orb-rush','drone-defense','meteor-blitz','phantom-hunt','zero-g-rush','last-stand','titan-breaker','inferno-run','nightfall-survival','rift-racer'] as const;
 registerQuestAction('next-game', () => {
   const current = gameModes.indexOf(activeGameMode as typeof gameModes[number]);
   const next = gameModes[(current + 1) % gameModes.length];
   const selector = byId<HTMLSelectElement>('game-select');
   if (selector) selector.value = next;
-  if (next === 'orb-rush') startArena();
+  if (next === 'rift-racer') startRiftRacer();
+  else if (next === 'orb-rush') startArena();
   else if (next === 'drone-defense') startDroneDefense();
   else if (next === 'meteor-blitz') startMeteorBlitz();
   else startExtraGame(next);
@@ -1034,10 +1069,16 @@ makeQuestButton('PAUSE', 'pause', -0.51, 1.00, 0xffb84d);
 makeQuestButton('DEST', 'destination', -0.17, 1.00, 0x31d6ff);
 makeQuestButton('NEXT GAME', 'next-game', 0.17, 1.00, 0x31d6ff);
 makeQuestButton('DONE', 'destination', 0, 1.10, 0x42e6a4, destinationPanelEntity);
+makeQuestButton('STEER LEFT','race-left',-0.45,0.82,0x31d6ff);
+makeQuestButton('STEER RIGHT','race-right',0.45,0.82,0xffb84d);
 
 // Desktop preview controls provide mouse-accessible equivalents to the 3D hand buttons.
 byId<HTMLButtonElement>('desktop-pause')?.addEventListener('click', () => actionHandlers.get('pause')?.());
 byId<HTMLButtonElement>('desktop-reset')?.addEventListener('click', () => actionHandlers.get('reset')?.());
+window.addEventListener('keydown',(event)=>{if(event.key==='ArrowLeft'||event.key.toLowerCase()==='a'){event.preventDefault();steerRace(-1);}if(event.key==='ArrowRight'||event.key.toLowerCase()==='d'){event.preventDefault();steerRace(1);}});
+let raceDragX:number|null=null;
+container.addEventListener('pointerdown',(event)=>{if(activeGameMode==='rift-racer'&&arenaActive)raceDragX=event.clientX;});
+container.addEventListener('pointerup',(event)=>{if(raceDragX!==null&&activeGameMode==='rift-racer'&&arenaActive){const dx=event.clientX-raceDragX;if(Math.abs(dx)>22)steerRace(dx>0?1:-1);raceDragX=null;}});
 byId<HTMLSelectElement>('game-select')?.addEventListener('change', (event) => {
   const mode = (event.currentTarget as HTMLSelectElement).value;
   if (mode === 'drone-defense') actionHandlers.get('drone-defense')?.();
@@ -1048,6 +1089,7 @@ byId<HTMLSelectElement>('game-select')?.addEventListener('change', (event) => {
   else if (mode === 'titan-breaker') actionHandlers.get('titan-breaker')?.();
   else if (mode === 'inferno-run') actionHandlers.get('inferno-run')?.();
   else if (mode === 'nightfall-survival') actionHandlers.get('nightfall-survival')?.();
+  else if (mode === 'rift-racer') actionHandlers.get('rift-racer')?.();
   else actionHandlers.get('arena')?.();
 });
 refreshDestinationButtons();
@@ -1090,6 +1132,7 @@ container.addEventListener('pointerdown', (event: PointerEvent) => {
   if (entity) hitArenaTarget(entity);
 });
 container.style.cursor = 'crosshair';
+window.addEventListener('keydown',(event)=>{if(event.key==='ArrowLeft'||event.key.toLowerCase()==='a')steerRace(-1);if(event.key==='ArrowRight'||event.key.toLowerCase()==='d')steerRace(1);});
 
 // Animate every live target so the arena feels like an active arcade game.
 // Targets drift across the play space, bob vertically, rotate and pulse.
@@ -1101,6 +1144,7 @@ class ArenaMotionSystem extends createSystem({
     const delta = Math.min(0.05, Math.max(0, time - arenaLastFrameTime));
     arenaLastFrameTime = time;
     if (!arenaActive || arenaPaused) return;
+    if(activeGameMode==='rift-racer'&&raceTrackActive){raceDistance+=delta*68;raceSpawnClock+=delta;if(raceSpawnClock>1.05){raceSpawnClock=0;spawnRaceObstacle();}if(raceCar)raceCar.rotation.z+=((raceLane-1)*-.11-raceCar.rotation.z)*Math.min(1,delta*7);for(let i=raceObjects.length-1;i>=0;i--){const item=raceObjects[i];item.mesh.position.z+=item.speed*delta;if(!item.passed&&item.mesh.position.z>.9){item.passed=true;if(item.lane===raceLane){arenaShield=Math.max(0,arenaShield-1);statusText(`CRASH! Shield ${arenaShield}/3 · change lanes!`);if(arenaShield<=0){stopArena('RACE WRECKED');return;}}else{arenaScore+=100;arenaHits++;}item.entity?.destroy?.();item.mesh.parent?.remove(item.mesh);item.mesh.geometry.dispose();(item.mesh.material as MeshStandardMaterial).dispose();raceObjects.splice(i,1);}}refreshQuestPanel();return;}
     this.queries.targets.entities.forEach((entity: any) => {
       const mesh = entity.object3D as Mesh | undefined;
       const motion = arenaMotion.get(entity.index);
