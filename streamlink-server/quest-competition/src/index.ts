@@ -700,38 +700,72 @@ function spawnArenaTarget() {
     mesh.add(aura);
   }
   if (isGroundCombat) {
-    // Ground-based hostile units: a torso, helmet, shoulders, arms and legs.
-    // These are physical combatants on the arena floor, not floating target props.
-    const armor = new MeshStandardMaterial({ color: activeGameMode === 'nightfall-survival' ? 0x351a2b : 0x26364a, metalness: 0.62, roughness: 0.34 });
-    const trim = new MeshStandardMaterial({ color: 0xff633d, emissive: 0x65120b, emissiveIntensity: 0.55, metalness: 0.5, roughness: 0.3 });
-    const helmet = new Mesh(new SphereGeometry(0.22, 16, 12), armor);
-    helmet.position.set(0, 0.57, 0.015); mesh.add(helmet);
-    const visor = new Mesh(new BoxGeometry(0.27, 0.075, 0.055), new MeshBasicMaterial({ color: 0xffb84d }));
-    visor.position.set(0, 0.59, 0.19); mesh.add(visor);
+    // Human raiders: visible skin, faces, hair, tactical clothing and natural proportions.
+    const skin = new MeshStandardMaterial({ color: 0xb87955, roughness: 0.82, metalness: 0.02 });
+    const skinLight = new MeshStandardMaterial({ color: 0xd49a72, roughness: 0.86 });
+    const clothing = new MeshStandardMaterial({ color: activeGameMode === 'nightfall-survival' ? 0x292b35 : 0x35483b, roughness: 0.9, metalness: 0.04 });
+    const clothDark = new MeshStandardMaterial({ color: 0x171d24, roughness: 0.94 });
+    const vest = new MeshStandardMaterial({ color: 0x5b4937, roughness: 0.86, metalness: 0.06 });
+    const trim = new MeshStandardMaterial({ color: 0xb94d32, emissive: 0x351008, emissiveIntensity: 0.22, roughness: 0.65 });
+    const eyeWhite = new MeshBasicMaterial({ color: 0xf2e7d6 });
+    const pupil = new MeshBasicMaterial({ color: 0x171313 });
+
+    // Torso, neck and head form a recognisably human silhouette.
+    const torso = new Mesh(new BoxGeometry(0.48, 0.62, 0.27), clothing);
+    torso.position.set(0, 0.03, 0); mesh.add(torso);
+    const neck = new Mesh(new BoxGeometry(0.16, 0.16, 0.16), skin);
+    neck.position.set(0, 0.39, 0.025); mesh.add(neck);
+    const head = new Mesh(new SphereGeometry(0.205, 20, 16), skin);
+    head.scale.set(0.88, 1.12, 0.92);
+    head.position.set(0, 0.59, 0.035); mesh.add(head);
+    const hair = new Mesh(new SphereGeometry(0.19, 16, 12), clothDark);
+    hair.scale.set(1.02, 0.55, 1.02);
+    hair.position.set(0, 0.735, 0.015); mesh.add(hair);
+    const hairBack = new Mesh(new BoxGeometry(0.29, 0.18, 0.12), clothDark);
+    hairBack.position.set(0, 0.62, -0.12); mesh.add(hairBack);
     for (const side of [-1, 1]) {
-      const shoulder = new Mesh(new BoxGeometry(0.23, 0.22, 0.28), armor);
-      shoulder.position.set(side * 0.34, 0.25, 0); mesh.add(shoulder);
-      const arm = new Mesh(new BoxGeometry(0.15, 0.48, 0.17), armor);
-      arm.position.set(side * 0.37, -0.03, 0.02); arm.rotation.z = side * -0.10; mesh.add(arm);
-      const leg = new Mesh(new BoxGeometry(0.18, 0.48, 0.22), armor);
-      leg.position.set(side * 0.14, -0.62, 0); mesh.add(leg);
-      const boot = new Mesh(new BoxGeometry(0.2, 0.12, 0.32), trim);
-      boot.position.set(side * 0.14, -0.89, 0.045); mesh.add(boot);
+      const ear = new Mesh(new SphereGeometry(0.045, 10, 8), skinLight);
+      ear.position.set(side * 0.18, 0.58, 0.025); mesh.add(ear);
+      const eye = new Mesh(new SphereGeometry(0.025, 10, 8), eyeWhite);
+      eye.position.set(side * 0.075, 0.625, 0.205); mesh.add(eye);
+      const iris = new Mesh(new SphereGeometry(0.012, 8, 6), pupil);
+      iris.position.set(side * 0.075, 0.625, 0.227); mesh.add(iris);
+      const shoulder = new Mesh(new SphereGeometry(0.14, 12, 10), clothing);
+      shoulder.position.set(side * 0.29, 0.25, 0); mesh.add(shoulder);
+      const upperArm = new Mesh(new BoxGeometry(0.14, 0.31, 0.16), clothing);
+      upperArm.position.set(side * 0.34, 0.055, 0.025); upperArm.rotation.z = side * -0.12; mesh.add(upperArm);
+      const forearm = new Mesh(new BoxGeometry(0.12, 0.27, 0.14), clothing);
+      forearm.position.set(side * 0.32, -0.19, 0.14); forearm.rotation.x = -0.42; mesh.add(forearm);
+      const hand = new Mesh(new SphereGeometry(0.075, 12, 10), skinLight);
+      hand.position.set(side * 0.30, -0.32, 0.24); mesh.add(hand);
+      const thigh = new Mesh(new BoxGeometry(0.19, 0.34, 0.22), clothing);
+      thigh.position.set(side * 0.13, -0.43, 0); mesh.add(thigh);
+      const lowerLeg = new Mesh(new BoxGeometry(0.16, 0.31, 0.18), clothDark);
+      lowerLeg.position.set(side * 0.13, -0.72, 0.015); mesh.add(lowerLeg);
+      const boot = new Mesh(new BoxGeometry(0.19, 0.13, 0.31), clothDark);
+      boot.position.set(side * 0.13, -0.91, 0.07); mesh.add(boot);
     }
-    const chest = new Mesh(new BoxGeometry(0.31, 0.24, 0.07), trim);
-    chest.position.set(0, 0.08, 0.19); mesh.add(chest);
-    const combatArms: Mesh[] = [];
+
+    // Chest rig, straps, pouches and belt make them read as human combatants.
+    const rig = new Mesh(new BoxGeometry(0.39, 0.39, 0.075), vest);
+    rig.position.set(0, 0.075, 0.17); mesh.add(rig);
     for (const side of [-1, 1]) {
-      const arm = mesh.children.find((part: any) => part.geometry?.type === 'BoxGeometry' && Math.abs(part.position.x - side * 0.37) < 0.02) as Mesh | undefined;
-      if (arm) combatArms.push(arm);
+      const pouch = new Mesh(new BoxGeometry(0.105, 0.13, 0.085), clothDark);
+      pouch.position.set(side * 0.105, -0.035, 0.225); mesh.add(pouch);
     }
-    const rifle = new Mesh(new BoxGeometry(0.11, 0.12, 0.62), new MeshStandardMaterial({ color: 0x151b29, metalness: 0.85, roughness: 0.22 }));
-    rifle.position.set(0.43, -0.10, 0.36); mesh.add(rifle);
-    const muzzle = new Mesh(new SphereGeometry(0.075, 10, 8), new MeshBasicMaterial({ color: 0xff542e }));
-    muzzle.position.set(0.43, -0.10, 0.69); mesh.add(muzzle);
-    mesh.userData.combatArms = combatArms;
+    const belt = new Mesh(new BoxGeometry(0.47, 0.09, 0.29), clothDark);
+    belt.position.set(0, -0.22, 0); mesh.add(belt);
+
+    // A compact rifle is held in front; muzzle flash remains visible during attack.
+    const rifle = new Mesh(new BoxGeometry(0.10, 0.105, 0.52), clothDark);
+    rifle.position.set(0.13, -0.105, 0.39); mesh.add(rifle);
+    const barrel = new Mesh(new BoxGeometry(0.045, 0.045, 0.22), vest);
+    barrel.position.set(0.13, -0.10, 0.74); mesh.add(barrel);
+    const muzzle = new Mesh(new SphereGeometry(0.055, 10, 8), new MeshBasicMaterial({ color: 0xff542e }));
+    muzzle.position.set(0.13, -0.10, 0.86); mesh.add(muzzle);
+    mesh.userData.combatArms = [];
     mesh.userData.muzzle = muzzle;
-    mesh.scale.setScalar(activeGameMode === 'nightfall-survival' || activeGameMode === 'last-stand' ? 1.18 : 1.0);
+    mesh.scale.setScalar(activeGameMode === 'nightfall-survival' || activeGameMode === 'last-stand' ? 1.12 : 1.0);
   }
   if (isDrone && !isGroundCombat) {
     if (activeGameMode === 'nightfall-survival') mesh.scale.setScalar(1.9);
