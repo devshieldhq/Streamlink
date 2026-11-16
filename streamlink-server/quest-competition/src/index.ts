@@ -1,5 +1,5 @@
 import {
-  BoxGeometry, CanvasTexture, createComponent, createSystem, DirectionalLight, EnvironmentType, Group, LocomotionEnvironment, Mesh, MeshBasicMaterial,
+  BoxGeometry, CanvasTexture, ConeGeometry, IcosahedronGeometry, OctahedronGeometry, createComponent, createSystem, DirectionalLight, EnvironmentType, Group, LocomotionEnvironment, Mesh, MeshBasicMaterial,
   MeshStandardMaterial, OneHandGrabbable, PlaneGeometry, PokeInteractable, Pressed, RayInteractable,
   SphereGeometry, TorusGeometry, Types, Vector2, Vector3, Raycaster, Quaternion, World
 } from '@iwsdk/core';
@@ -655,10 +655,43 @@ function spawnArenaTarget() {
   const targetRadius = activeGameMode === 'titan-breaker' ? 0.34 : activeGameMode === 'meteor-blitz' || activeGameMode === 'inferno-run' ? 0.135 : activeGameMode === 'phantom-hunt' ? 0.105 : Math.max(0.14, 0.24 - (arenaWave - 1) * 0.012);
   const spread = Math.min(1.35, 0.72 + (arenaWave - 1) * 0.08);
   const droneMaterial = new MeshStandardMaterial({ color, emissive: color, emissiveIntensity: 1.15, roughness: 0.2, metalness: 0.32 });
-  const mesh = new Mesh(
-    isDrone ? new BoxGeometry(0.34, 0.14, 0.24) : activeGameMode === 'zero-g-rush' ? new TorusGeometry(0.19, 0.065, 12, 28) : new SphereGeometry(targetRadius, 28, 20),
-    droneMaterial,
-  );
+  const geometry = activeGameMode === 'titan-breaker'
+    ? new BoxGeometry(0.68, 0.86, 0.38)
+    : activeGameMode === 'inferno-run' || activeGameMode === 'meteor-blitz'
+      ? new IcosahedronGeometry(targetRadius * 1.55, 1)
+      : activeGameMode === 'phantom-hunt'
+        ? new OctahedronGeometry(targetRadius * 1.65, 0)
+        : isDrone ? new BoxGeometry(0.34, 0.14, 0.24)
+          : activeGameMode === 'zero-g-rush' ? new TorusGeometry(0.19, 0.065, 12, 28)
+            : new SphereGeometry(targetRadius, 28, 20);
+  const mesh = new Mesh(geometry, droneMaterial);
+  if (activeGameMode === 'titan-breaker') {
+    const armor = new MeshStandardMaterial({ color: 0x4c5268, metalness: 0.88, roughness: 0.22 });
+    const eye = new Mesh(new SphereGeometry(0.09, 16, 12), new MeshBasicMaterial({ color: 0xff3b1f }));
+    eye.position.set(0, 0.13, 0.22);
+    mesh.add(eye);
+    for (const side of [-1, 1]) {
+      const arm = new Mesh(new BoxGeometry(0.2, 0.62, 0.22), armor);
+      arm.position.set(side * 0.43, -0.08, 0);
+      mesh.add(arm);
+      const fist = new Mesh(new BoxGeometry(0.24, 0.22, 0.28), droneMaterial);
+      fist.position.set(side * 0.45, -0.43, 0.02);
+      mesh.add(fist);
+    }
+    const crown = new Mesh(new ConeGeometry(0.17, 0.3, 5), armor);
+    crown.position.set(0, 0.56, 0);
+    mesh.add(crown);
+  }
+  if (activeGameMode === 'inferno-run' || activeGameMode === 'meteor-blitz') {
+    const flame = new Mesh(new ConeGeometry(targetRadius * 0.9, targetRadius * 2.5, 7), new MeshBasicMaterial({ color: 0xff5a18 }));
+    flame.rotation.x = Math.PI / 2;
+    flame.position.z = 0.2;
+    mesh.add(flame);
+  }
+  if (activeGameMode === 'phantom-hunt') {
+    const aura = new Mesh(new TorusGeometry(targetRadius * 1.8, 0.012, 6, 24), new MeshBasicMaterial({ color: 0xe45bff }));
+    mesh.add(aura);
+  }
   if (isDrone) {
     const wingMaterial = new MeshStandardMaterial({ color: 0xffb84d, emissive: 0xff4d6d, emissiveIntensity: 0.65, metalness: 0.45, roughness: 0.25 });
     for (const side of [-1, 1]) {
