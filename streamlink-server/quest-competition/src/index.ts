@@ -818,7 +818,6 @@ makeQuestButton('RESET', 'reset', 0.42, 1.10, 0xff668c);
 makeQuestButton('PAUSE', 'pause', -0.51, 1.00, 0xffb84d);
 makeQuestButton('DEST', 'destination', -0.17, 1.00, 0x31d6ff);
 makeQuestButton('DRONES', 'drone-defense', 0.17, 1.00, 0xff668c);
-makeQuestButton('ROOM', 'environment', 0.51, 1.00, 0x31d6ff);
 makeQuestButton('DONE', 'destination', 0, 1.10, 0x42e6a4, destinationPanelEntity);
 
 // Desktop preview controls provide mouse-accessible equivalents to the 3D hand buttons.
