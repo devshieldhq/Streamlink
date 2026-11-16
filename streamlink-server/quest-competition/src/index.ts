@@ -919,6 +919,18 @@ registerQuestAction('quality', () => {
   refreshQuestPanel();
 });
 registerQuestAction('arena', startArena);
+const gameModes = ['orb-rush','drone-defense','meteor-blitz','phantom-hunt','zero-g-rush','last-stand','titan-breaker','inferno-run','nightfall-survival'] as const;
+registerQuestAction('next-game', () => {
+  const current = gameModes.indexOf(activeGameMode as typeof gameModes[number]);
+  const next = gameModes[(current + 1) % gameModes.length];
+  const selector = byId<HTMLSelectElement>('game-select');
+  if (selector) selector.value = next;
+  if (next === 'orb-rush') startArena();
+  else if (next === 'drone-defense') startDroneDefense();
+  else if (next === 'meteor-blitz') startMeteorBlitz();
+  else startExtraGame(next);
+  statusText(`GAME SELECTED · ${next.replaceAll('-', ' ').toUpperCase()} · use the game dropdown on desktop to jump directly to any mode.`);
+});
 registerQuestAction('drone-defense', startDroneDefense);
 registerQuestAction('meteor-blitz', startMeteorBlitz);
 registerQuestAction('phantom-hunt', () => startExtraGame('phantom-hunt'));
@@ -981,34 +993,18 @@ registerQuestAction('destination', () => {
 
 makeQuestButton('GO LIVE / STOP', 'stream', -0.42, 1.25, 0x42e6a4);
 makeQuestButton('QUALITY', 'quality', 0, 1.25, 0x31d6ff);
-makeQuestButton('ORB RUSH', 'arena', 0.42, 1.25, 0xffb84d);
+makeQuestButton('GAME SELECT', 'next-game', 0.42, 1.25, 0xffb84d);
 makeQuestButton('FOCUS', 'focus', -0.42, 1.10, 0x8b7bff);
 makeQuestButton('COMFORT', 'comfort', 0, 1.10, 0x42e6a4);
 makeQuestButton('RESET', 'reset', 0.42, 1.10, 0xff668c);
 makeQuestButton('PAUSE', 'pause', -0.51, 1.00, 0xffb84d);
 makeQuestButton('DEST', 'destination', -0.17, 1.00, 0x31d6ff);
-makeQuestButton('RIFT GUARD', 'drone-defense', 0.17, 1.00, 0xff668c);
-makeQuestButton('METEOR', 'meteor-blitz', 0.42, 1.00, 0xffb84d);
-makeQuestButton('PHANTOM', 'phantom-hunt', -0.42, 0.88, 0x9b5cff);
-makeQuestButton('ZERO-G', 'zero-g-rush', 0, 0.88, 0x19e6d2);
-makeQuestButton('LAST STAND', 'last-stand', 0.42, 0.88, 0xff4d6d);
-makeQuestButton('TITAN', 'titan-breaker', -0.42, 0.76, 0xffb000);
-makeQuestButton('INFERNO', 'inferno-run', 0, 0.76, 0xff542e);
-makeQuestButton('NIGHTFALL', 'nightfall-survival', 0.42, 0.76, 0x8b5cff);
+makeQuestButton('NEXT GAME', 'next-game', 0.17, 1.00, 0x31d6ff);
 makeQuestButton('DONE', 'destination', 0, 1.10, 0x42e6a4, destinationPanelEntity);
 
 // Desktop preview controls provide mouse-accessible equivalents to the 3D hand buttons.
-byId<HTMLButtonElement>('desktop-arena')?.addEventListener('click', () => actionHandlers.get('arena')?.());
 byId<HTMLButtonElement>('desktop-pause')?.addEventListener('click', () => actionHandlers.get('pause')?.());
 byId<HTMLButtonElement>('desktop-reset')?.addEventListener('click', () => actionHandlers.get('reset')?.());
-byId<HTMLButtonElement>('desktop-defense')?.addEventListener('click', () => actionHandlers.get('drone-defense')?.());
-byId<HTMLButtonElement>('desktop-meteor')?.addEventListener('click', () => actionHandlers.get('meteor-blitz')?.());
-byId<HTMLButtonElement>('desktop-phantom')?.addEventListener('click', () => actionHandlers.get('phantom-hunt')?.());
-byId<HTMLButtonElement>('desktop-zero-g')?.addEventListener('click', () => actionHandlers.get('zero-g-rush')?.());
-byId<HTMLButtonElement>('desktop-last-stand')?.addEventListener('click', () => actionHandlers.get('last-stand')?.());
-byId<HTMLButtonElement>('desktop-titan')?.addEventListener('click', () => actionHandlers.get('titan-breaker')?.());
-byId<HTMLButtonElement>('desktop-inferno')?.addEventListener('click', () => actionHandlers.get('inferno-run')?.());
-byId<HTMLButtonElement>('desktop-nightfall')?.addEventListener('click', () => actionHandlers.get('nightfall-survival')?.());
 byId<HTMLSelectElement>('game-select')?.addEventListener('change', (event) => {
   const mode = (event.currentTarget as HTMLSelectElement).value;
   if (mode === 'drone-defense') actionHandlers.get('drone-defense')?.();
