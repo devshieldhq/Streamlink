@@ -1339,6 +1339,30 @@ makeQuestButton('STEER RIGHT','race-right',0.45,0.82,0xffb84d);
 byId<HTMLButtonElement>('desktop-pause')?.addEventListener('click', () => actionHandlers.get('pause')?.());
 byId<HTMLButtonElement>('desktop-reset')?.addEventListener('click', () => actionHandlers.get('reset')?.());
 window.addEventListener('keydown',(event)=>{if(event.key==='ArrowLeft'||event.key.toLowerCase()==='a'){event.preventDefault();steerRace(-1);}if(event.key==='ArrowRight'||event.key.toLowerCase()==='d'){event.preventDefault();steerRace(1);}});
+// Desktop mouse/touch drag lets players physically reposition and aim the first-person rifle.
+let gunDragPointer:number|null=null;
+let gunDragLastX=0, gunDragLastY=0;
+container.addEventListener('pointerdown',(event)=>{
+  if(!arenaActive||!isShooterMode()||!firstPersonGun.visible)return;
+  gunDragPointer=event.pointerId;
+  gunDragLastX=event.clientX; gunDragLastY=event.clientY;
+  try{container.setPointerCapture(event.pointerId);}catch{}
+});
+container.addEventListener('pointermove',(event)=>{
+  if(gunDragPointer!==event.pointerId)return;
+  const dx=event.clientX-gunDragLastX, dy=event.clientY-gunDragLastY;
+  gunDragLastX=event.clientX; gunDragLastY=event.clientY;
+  firstPersonGun.position.x=Math.max(-0.42,Math.min(0.62,firstPersonGun.position.x+dx*0.0024));
+  firstPersonGun.position.y=Math.max(-0.62,Math.min(-0.12,firstPersonGun.position.y-dy*0.0024));
+  firstPersonGun.rotation.y=Math.max(-0.48,Math.min(0.48,firstPersonGun.rotation.y-dx*0.0018));
+  firstPersonGun.rotation.x=Math.max(-0.28,Math.min(0.28,firstPersonGun.rotation.x-dy*0.0018));
+});
+const releaseGunDrag=(event:PointerEvent)=>{
+  if(gunDragPointer!==event.pointerId)return;
+  gunDragPointer=null;
+};
+container.addEventListener('pointerup',releaseGunDrag);
+container.addEventListener('pointercancel',releaseGunDrag);
 let raceDragX:number|null=null;
 container.addEventListener('pointerdown',(event)=>{if(activeGameMode==='rift-racer'&&arenaActive)raceDragX=event.clientX;});
 container.addEventListener('pointerup',(event)=>{if(raceDragX!==null&&activeGameMode==='rift-racer'&&arenaActive){const dx=event.clientX-raceDragX;if(Math.abs(dx)>22)steerRace(dx>0?1:-1);raceDragX=null;}});
