@@ -20,7 +20,8 @@ const byId = <T extends HTMLElement>(id: string) => document.getElementById(id) 
 const container = byId<HTMLDivElement>('scene-container');
 const enterButton = byId<HTMLButtonElement>('enter-xr');
 const status = byId<HTMLDivElement>('status');
-const statusText = (message: string) => { if (status) status.textContent = message; };
+let vrNoticeUpdater: ((message: string) => void) | null = null;
+const statusText = (message: string) => { if (status) status.textContent = message; vrNoticeUpdater?.(message); };
 const apiFetch = (url: string, options: RequestInit = {}) =>
   window.SLAuth?.enabled ? window.SLAuth.fetch(url, options) : fetch(url, options);
 const socketOptions = () => window.SLAuth?.socketOptions?.() || { transports: ['websocket'] };
@@ -40,6 +41,24 @@ const arenaShellMaterial = new MeshBasicMaterial({ color: 0x101b35 });
 const arenaAccentMaterial = new MeshBasicMaterial({ color: 0x16d9ff });
 const arenaPurpleMaterial = new MeshBasicMaterial({ color: 0x6c55ff });
 const arenaFloorLineMaterial = new MeshBasicMaterial({ color: 0x174c79 });
+const arenaEnvironmentSelect = byId<HTMLSelectElement>('environment-select');
+const arenaEnvironmentPalettes: Record<string, { shell: number; accent: number; purple: number; floor: number; background: number }> = {
+  neon: { shell: 0x101b35, accent: 0x16d9ff, purple: 0x6c55ff, floor: 0x101a31, background: 0x080d20 },
+  sunset: { shell: 0x32182b, accent: 0xffa45b, purple: 0xff4f91, floor: 0x24172b, background: 0x160b20 },
+  arctic: { shell: 0x142c3b, accent: 0x8af4ff, purple: 0x6c9dff, floor: 0x102536, background: 0x071624 },
+  cosmic: { shell: 0x17112e, accent: 0xc18bff, purple: 0xff63c3, floor: 0x100d25, background: 0x070615 },
+};
+function setArenaEnvironment(name: string) {
+  const palette = arenaEnvironmentPalettes[name] || arenaEnvironmentPalettes.neon;
+  arenaShellMaterial.color.setHex(palette.shell);
+  arenaAccentMaterial.color.setHex(palette.accent);
+  arenaPurpleMaterial.color.setHex(palette.purple);
+  arenaFloorLineMaterial.color.setHex(palette.accent);
+  (floor.material as MeshStandardMaterial).color.setHex(palette.floor);
+  if (container) container.style.background = `#${palette.background.toString(16).padStart(6, '0')}`;
+  statusText(`Environment changed to ${name}.`);
+}
+arenaEnvironmentSelect?.addEventListener('change', () => setArenaEnvironment(arenaEnvironmentSelect.value));
 const addArenaMesh = (geometry: any, material: any, position: [number, number, number], rotation?: [number, number, number]) => {
   const mesh = new Mesh(geometry, material);
   // Register first: IWSDK binds Object3D transforms to ECS storage here.
@@ -109,7 +128,7 @@ const stage = new Mesh(
 );
 const stageEntity = world.createTransformEntity(stage, { persistent: true });
 stageEntity.object3D!.position.set(0, 0.02, -2.2);
-stageEntity.addComponent(OneHandGrabbable, { rotate: true, translate: true });
+stageEntity.addComponent(RayInteractable).addComponent(OneHandGrabbable, { rotate: true, translate: true });
 
 const colors = [0x31d6ff, 0x8b7bff, 0xffb84d, 0x42e6a4, 0xff668c];
 const arenaTargets: Mesh[] = [];
@@ -458,7 +477,8 @@ let arenaHits = 0;
 let arenaCombo = 0;
 let arenaBestCombo = 0;
 let arenaWave = 1;
-const ARENA_GOAL = 15;
+let arenaGoal = 15;
+let activeGameMode: 'orb-rush' | 'drone-defense' = 'orb-rush';
 let arenaSeconds = 45;
 let arenaDeadline = 0;
 let arenaTimer: number | null = null;
@@ -480,7 +500,7 @@ const panelMesh = new Mesh(new PlaneGeometry(1.45, 0.90), panelMaterial);
 panelMesh.userData.label = 'StreamLink Quest Studio control panel';
 const panelEntity = world.createTransformEntity(panelMesh, { persistent: true });
 panelEntity.object3D!.position.set(0, 1.5, -1.55);
-panelEntity.addComponent(OneHandGrabbable, { rotate: true, translate: true });
+panelEntity.addComponent(RayInteractable).addComponent(OneHandGrabbable, { rotate: true, translate: true });
 
 const destinationPanelGroup = new Group();
 destinationPanelGroup.visible = false;
@@ -519,13 +539,19 @@ function drawQuestPanel() {
   ctx.fillStyle = '#42e6a4'; ctx.font = 'bold 30px Inter, sans-serif';
   ctx.fillText(`SCORE ${arenaScore}   WAVE ${arenaWave}   COMBO x${Math.min(5, 1 + Math.floor(Math.max(0, arenaCombo - 1) / 3))}   TIME ${arenaSeconds}s`, 48, 276);
   ctx.fillStyle = '#aab8d2'; ctx.font = '21px Inter, sans-serif';
-  ctx.fillText(`ARENA OBJECTIVE  ${arenaHits}/${ARENA_GOAL} targets · best combo ${arenaBestCombo}`, 48, 330);
+  ctx.fillText(`ARENA OBJECTIVE  ${arenaHits}/${arenaGoal} targets · best combo ${arenaBestCombo}`, 48, 330);
   ctx.fillText('Pinch or poke targets. Every 5 hits advances the wave and raises the challenge.', 48, 365);
   ctx.fillText(`DESTINATIONS  ${selectedDestinationNames.size} selected · use ADD DEST to choose platforms`, 48, 410);
-  ctx.fillText('Use the physical headset menu to exit the immersive session.', 48, 450);
+  ctx.fillText(activeGameMode === 'drone-defense' ? 'DRONE DEFENSE · stop the incoming drones!' : 'ORB RUSH · pinch or poke glowing targets.', 48, 450);
+  ctx.fillStyle = '#d8e7ff'; ctx.font = 'bold 20px Inter, sans-serif';
+  ctx.fillText(`STATUS  ${questNotice.slice(0, 90)}`, 48, 570);
+  ctx.fillStyle = '#8198c4'; ctx.font = '18px Inter, sans-serif';
+  ctx.fillText('Aim with a controller ray or hand pointer, then pinch / press to interact.', 48, 605);
   panelTexture.needsUpdate = true;
 }
+let questNotice = 'Studio ready.';
 function refreshQuestPanel() { drawQuestPanel(); }
+vrNoticeUpdater = (message: string) => { questNotice = message; refreshQuestPanel(); };
 
 function makeQuestButton(label: string, action: string, x: number, y: number, color: number, parent: any = panelEntity) {
   const canvas = document.createElement('canvas');
@@ -621,7 +647,7 @@ function refreshDestinationButtons() {
   destinationTexture.needsUpdate = true;
 }
 function spawnArenaTarget() {
-  const color = [0x31d6ff, 0x8b7bff, 0xffb84d, 0x42e6a4, 0xff668c][Math.floor(Math.random() * 5)];
+  const color = activeGameMode === 'drone-defense' ? [0xff4d6d, 0xff8a3d, 0xffd166][Math.floor(Math.random() * 3)] : [0x31d6ff, 0x8b7bff, 0xffb84d, 0x42e6a4, 0xff668c][Math.floor(Math.random() * 5)];
   const targetRadius = Math.max(0.075, 0.13 - (arenaWave - 1) * 0.012);
   const spread = Math.min(0.9, 0.4 + (arenaWave - 1) * 0.08);
   const mesh = new Mesh(
@@ -663,6 +689,8 @@ function stopArena(message = 'Arena complete') {
 }
 function startArena() {
   if (arenaActive) { stopArena('Arena stopped'); return; }
+  activeGameMode = 'orb-rush';
+  arenaGoal = 15;
   arenaActive = true;
   arenaPaused = false;
   arenaScore = 0;
@@ -681,6 +709,24 @@ function startArena() {
     else refreshQuestPanel();
   }, 250);
   statusText(`VR Arena started · hit ${ARENA_GOAL} targets in 45 seconds. Build combos for bonus points.`);
+  refreshQuestPanel();
+}
+function startDroneDefense() {
+  if (arenaActive) stopArena('Previous game ended');
+  activeGameMode = 'drone-defense';
+  arenaGoal = 20;
+  arenaActive = true;
+  arenaPaused = false;
+  arenaScore = 0; arenaHits = 0; arenaCombo = 0; arenaBestCombo = 0; arenaWave = 1;
+  arenaSeconds = 60; arenaDeadline = Date.now() + 60000;
+  clearArena();
+  for (let i = 0; i < 6; i++) spawnArenaTarget();
+  if (arenaTimer !== null) window.clearInterval(arenaTimer);
+  arenaTimer = window.setInterval(() => {
+    arenaSeconds = Math.max(0, Math.ceil((arenaDeadline - Date.now()) / 1000));
+    if (arenaSeconds <= 0) stopArena('Defense time expired'); else refreshQuestPanel();
+  }, 250);
+  statusText('Drone Defense started · intercept 20 incoming drones in 60 seconds.');
   refreshQuestPanel();
 }
 function pauseArena() {
@@ -729,6 +775,7 @@ registerQuestAction('quality', () => {
   refreshQuestPanel();
 });
 registerQuestAction('arena', startArena);
+registerQuestAction('drone-defense', startDroneDefense);
 registerQuestAction('pause', pauseArena);
 registerQuestAction('focus', () => {
   focusMode = !focusMode;
@@ -783,7 +830,8 @@ registerQuestAction('destination', () => {
 
 makeQuestButton('GO LIVE / STOP', 'stream', -0.42, 1.25, 0x42e6a4);
 makeQuestButton('QUALITY', 'quality', 0, 1.25, 0x31d6ff);
-makeQuestButton('VR ARENA', 'arena', 0.42, 1.25, 0xffb84d);
+makeQuestButton('ORB RUSH', 'arena', 0.42, 1.25, 0xffb84d);
+makeQuestButton('DRONE DEFENSE', 'drone-defense', 0, 0.88, 0xff668c);
 makeQuestButton('FOCUS', 'focus', -0.42, 1.10, 0x8b7bff);
 makeQuestButton('COMFORT', 'comfort', 0, 1.10, 0x42e6a4);
 makeQuestButton('RESET', 'reset', 0.42, 1.10, 0xff668c);
@@ -795,6 +843,7 @@ makeQuestButton('DONE', 'destination', 0, 1.10, 0x42e6a4, destinationPanelEntity
 byId<HTMLButtonElement>('desktop-arena')?.addEventListener('click', () => actionHandlers.get('arena')?.());
 byId<HTMLButtonElement>('desktop-pause')?.addEventListener('click', () => actionHandlers.get('pause')?.());
 byId<HTMLButtonElement>('desktop-reset')?.addEventListener('click', () => actionHandlers.get('reset')?.());
+byId<HTMLButtonElement>('desktop-defense')?.addEventListener('click', () => actionHandlers.get('drone-defense')?.());
 refreshDestinationButtons();
 platformList?.addEventListener('input', refreshDestinationButtons);
 
@@ -836,14 +885,14 @@ class QuestInteractionSystem extends createSystem({
       const multiplier = Math.min(5, 1 + Math.floor((arenaCombo - 1) / 3));
       const points = 10 * multiplier;
       arenaScore += points;
-      if (arenaHits % 5 === 0 && arenaHits < ARENA_GOAL) {
+      if (arenaHits % 5 === 0 && arenaHits < arenaGoal) {
         arenaWave += 1;
         arenaCombo = 0;
         statusText(`Wave ${arenaWave}! Targets are smaller and more spread out. Score: ${arenaScore}`);
       } else {
         statusText(`Target hit! +${points} · combo x${multiplier} · ${arenaHits}/${ARENA_GOAL}`);
       }
-      if (arenaHits >= ARENA_GOAL) stopArena('Arena cleared');
+      if (arenaHits >= arenaGoal) stopArena('Arena cleared');
       else spawnArenaTarget();
       refreshQuestPanel();
     });
