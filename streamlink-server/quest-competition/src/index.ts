@@ -495,7 +495,7 @@ const panelCtx = panelCanvas.getContext('2d');
 if (!panelCtx) throw new Error('Could not create Quest Studio panel canvas');
 const panelTexture = new CanvasTexture(panelCanvas);
 const panelMaterial = new MeshBasicMaterial({ map: panelTexture, transparent: true });
-const panelMesh = new Mesh(new PlaneGeometry(1.45, 0.90), panelMaterial);
+const panelMesh = new Mesh(new PlaneGeometry(1.75, 1.10), panelMaterial);
 panelMesh.userData.label = 'StreamLink Quest Studio control panel';
 const panelEntity = world.createTransformEntity(panelMesh, { persistent: true });
 panelEntity.object3D!.position.set(0, 1.5, -1.55);
@@ -564,7 +564,7 @@ function makeQuestButton(label: string, action: string, x: number, y: number, co
   ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
   ctx.fillText(label, 256, 90);
   const texture = new CanvasTexture(canvas);
-  const mesh = new Mesh(new PlaneGeometry(0.34, 0.13), new MeshBasicMaterial({ map: texture, transparent: true }));
+  const mesh = new Mesh(new PlaneGeometry(0.38, 0.14), new MeshBasicMaterial({ map: texture, transparent: true }));
   mesh.userData.action = action;
   const entity = world.createTransformEntity(mesh, { parent });
   entity.object3D!.position.set(x, y - 1.45, 0.025);
