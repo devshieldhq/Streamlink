@@ -538,7 +538,7 @@ function drawQuestPanel() {
   ctx.fillText(`Quality: ${currentQuality.toUpperCase()}     Arena: ${arenaActive ? (arenaPaused ? 'PAUSED' : 'PLAYING') : 'READY'}`, 48, 218);
   ctx.fillStyle = '#42e6a4'; ctx.font = 'bold 30px Inter, sans-serif';
   ctx.fillText(`SCORE ${arenaScore}   WAVE ${arenaWave}   COMBO x${Math.min(5, 1 + Math.floor(Math.max(0, arenaCombo - 1) / 3))}   TIME ${arenaSeconds}s`, 48, 276);
-  ctx.fillStyle = activeGameMode === 'drone-defense' ? (arenaShield > 1 ? '#42e6a4' : '#ff668c') : '#8198c4';
+  ctx.fillStyle = activeGameMode === 'drone-defense' || activeGameMode === 'last-stand' || activeGameMode === 'nightfall-survival' ? (arenaShield > 1 ? '#42e6a4' : '#ff668c') : '#8198c4';
   ctx.font = 'bold 22px Inter, sans-serif';
   ctx.fillText(activeGameMode === 'drone-defense' || activeGameMode === 'last-stand' || activeGameMode === 'nightfall-survival' ? `SHIELD INTEGRITY  ${'◆ '.repeat(arenaShield)}${'◇ '.repeat(3 - arenaShield)}` : 'ARCADE CHALLENGE · HIT TARGETS TO BUILD YOUR COMBO', 48, 306);
   ctx.fillStyle = '#aab8d2'; ctx.font = '21px Inter, sans-serif';
@@ -867,7 +867,7 @@ function startExtraGame(mode: 'phantom-hunt' | 'zero-g-rush' | 'last-stand' | 't
   if (arenaTimer !== null) window.clearInterval(arenaTimer);
   arenaTimer = window.setInterval(() => {
     arenaSeconds = Math.max(0, Math.ceil((arenaDeadline - Date.now()) / 1000));
-    if (arenaSeconds <= 0) stopArena(mode === 'last-stand' ? 'LAST STAND survived' : 'Challenge complete');
+    if (arenaSeconds <= 0) stopArena(mode === 'last-stand' || mode === 'nightfall-survival' ? 'SURVIVAL COMPLETE' : 'Challenge complete');
     else refreshQuestPanel();
   }, 250);
   statusText(config.intro);
