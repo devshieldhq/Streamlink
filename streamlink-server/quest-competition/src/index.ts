@@ -478,7 +478,7 @@ let arenaWave = 1;
 let arenaGoal = 15;
 let arenaShield = 3;
 let arenaLastFrameTime = performance.now() / 1000;
-let activeGameMode: 'orb-rush' | 'drone-defense' | 'meteor-blitz' | 'phantom-hunt' | 'zero-g-rush' | 'last-stand' = 'orb-rush';
+let activeGameMode: 'orb-rush' | 'drone-defense' | 'meteor-blitz' | 'phantom-hunt' | 'zero-g-rush' | 'last-stand' | 'titan-breaker' | 'inferno-run' | 'nightfall-survival' = 'orb-rush';
 let arenaSeconds = 45;
 let arenaDeadline = 0;
 let arenaTimer: number | null = null;
@@ -540,12 +540,12 @@ function drawQuestPanel() {
   ctx.fillText(`SCORE ${arenaScore}   WAVE ${arenaWave}   COMBO x${Math.min(5, 1 + Math.floor(Math.max(0, arenaCombo - 1) / 3))}   TIME ${arenaSeconds}s`, 48, 276);
   ctx.fillStyle = activeGameMode === 'drone-defense' ? (arenaShield > 1 ? '#42e6a4' : '#ff668c') : '#8198c4';
   ctx.font = 'bold 22px Inter, sans-serif';
-  ctx.fillText(activeGameMode === 'drone-defense' || activeGameMode === 'last-stand' ? `SHIELD INTEGRITY  ${'◆ '.repeat(arenaShield)}${'◇ '.repeat(3 - arenaShield)}` : 'ARCADE CHALLENGE · HIT TARGETS TO BUILD YOUR COMBO', 48, 306);
+  ctx.fillText(activeGameMode === 'drone-defense' || activeGameMode === 'last-stand' || activeGameMode === 'nightfall-survival' ? `SHIELD INTEGRITY  ${'◆ '.repeat(arenaShield)}${'◇ '.repeat(3 - arenaShield)}` : 'ARCADE CHALLENGE · HIT TARGETS TO BUILD YOUR COMBO', 48, 306);
   ctx.fillStyle = '#aab8d2'; ctx.font = '21px Inter, sans-serif';
   ctx.fillText(`ARENA OBJECTIVE  ${arenaHits}/${arenaGoal} targets · best combo ${arenaBestCombo}`, 48, 330);
   ctx.fillText('Track the moving targets. Pinch or poke to score; every 5 hits advances the wave.', 48, 365);
   ctx.fillText(`DESTINATIONS  ${selectedDestinationNames.size} selected · use ADD DEST to choose platforms`, 48, 410);
-  const gameLabel = ({ 'orb-rush': 'ORB RUSH · warm-up arcade challenge.', 'drone-defense': 'RIFT GUARD · protect the core from incoming attack craft.', 'meteor-blitz': 'METEOR BLITZ · smash the incoming meteor storm.', 'phantom-hunt': 'PHANTOM HUNT · precision shots on unstable spectres.', 'zero-g-rush': 'ZERO-G RUSH · chase spinning energy gates.', 'last-stand': 'LAST STAND · defend the core through enemy waves.' } as Record<string, string>)[activeGameMode];
+  const gameLabel = ({ 'orb-rush': 'ORB RUSH · warm-up arcade challenge.', 'drone-defense': 'RIFT GUARD · protect the core from incoming attack craft.', 'meteor-blitz': 'METEOR BLITZ · smash the incoming meteor storm.', 'phantom-hunt': 'PHANTOM HUNT · precision shots on unstable spectres.', 'zero-g-rush': 'ZERO-G RUSH · chase spinning energy gates.', 'last-stand': 'LAST STAND · defend the core through enemy waves.', 'titan-breaker': 'TITAN BREAKER · smash the colossal targets before time runs out.', 'inferno-run': 'INFERNO RUN · intercept the firestorm before it reaches you.', 'nightfall-survival': 'NIGHTFALL SURVIVAL · hold the line against relentless night drones.' } as Record<string, string>)[activeGameMode];
   ctx.fillText(gameLabel, 48, 450);
   ctx.fillStyle = '#8198c4'; ctx.font = '18px Inter, sans-serif';
   ctx.fillText('MOVING TARGETS · hand pinch / controller trigger · combos multiply your score', 48, 605);
@@ -649,10 +649,10 @@ function refreshDestinationButtons() {
   destinationTexture.needsUpdate = true;
 }
 function spawnArenaTarget() {
-  const isSiege = activeGameMode === 'drone-defense' || activeGameMode === 'last-stand';
-  const color = isSiege ? [0xff4d6d, 0xff8a3d, 0xffd166][Math.floor(Math.random() * 3)] : activeGameMode === 'meteor-blitz' ? [0xff5b35, 0xffc247, 0xff3d81][Math.floor(Math.random() * 3)] : activeGameMode === 'phantom-hunt' ? [0x9b5cff, 0xe45bff, 0x5d7cff][Math.floor(Math.random() * 3)] : activeGameMode === 'zero-g-rush' ? [0x19e6d2, 0x39a7ff, 0xf3e65c][Math.floor(Math.random() * 3)] : [0x31d6ff, 0x8b7bff, 0xffb84d, 0x42e6a4, 0xff668c][Math.floor(Math.random() * 5)];
+  const isSiege = activeGameMode === 'drone-defense' || activeGameMode === 'last-stand' || activeGameMode === 'nightfall-survival';
+  const color = isSiege ? [0xff4d6d, 0xff8a3d, 0xffd166][Math.floor(Math.random() * 3)] : activeGameMode === 'meteor-blitz' ? [0xff5b35, 0xffc247, 0xff3d81][Math.floor(Math.random() * 3)] : activeGameMode === 'phantom-hunt' ? [0x9b5cff, 0xe45bff, 0x5d7cff][Math.floor(Math.random() * 3)] : activeGameMode === 'zero-g-rush' ? [0x19e6d2, 0x39a7ff, 0xf3e65c][Math.floor(Math.random() * 3)] : activeGameMode === 'titan-breaker' ? [0xffb000, 0xff542e, 0xffdf65][Math.floor(Math.random() * 3)] : activeGameMode === 'inferno-run' ? [0xff3b1f, 0xff8a24, 0xffd34e][Math.floor(Math.random() * 3)] : [0x31d6ff, 0x8b7bff, 0xffb84d, 0x42e6a4, 0xff668c][Math.floor(Math.random() * 5)];
   const isDrone = isSiege;
-  const targetRadius = activeGameMode === 'meteor-blitz' ? 0.135 : activeGameMode === 'phantom-hunt' ? 0.105 : Math.max(0.14, 0.24 - (arenaWave - 1) * 0.012);
+  const targetRadius = activeGameMode === 'titan-breaker' ? 0.34 : activeGameMode === 'meteor-blitz' || activeGameMode === 'inferno-run' ? 0.135 : activeGameMode === 'phantom-hunt' ? 0.105 : Math.max(0.14, 0.24 - (arenaWave - 1) * 0.012);
   const spread = Math.min(1.35, 0.72 + (arenaWave - 1) * 0.08);
   const droneMaterial = new MeshStandardMaterial({ color, emissive: color, emissiveIntensity: 1.15, roughness: 0.2, metalness: 0.32 });
   const mesh = new Mesh(
@@ -685,9 +685,9 @@ function spawnArenaTarget() {
   arenaMotion.set(entity.index, {
     x: baseX, y: baseY, z: baseZ,
     phase: Math.random() * Math.PI * 2,
-    speed: isSiege ? 1.35 + arenaWave * 0.12 : activeGameMode === 'meteor-blitz' ? 2.0 + arenaWave * 0.16 : activeGameMode === 'phantom-hunt' ? 2.65 + arenaWave * 0.20 : activeGameMode === 'zero-g-rush' ? 2.35 + arenaWave * 0.18 : 0.85 + arenaWave * 0.08,
-    drift: isSiege ? 0.48 : activeGameMode === 'meteor-blitz' ? 0.62 : activeGameMode === 'phantom-hunt' ? 0.72 : activeGameMode === 'zero-g-rush' ? 0.88 : 0.30,
-    approachSpeed: isSiege ? 0.34 + arenaWave * 0.035 : activeGameMode === 'meteor-blitz' ? 0.10 + arenaWave * 0.012 : activeGameMode === 'phantom-hunt' ? 0.04 : activeGameMode === 'zero-g-rush' ? 0.06 : 0,
+    speed: isSiege ? 1.35 + arenaWave * 0.12 : activeGameMode === 'meteor-blitz' || activeGameMode === 'inferno-run' ? 2.0 + arenaWave * 0.16 : activeGameMode === 'titan-breaker' ? 1.7 + arenaWave * 0.14 : activeGameMode === 'phantom-hunt' ? 2.65 + arenaWave * 0.20 : activeGameMode === 'zero-g-rush' ? 2.35 + arenaWave * 0.18 : 0.85 + arenaWave * 0.08,
+    drift: isSiege ? 0.48 : activeGameMode === 'meteor-blitz' || activeGameMode === 'inferno-run' ? 0.62 : activeGameMode === 'titan-breaker' ? 0.35 : activeGameMode === 'phantom-hunt' ? 0.72 : activeGameMode === 'zero-g-rush' ? 0.88 : 0.30,
+    approachSpeed: isSiege ? 0.34 + arenaWave * 0.035 : activeGameMode === 'meteor-blitz' ? 0.10 + arenaWave * 0.012 : activeGameMode === 'inferno-run' ? 0.19 + arenaWave * 0.022 : activeGameMode === 'phantom-hunt' ? 0.04 : activeGameMode === 'zero-g-rush' ? 0.06 : 0,
   });
   return entity;
 }
@@ -730,7 +730,7 @@ function hitArenaTarget(entity: any) {
   arenaCombo += 1;
   arenaBestCombo = Math.max(arenaBestCombo, arenaCombo);
   const multiplier = Math.min(5, 1 + Math.floor((arenaCombo - 1) / 3));
-  const precisionBonus = activeGameMode === 'phantom-hunt' ? 25 : activeGameMode === 'zero-g-rush' ? 15 : 10;
+  const precisionBonus = activeGameMode === 'titan-breaker' ? 30 : activeGameMode === 'phantom-hunt' ? 25 : activeGameMode === 'zero-g-rush' ? 15 : 10;
   const points = precisionBonus * multiplier;
   arenaScore += points;
   if (arenaHits % 5 === 0 && arenaHits < arenaGoal) {
@@ -746,7 +746,7 @@ function hitArenaTarget(entity: any) {
 }
 
 function breachArenaTarget(entity: any) {
-  if (!arenaActive || arenaPaused || (activeGameMode !== 'drone-defense' && activeGameMode !== 'last-stand')) return;
+  if (!arenaActive || arenaPaused || (activeGameMode !== 'drone-defense' && activeGameMode !== 'last-stand' && activeGameMode !== 'nightfall-survival')) return;
   const mesh = entity.object3D as Mesh | undefined;
   if (mesh) {
     arenaMeshes.delete(mesh);
@@ -845,14 +845,20 @@ function startMeteorBlitz() {
   statusText('METEOR BLITZ · smash 30 fast-moving meteors before the storm ends. Keep your combo alive!');
   refreshQuestPanel();
 }
-function startExtraGame(mode: 'phantom-hunt' | 'zero-g-rush' | 'last-stand') {
+function startExtraGame(mode: 'phantom-hunt' | 'zero-g-rush' | 'last-stand' | 'titan-breaker' | 'inferno-run' | 'nightfall-survival') {
   if (arenaActive) stopArena('Previous game ended');
   activeGameMode = mode;
   const config = mode === 'phantom-hunt'
     ? { goal: 18, seconds: 40, targets: 6, intro: 'PHANTOM HUNT · track unstable spectres. Small targets score 25 points; chain precision hits!' }
     : mode === 'zero-g-rush'
       ? { goal: 35, seconds: 45, targets: 9, intro: 'ZERO-G RUSH · chase spinning energy gates. Fast movement, wide drift, 35 hits to clear!' }
-      : { goal: 25, seconds: 60, targets: 7, intro: 'LAST STAND · survive the breach. Stop hostile craft before they reach the core. You have 3 shields!' };
+      : mode === 'last-stand'
+        ? { goal: 25, seconds: 60, targets: 7, intro: 'LAST STAND · survive the breach. Stop hostile craft before they reach the core. You have 3 shields!' }
+        : mode === 'titan-breaker'
+          ? { goal: 18, seconds: 50, targets: 4, intro: 'TITAN BREAKER · colossal targets, heavy impact and a 50-second countdown. Land 18 hits!' }
+          : mode === 'inferno-run'
+            ? { goal: 30, seconds: 45, targets: 8, intro: 'INFERNO RUN · a firestorm is closing in. Intercept 30 blazing meteors before time expires!' }
+            : { goal: 30, seconds: 60, targets: 8, intro: 'NIGHTFALL SURVIVAL · hostile drones attack from the dark. Protect the core with 3 shields!' };
   arenaShield = 3; arenaGoal = config.goal; arenaActive = true; arenaPaused = false;
   arenaScore = 0; arenaHits = 0; arenaCombo = 0; arenaBestCombo = 0; arenaWave = 1;
   arenaSeconds = config.seconds; arenaDeadline = Date.now() + config.seconds * 1000;
@@ -918,6 +924,9 @@ registerQuestAction('meteor-blitz', startMeteorBlitz);
 registerQuestAction('phantom-hunt', () => startExtraGame('phantom-hunt'));
 registerQuestAction('zero-g-rush', () => startExtraGame('zero-g-rush'));
 registerQuestAction('last-stand', () => startExtraGame('last-stand'));
+registerQuestAction('titan-breaker', () => startExtraGame('titan-breaker'));
+registerQuestAction('inferno-run', () => startExtraGame('inferno-run'));
+registerQuestAction('nightfall-survival', () => startExtraGame('nightfall-survival'));
 registerQuestAction('pause', pauseArena);
 registerQuestAction('focus', () => {
   focusMode = !focusMode;
@@ -983,6 +992,9 @@ makeQuestButton('METEOR', 'meteor-blitz', 0.42, 1.00, 0xffb84d);
 makeQuestButton('PHANTOM', 'phantom-hunt', -0.42, 0.88, 0x9b5cff);
 makeQuestButton('ZERO-G', 'zero-g-rush', 0, 0.88, 0x19e6d2);
 makeQuestButton('LAST STAND', 'last-stand', 0.42, 0.88, 0xff4d6d);
+makeQuestButton('TITAN', 'titan-breaker', -0.42, 0.76, 0xffb000);
+makeQuestButton('INFERNO', 'inferno-run', 0, 0.76, 0xff542e);
+makeQuestButton('NIGHTFALL', 'nightfall-survival', 0.42, 0.76, 0x8b5cff);
 makeQuestButton('DONE', 'destination', 0, 1.10, 0x42e6a4, destinationPanelEntity);
 
 // Desktop preview controls provide mouse-accessible equivalents to the 3D hand buttons.
@@ -994,6 +1006,9 @@ byId<HTMLButtonElement>('desktop-meteor')?.addEventListener('click', () => actio
 byId<HTMLButtonElement>('desktop-phantom')?.addEventListener('click', () => actionHandlers.get('phantom-hunt')?.());
 byId<HTMLButtonElement>('desktop-zero-g')?.addEventListener('click', () => actionHandlers.get('zero-g-rush')?.());
 byId<HTMLButtonElement>('desktop-last-stand')?.addEventListener('click', () => actionHandlers.get('last-stand')?.());
+byId<HTMLButtonElement>('desktop-titan')?.addEventListener('click', () => actionHandlers.get('titan-breaker')?.());
+byId<HTMLButtonElement>('desktop-inferno')?.addEventListener('click', () => actionHandlers.get('inferno-run')?.());
+byId<HTMLButtonElement>('desktop-nightfall')?.addEventListener('click', () => actionHandlers.get('nightfall-survival')?.());
 byId<HTMLSelectElement>('game-select')?.addEventListener('change', (event) => {
   const mode = (event.currentTarget as HTMLSelectElement).value;
   if (mode === 'drone-defense') actionHandlers.get('drone-defense')?.();
@@ -1001,6 +1016,9 @@ byId<HTMLSelectElement>('game-select')?.addEventListener('change', (event) => {
   else if (mode === 'phantom-hunt') actionHandlers.get('phantom-hunt')?.();
   else if (mode === 'zero-g-rush') actionHandlers.get('zero-g-rush')?.();
   else if (mode === 'last-stand') actionHandlers.get('last-stand')?.();
+  else if (mode === 'titan-breaker') actionHandlers.get('titan-breaker')?.();
+  else if (mode === 'inferno-run') actionHandlers.get('inferno-run')?.();
+  else if (mode === 'nightfall-survival') actionHandlers.get('nightfall-survival')?.();
   else actionHandlers.get('arena')?.();
 });
 refreshDestinationButtons();
@@ -1060,9 +1078,9 @@ class ArenaMotionSystem extends createSystem({
       if (!mesh || !motion) return;
       mesh.position.x = motion.x + Math.sin(time * motion.speed + motion.phase) * motion.drift;
       mesh.position.y = motion.y + Math.sin(time * 1.9 + motion.phase) * 0.16;
-      if (activeGameMode === 'drone-defense' || activeGameMode === 'meteor-blitz' || activeGameMode === 'last-stand') {
+      if (activeGameMode === 'drone-defense' || activeGameMode === 'meteor-blitz' || activeGameMode === 'last-stand' || activeGameMode === 'inferno-run' || activeGameMode === 'nightfall-survival') {
         motion.z += motion.approachSpeed * delta;
-        if (motion.z >= -0.95) { if (activeGameMode === 'drone-defense' || activeGameMode === 'last-stand') breachArenaTarget(entity); else { const mesh = entity.object3D as Mesh; arenaMeshes.delete(mesh); arenaMotion.delete(entity.index); arenaEntities.delete(mesh); mesh.parent?.remove(mesh); mesh.geometry.dispose(); (mesh.material as MeshStandardMaterial).dispose(); entity.destroy?.(); arenaCombo = 0; spawnArenaTarget(); } return; }
+        if (motion.z >= -0.95) { if (activeGameMode === 'drone-defense' || activeGameMode === 'last-stand' || activeGameMode === 'nightfall-survival') breachArenaTarget(entity); else { const mesh = entity.object3D as Mesh; arenaMeshes.delete(mesh); arenaMotion.delete(entity.index); arenaEntities.delete(mesh); mesh.parent?.remove(mesh); mesh.geometry.dispose(); (mesh.material as MeshStandardMaterial).dispose(); entity.destroy?.(); arenaCombo = 0; spawnArenaTarget(); } return; }
         mesh.position.z = motion.z + Math.cos(time * motion.speed * 0.7 + motion.phase) * 0.12;
       } else {
         mesh.position.z = motion.z + Math.cos(time * motion.speed * 0.7 + motion.phase) * 0.12;
