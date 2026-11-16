@@ -478,7 +478,7 @@ let arenaWave = 1;
 let arenaGoal = 15;
 let arenaShield = 3;
 let arenaLastFrameTime = performance.now() / 1000;
-let activeGameMode: 'orb-rush' | 'drone-defense' = 'orb-rush';
+let activeGameMode: 'orb-rush' | 'drone-defense' | 'meteor-blitz' = 'orb-rush';
 let arenaSeconds = 45;
 let arenaDeadline = 0;
 let arenaTimer: number | null = null;
@@ -648,9 +648,9 @@ function refreshDestinationButtons() {
   destinationTexture.needsUpdate = true;
 }
 function spawnArenaTarget() {
-  const color = activeGameMode === 'drone-defense' ? [0xff4d6d, 0xff8a3d, 0xffd166][Math.floor(Math.random() * 3)] : [0x31d6ff, 0x8b7bff, 0xffb84d, 0x42e6a4, 0xff668c][Math.floor(Math.random() * 5)];
+  const color = activeGameMode === 'drone-defense' ? [0xff4d6d, 0xff8a3d, 0xffd166][Math.floor(Math.random() * 3)] : activeGameMode === 'meteor-blitz' ? [0xff5b35, 0xffc247, 0xff3d81][Math.floor(Math.random() * 3)] : [0x31d6ff, 0x8b7bff, 0xffb84d, 0x42e6a4, 0xff668c][Math.floor(Math.random() * 5)];
   const isDrone = activeGameMode === 'drone-defense';
-  const targetRadius = Math.max(0.14, 0.24 - (arenaWave - 1) * 0.012);
+  const targetRadius = activeGameMode === 'meteor-blitz' ? 0.135 : Math.max(0.14, 0.24 - (arenaWave - 1) * 0.012);
   const spread = Math.min(1.35, 0.72 + (arenaWave - 1) * 0.08);
   const droneMaterial = new MeshStandardMaterial({ color, emissive: color, emissiveIntensity: 1.15, roughness: 0.2, metalness: 0.32 });
   const mesh = new Mesh(
@@ -683,9 +683,9 @@ function spawnArenaTarget() {
   arenaMotion.set(entity.index, {
     x: baseX, y: baseY, z: baseZ,
     phase: Math.random() * Math.PI * 2,
-    speed: activeGameMode === 'drone-defense' ? 1.35 + arenaWave * 0.12 : 0.85 + arenaWave * 0.08,
-    drift: activeGameMode === 'drone-defense' ? 0.48 : 0.30,
-    approachSpeed: activeGameMode === 'drone-defense' ? 0.34 + arenaWave * 0.035 : 0,
+    speed: activeGameMode === 'drone-defense' ? 1.35 + arenaWave * 0.12 : activeGameMode === 'meteor-blitz' ? 2.0 + arenaWave * 0.16 : 0.85 + arenaWave * 0.08,
+    drift: activeGameMode === 'drone-defense' ? 0.48 : activeGameMode === 'meteor-blitz' ? 0.62 : 0.30,
+    approachSpeed: activeGameMode === 'drone-defense' ? 0.34 + arenaWave * 0.035 : activeGameMode === 'meteor-blitz' ? 0.10 + arenaWave * 0.012 : 0,
   });
   return entity;
 }
@@ -823,6 +823,25 @@ function startDroneDefense() {
   statusText('RIFT GUARD ONLINE · intercept attack craft before they breach the core.');
   refreshQuestPanel();
 }
+function startMeteorBlitz() {
+  if (arenaActive) stopArena('Previous game ended');
+  activeGameMode = 'meteor-blitz';
+  arenaShield = 3;
+  arenaGoal = 30;
+  arenaActive = true;
+  arenaPaused = false;
+  arenaScore = 0; arenaHits = 0; arenaCombo = 0; arenaBestCombo = 0; arenaWave = 1;
+  arenaSeconds = 45; arenaDeadline = Date.now() + 45000;
+  clearArena();
+  for (let i = 0; i < 8; i++) spawnArenaTarget();
+  if (arenaTimer !== null) window.clearInterval(arenaTimer);
+  arenaTimer = window.setInterval(() => {
+    arenaSeconds = Math.max(0, Math.ceil((arenaDeadline - Date.now()) / 1000));
+    if (arenaSeconds <= 0) stopArena('Meteor storm survived'); else refreshQuestPanel();
+  }, 250);
+  statusText('METEOR BLITZ · smash 30 fast-moving meteors before the storm ends. Keep your combo alive!');
+  refreshQuestPanel();
+}
 function pauseArena() {
   if (!arenaActive) {
     statusText('Start VR Arena before pausing.');
@@ -870,6 +889,7 @@ registerQuestAction('quality', () => {
 });
 registerQuestAction('arena', startArena);
 registerQuestAction('drone-defense', startDroneDefense);
+registerQuestAction('meteor-blitz', startMeteorBlitz);
 registerQuestAction('pause', pauseArena);
 registerQuestAction('focus', () => {
   focusMode = !focusMode;
@@ -931,6 +951,7 @@ makeQuestButton('RESET', 'reset', 0.42, 1.10, 0xff668c);
 makeQuestButton('PAUSE', 'pause', -0.51, 1.00, 0xffb84d);
 makeQuestButton('DEST', 'destination', -0.17, 1.00, 0x31d6ff);
 makeQuestButton('RIFT GUARD', 'drone-defense', 0.17, 1.00, 0xff668c);
+makeQuestButton('METEOR', 'meteor-blitz', 0.42, 1.00, 0xffb84d);
 makeQuestButton('DONE', 'destination', 0, 1.10, 0x42e6a4, destinationPanelEntity);
 
 // Desktop preview controls provide mouse-accessible equivalents to the 3D hand buttons.
@@ -938,6 +959,13 @@ byId<HTMLButtonElement>('desktop-arena')?.addEventListener('click', () => action
 byId<HTMLButtonElement>('desktop-pause')?.addEventListener('click', () => actionHandlers.get('pause')?.());
 byId<HTMLButtonElement>('desktop-reset')?.addEventListener('click', () => actionHandlers.get('reset')?.());
 byId<HTMLButtonElement>('desktop-defense')?.addEventListener('click', () => actionHandlers.get('drone-defense')?.());
+byId<HTMLButtonElement>('desktop-meteor')?.addEventListener('click', () => actionHandlers.get('meteor-blitz')?.());
+byId<HTMLSelectElement>('game-select')?.addEventListener('change', (event) => {
+  const mode = (event.currentTarget as HTMLSelectElement).value;
+  if (mode === 'drone-defense') actionHandlers.get('drone-defense')?.();
+  else if (mode === 'meteor-blitz') actionHandlers.get('meteor-blitz')?.();
+  else actionHandlers.get('arena')?.();
+});
 refreshDestinationButtons();
 platformList?.addEventListener('input', refreshDestinationButtons);
 
@@ -995,9 +1023,9 @@ class ArenaMotionSystem extends createSystem({
       if (!mesh || !motion) return;
       mesh.position.x = motion.x + Math.sin(time * motion.speed + motion.phase) * motion.drift;
       mesh.position.y = motion.y + Math.sin(time * 1.9 + motion.phase) * 0.16;
-      if (activeGameMode === 'drone-defense') {
+      if (activeGameMode === 'drone-defense' || activeGameMode === 'meteor-blitz') {
         motion.z += motion.approachSpeed * delta;
-        if (motion.z >= -0.95) { breachArenaTarget(entity); return; }
+        if (motion.z >= -0.95) { if (activeGameMode === 'drone-defense') breachArenaTarget(entity); else { const mesh = entity.object3D as Mesh; arenaMeshes.delete(mesh); arenaMotion.delete(entity.index); arenaEntities.delete(mesh); mesh.parent?.remove(mesh); mesh.geometry.dispose(); (mesh.material as MeshStandardMaterial).dispose(); entity.destroy?.(); arenaCombo = 0; spawnArenaTarget(); } return; }
         mesh.position.z = motion.z + Math.cos(time * motion.speed * 0.7 + motion.phase) * 0.12;
       } else {
         mesh.position.z = motion.z + Math.cos(time * motion.speed * 0.7 + motion.phase) * 0.12;
