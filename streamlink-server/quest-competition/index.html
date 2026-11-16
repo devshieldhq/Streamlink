@@ -16,6 +16,8 @@
     #actions { position: fixed; z-index: 8; right: 16px; top: 16px; max-width: calc(100vw - 32px); display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
     #actions button, #actions a { padding: 9px 11px; font-size: 11px; }
     #desktop-arena { background: #167a63; border-color: #42e6a4; }
+    #scene-container canvas { cursor: crosshair; }
+    #mouse-tip { position: fixed; z-index: 4; right: 18px; bottom: 18px; padding: 10px 14px; border: 1px solid #31d6ff88; border-radius: 10px; background: #071326dd; color: #dceeff; font-size: 12px; pointer-events: none; box-shadow: 0 0 22px #31d6ff22; }
     a, button { border: 1px solid #52658e; border-radius: 9px; padding: 10px 13px; background: #263d72; color: white; font: 700 12px system-ui, sans-serif; text-decoration: none; cursor: pointer; }
     a.secondary, button.secondary { background: #121b30; }
     button:disabled { opacity: .45; cursor: not-allowed; }
@@ -40,7 +42,7 @@
 </head>
 <body>
   <div id="scene-container"></div>
-  <div id="hud"><strong>STREAMLINK XR</strong><span>IWSDK · HANDS-FIRST QUEST STUDIO</span></div>
+  <div id="hud"><strong>STREAMLINK XR</strong><span>MOUSE: AIM + CLICK TO SHOOT · QUEST: PINCH / POKE</span></div>
   <nav id="actions">
     <a class="secondary" href="/">Website</a>
     <a class="secondary" href="/account.html">Account</a>
@@ -68,6 +70,7 @@
     <p><small>Sign in and manage saved stream keys in your account. Credentials are saved through your existing Supabase account and are never sent to the AI agent.</small></p>
     <div id="passport" class="hidden"></div>
   </aside>
+  <div id="mouse-tip">DESKTOP PLAY: Start Arena or Drone Defense, move your mouse over a glowing target, then click to shoot.</div>
   <div id="status" role="status">Preparing the IWSDK Quest experience…</div>
 
   <script src="/config.js"></script>
