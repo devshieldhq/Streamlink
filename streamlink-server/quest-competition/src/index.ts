@@ -488,7 +488,8 @@ let arenaDeadline = 0;
 let arenaTimer: number | null = null;
 const arenaMeshes = new Set<Mesh>();
 const arenaEntities = new Map<Mesh, any>();
-const arenaMotion = new Map<number, { x: number; y: number; z: number; phase: number; speed: number; drift: number; approachSpeed: number }>();
+const arenaMotion = new Map<number, { x: number; y: number; z: number; phase: number; speed: number; drift: number; approachSpeed: number; attackClock: number }>();
+const hostileShots: { mesh: Mesh; entity: any; speed: number }[] = [];
 const actionByEntity = new Map<number, string>();
 const actionHandlers = new Map<string, () => void>();
 const pressedTargets = new Set<number>();
@@ -547,7 +548,7 @@ function drawQuestPanel() {
   ctx.fillText(activeGameMode === 'drone-defense' || activeGameMode === 'last-stand' || activeGameMode === 'nightfall-survival' ? `SHIELD INTEGRITY  ${'◆ '.repeat(arenaShield)}${'◇ '.repeat(3 - arenaShield)}` : 'ARCADE CHALLENGE · HIT TARGETS TO BUILD YOUR COMBO', 48, 306);
   ctx.fillStyle = '#aab8d2'; ctx.font = '21px Inter, sans-serif';
   ctx.fillText(`ARENA OBJECTIVE  ${arenaHits}/${arenaGoal} targets · best combo ${arenaBestCombo}`, 48, 330);
-  ctx.fillText(activeGameMode==='rift-racer' ? 'ARROWS / A-D to steer · drag left/right · avoid rival cars and roadblocks.' : 'Track the moving targets. Pinch or poke to score; every 5 hits advances the wave.', 48, 365);
+  ctx.fillText(activeGameMode==='rift-racer' ? 'ARROWS / A-D to steer · drag left/right · avoid rival cars and roadblocks.' : (activeGameMode === 'nightfall-survival' || activeGameMode === 'last-stand') ? 'HOSTILES FIRE BACK · dodge red plasma shots and eliminate attackers with hand pinch.' : 'Track the enemies. Pinch or poke to strike; every 5 hits advances the wave.', 48, 365);
   ctx.fillText(`DESTINATIONS  ${selectedDestinationNames.size} selected · use ADD DEST to choose platforms`, 48, 410);
   const gameLabel = ({ 'rift-racer': 'RIFT RACER · dodge traffic and roadblocks on a neon highway.', 'orb-rush': 'ORB RUSH · warm-up arcade challenge.', 'drone-defense': 'RIFT GUARD · protect the core from incoming attack craft.', 'meteor-blitz': 'METEOR BLITZ · smash the incoming meteor storm.', 'phantom-hunt': 'PHANTOM HUNT · precision shots on unstable spectres.', 'zero-g-rush': 'ZERO-G RUSH · chase spinning energy gates.', 'last-stand': 'LAST STAND · defend the core through enemy waves.', 'titan-breaker': 'TITAN BREAKER · smash the colossal targets before time runs out.', 'inferno-run': 'INFERNO RUN · intercept the firestorm before it reaches you.', 'nightfall-survival': 'NIGHTFALL SURVIVAL · hold the line against relentless night drones.' } as Record<string, string>)[activeGameMode];
   ctx.fillText(gameLabel, 48, 450);
@@ -719,6 +720,17 @@ function spawnArenaTarget() {
     }
     const chest = new Mesh(new BoxGeometry(0.31, 0.24, 0.07), trim);
     chest.position.set(0, 0.08, 0.19); mesh.add(chest);
+    const combatArms: Mesh[] = [];
+    for (const side of [-1, 1]) {
+      const arm = mesh.children.find((part: any) => part.geometry?.type === 'BoxGeometry' && Math.abs(part.position.x - side * 0.37) < 0.02) as Mesh | undefined;
+      if (arm) combatArms.push(arm);
+    }
+    const rifle = new Mesh(new BoxGeometry(0.11, 0.12, 0.62), new MeshStandardMaterial({ color: 0x151b29, metalness: 0.85, roughness: 0.22 }));
+    rifle.position.set(0.43, -0.10, 0.36); mesh.add(rifle);
+    const muzzle = new Mesh(new SphereGeometry(0.075, 10, 8), new MeshBasicMaterial({ color: 0xff542e }));
+    muzzle.position.set(0.43, -0.10, 0.69); mesh.add(muzzle);
+    mesh.userData.combatArms = combatArms;
+    mesh.userData.muzzle = muzzle;
     mesh.scale.setScalar(activeGameMode === 'nightfall-survival' || activeGameMode === 'last-stand' ? 1.18 : 1.0);
   }
   if (isDrone && !isGroundCombat) {
@@ -760,7 +772,8 @@ function spawnArenaTarget() {
     phase: Math.random() * Math.PI * 2,
     speed: isSiege ? 1.35 + arenaWave * 0.12 : activeGameMode === 'meteor-blitz' || activeGameMode === 'inferno-run' ? 2.0 + arenaWave * 0.16 : activeGameMode === 'titan-breaker' ? 1.7 + arenaWave * 0.14 : activeGameMode === 'phantom-hunt' ? 2.65 + arenaWave * 0.20 : activeGameMode === 'zero-g-rush' ? 2.35 + arenaWave * 0.18 : 0.85 + arenaWave * 0.08,
     drift: isGroundCombat ? 0.12 : isSiege ? 0.48 : activeGameMode === 'meteor-blitz' || activeGameMode === 'inferno-run' ? 0.62 : activeGameMode === 'titan-breaker' ? 0.35 : 0.30,
-    approachSpeed: isGroundCombat ? 0.72 + arenaWave * 0.10 : isSiege ? 0.34 + arenaWave * 0.035 : activeGameMode === 'meteor-blitz' ? 0.10 + arenaWave * 0.012 : activeGameMode === 'inferno-run' ? 0.19 + arenaWave * 0.022 : 0,
+    approachSpeed: isGroundCombat ? (activeGameMode === 'nightfall-survival' || activeGameMode === 'last-stand' ? 0.92 + arenaWave * 0.12 : 0.72 + arenaWave * 0.10) : isSiege ? 0.34 + arenaWave * 0.035 : activeGameMode === 'meteor-blitz' ? 0.10 + arenaWave * 0.012 : activeGameMode === 'inferno-run' ? 0.19 + arenaWave * 0.022 : 0,
+    attackClock: 0.45 + Math.random() * 1.2,
   });
   return entity;
 }
@@ -806,6 +819,8 @@ function clearArena() {
     });
   }
   arenaMeshes.clear();
+  for (const shot of hostileShots) { shot.entity?.destroy?.(); shot.mesh.parent?.remove(shot.mesh); shot.mesh.geometry.dispose(); (shot.mesh.material as MeshBasicMaterial).dispose(); }
+  hostileShots.length = 0;
   clearRaceTrack();
 }
 function hitArenaTarget(entity: any) {
@@ -953,12 +968,12 @@ function startExtraGame(mode: 'phantom-hunt' | 'zero-g-rush' | 'last-stand' | 't
     : mode === 'zero-g-rush'
       ? { goal: 35, seconds: 45, targets: 9, intro: 'ZERO-G RUSH · chase spinning energy gates. Fast movement, wide drift, 35 hits to clear!' }
       : mode === 'last-stand'
-        ? { goal: 25, seconds: 60, targets: 7, intro: 'LAST STAND · survive the breach. Stop hostile craft before they reach the core. You have 3 shields!' }
+        ? { goal: 25, seconds: 60, targets: 7, intro: 'LAST STAND · armed attackers push your position and shoot back. Take them down before your shields fail!' }
         : mode === 'titan-breaker'
           ? { goal: 18, seconds: 50, targets: 4, intro: 'TITAN BREAKER · colossal targets, heavy impact and a 50-second countdown. Land 18 hits!' }
           : mode === 'inferno-run'
             ? { goal: 30, seconds: 45, targets: 8, intro: 'INFERNO RUN · a firestorm is closing in. Intercept 30 blazing meteors before time expires!' }
-            : { goal: 30, seconds: 60, targets: 8, intro: 'NIGHTFALL SURVIVAL · hostile drones attack from the dark. Protect the core with 3 shields!' };
+            : { goal: 30, seconds: 60, targets: 8, intro: 'NIGHTFALL SURVIVAL · armed raiders advance and fire plasma at you. Eliminate them and dodge incoming shots!' };
   arenaShield = 3; arenaGoal = config.goal; arenaActive = true; arenaPaused = false;
   arenaScore = 0; arenaHits = 0; arenaCombo = 0; arenaBestCombo = 0; arenaWave = 1;
   arenaSeconds = config.seconds; arenaDeadline = Date.now() + config.seconds * 1000;
@@ -1190,13 +1205,42 @@ class ArenaMotionSystem extends createSystem({
         // Enemies advance along the floor toward the player. Their feet stay planted;
         // no bobbing, hovering or orbiting target motion is used in these modes.
         motion.z += motion.approachSpeed * delta;
-        mesh.position.set(motion.x + Math.sin(time * 1.25 + motion.phase) * motion.drift, motion.y, motion.z);
-        mesh.rotation.y = Math.sin(time * 1.7 + motion.phase) * 0.09;
+        const laneSway = Math.sin(time * 1.25 + motion.phase) * motion.drift;
+        mesh.position.set(motion.x + laneSway, motion.y, motion.z);
+        mesh.rotation.y = Math.atan2(-mesh.position.x, 4.8) + Math.sin(time * 1.7 + motion.phase) * 0.06;
+        const arms = mesh.userData.combatArms as Mesh[] | undefined;
+        if (arms?.length) { arms[0].rotation.x = Math.sin(time * 7 + motion.phase) * 0.42; arms[1].rotation.x = -0.18 + Math.sin(time * 7 + motion.phase + Math.PI) * 0.42; }
+        const muzzle = mesh.userData.muzzle as Mesh | undefined;
+        if (muzzle) muzzle.visible = Math.sin(time * 16 + motion.phase) > 0.82;
+        if (activeGameMode === 'nightfall-survival' || activeGameMode === 'last-stand') {
+          motion.attackClock += delta;
+          if (motion.attackClock >= 1.65 + Math.random() * 0.35) {
+            motion.attackClock = 0;
+            const shot = new Mesh(new SphereGeometry(0.075, 10, 8), new MeshBasicMaterial({ color: 0xff3c28 }));
+            const shotEntity = world.createTransformEntity(shot, { persistent: true });
+            shotEntity.object3D!.position.set(mesh.position.x + 0.42, 1.02, mesh.position.z + 0.42);
+            hostileShots.push({ mesh: shot, entity: shotEntity, speed: 5.2 + arenaWave * 0.25 });
+          }
+        }
         if (motion.z >= 1.05) { breachArenaTarget(entity); return; }
         return;
       }
       // All non-racing modes are handled by the grounded enemy movement above.
     });
+    for (let i = hostileShots.length - 1; i >= 0; i--) {
+      const shot = hostileShots[i];
+      shot.mesh.position.z += shot.speed * delta;
+      shot.mesh.scale.setScalar(1 + Math.sin(time * 18 + i) * 0.16);
+      if (shot.mesh.position.z >= 0.75) {
+        arenaShield = Math.max(0, arenaShield - 1);
+        statusText(`INCOMING FIRE HIT · shield ${arenaShield}/3 · eliminate the shooters!`);
+        shot.entity?.destroy?.(); shot.mesh.parent?.remove(shot.mesh); shot.mesh.geometry.dispose(); (shot.mesh.material as MeshBasicMaterial).dispose(); hostileShots.splice(i, 1);
+        if (arenaShield <= 0) { stopArena('OVERWHELMED · SURVIVAL FAILED'); return; }
+        refreshQuestPanel();
+      } else if (shot.mesh.position.z > 2.2) {
+        shot.entity?.destroy?.(); shot.mesh.parent?.remove(shot.mesh); shot.mesh.geometry.dispose(); (shot.mesh.material as MeshBasicMaterial).dispose(); hostileShots.splice(i, 1);
+      }
+    }
   }
 }
 world.registerSystem(ArenaMotionSystem);
