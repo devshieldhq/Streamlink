@@ -1021,8 +1021,8 @@ function hitArenaTarget(entity: any) {
   } else {
     statusText(`Direct hit! +${points} · combo x${multiplier} · ${arenaHits}/${arenaGoal}`);
   }
-  if (arenaHits >= arenaGoal) stopArena('Arena cleared');
-  else spawnArenaTarget();
+  if (arenaHits >= arenaGoal) statusText(`OBJECTIVE REACHED · ${arenaHits} hits! Keep playing until the 2-minute round ends.`);
+  spawnArenaTarget();
   refreshQuestPanel();
 }
 
@@ -1079,8 +1079,8 @@ function startArena() {
   arenaCombo = 0;
   arenaBestCombo = 0;
   arenaWave = 1;
-  arenaSeconds = 45;
-  arenaDeadline = Date.now() + 45000;
+  arenaSeconds = 120;
+  arenaDeadline = Date.now() + 120000;
   clearArena();
   for (let i = 0; i < 5; i++) spawnArenaTarget();
   if (arenaTimer !== null) window.clearInterval(arenaTimer);
@@ -1090,7 +1090,7 @@ function startArena() {
     else refreshQuestPanel();
   }, 250);
   playArenaSound('start');
-  statusText(`VR Arena started · hit ${arenaGoal} targets in 45 seconds. Build combos for bonus points.`);
+  statusText(`VR Arena started · 2-minute minimum round. Build combos and keep playing until the timer ends.`);
   refreshQuestPanel();
 }
 function startDroneDefense() {
@@ -1102,7 +1102,7 @@ function startDroneDefense() {
   arenaActive = true;
   arenaPaused = false;
   arenaScore = 0; arenaHits = 0; arenaCombo = 0; arenaBestCombo = 0; arenaWave = 1;
-  arenaSeconds = 60; arenaDeadline = Date.now() + 60000;
+  arenaSeconds = 120; arenaDeadline = Date.now() + 120000;
   clearArena();
   for (let i = 0; i < 6; i++) spawnArenaTarget();
   if (arenaTimer !== null) window.clearInterval(arenaTimer);
@@ -1111,7 +1111,7 @@ function startDroneDefense() {
     if (arenaSeconds <= 0) stopArena('Defense time expired'); else refreshQuestPanel();
   }, 250);
   playArenaSound('start');
-  statusText('RIFT GUARD ONLINE · intercept attack craft before they breach the core.');
+  statusText('RIFT GUARD ONLINE · 2-minute defense. Intercept attack craft before they breach the core.');
   refreshQuestPanel();
 }
 function startMeteorBlitz() {
@@ -1122,7 +1122,7 @@ function startMeteorBlitz() {
   arenaActive = true;
   arenaPaused = false;
   arenaScore = 0; arenaHits = 0; arenaCombo = 0; arenaBestCombo = 0; arenaWave = 1;
-  arenaSeconds = 45; arenaDeadline = Date.now() + 45000;
+  arenaSeconds = 120; arenaDeadline = Date.now() + 120000;
   clearArena();
   for (let i = 0; i < 8; i++) spawnArenaTarget();
   if (arenaTimer !== null) window.clearInterval(arenaTimer);
@@ -1131,7 +1131,7 @@ function startMeteorBlitz() {
     if (arenaSeconds <= 0) stopArena('Meteor storm survived'); else refreshQuestPanel();
   }, 250);
   playArenaSound('start');
-  statusText('METEOR BLITZ · smash 30 fast-moving meteors before the storm ends. Keep your combo alive!');
+  statusText('METEOR BLITZ · 2-minute meteor storm. Smash incoming meteors and keep your combo alive!');
   refreshQuestPanel();
 }
 function startExtraGame(mode: 'phantom-hunt' | 'zero-g-rush' | 'last-stand' | 'titan-breaker' | 'inferno-run' | 'nightfall-survival') {
@@ -1139,15 +1139,15 @@ function startExtraGame(mode: 'phantom-hunt' | 'zero-g-rush' | 'last-stand' | 't
   activeGameMode = mode;
   syncFirstPersonGun();
   const config = mode === 'phantom-hunt'
-    ? { goal: 18, seconds: 40, targets: 6, intro: 'PHANTOM HUNT · track unstable spectres. Small targets score 25 points; chain precision hits!' }
+    ? { goal: 18, seconds: 120, targets: 6, intro: 'PHANTOM HUNT · 2-minute hunt. Track unstable spectres and chain precision hits!' }
     : mode === 'zero-g-rush'
-      ? { goal: 35, seconds: 45, targets: 9, intro: 'ZERO-G RUSH · chase spinning energy gates. Fast movement, wide drift, 35 hits to clear!' }
+      ? { goal: 35, seconds: 120, targets: 9, intro: 'ZERO-G RUSH · 2-minute run. Chase spinning energy gates and keep moving!' }
       : mode === 'last-stand'
         ? { goal: 65, seconds: 180, targets: 9, intro: 'LAST STAND · survive a 3-minute assault. Armed raiders push your position in escalating waves. Take them down and dodge incoming fire!' }
         : mode === 'titan-breaker'
-          ? { goal: 18, seconds: 50, targets: 4, intro: 'TITAN BREAKER · colossal targets, heavy impact and a 50-second countdown. Land 18 hits!' }
+          ? { goal: 18, seconds: 120, targets: 4, intro: 'TITAN BREAKER · 2-minute battle. Smash colossal targets with heavy impact!' }
           : mode === 'inferno-run'
-            ? { goal: 30, seconds: 45, targets: 8, intro: 'INFERNO RUN · a firestorm is closing in. Intercept 30 blazing meteors before time expires!' }
+            ? { goal: 30, seconds: 120, targets: 8, intro: 'INFERNO RUN · survive a 2-minute firestorm and intercept blazing meteors!' }
             : { goal: 90, seconds: 180, targets: 10, intro: 'NIGHTFALL SURVIVAL · survive a 3-minute raid. Human soldiers advance in escalating waves and fire at your position. Eliminate 90 hostiles and dodge incoming shots!' };
   arenaShield = 3; arenaGoal = config.goal; arenaActive = true; arenaPaused = false;
   arenaScore = 0; arenaHits = 0; arenaCombo = 0; arenaBestCombo = 0; arenaWave = 1;
