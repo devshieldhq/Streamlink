@@ -1,5 +1,5 @@
 import {
-  BoxGeometry, CanvasTexture, ConeGeometry, IcosahedronGeometry, OctahedronGeometry, createComponent, createSystem, DirectionalLight, EnvironmentType, Group, LocomotionEnvironment, Mesh, MeshBasicMaterial,
+  BoxGeometry, CanvasTexture, CapsuleGeometry, ConeGeometry, CylinderGeometry, IcosahedronGeometry, OctahedronGeometry, createComponent, createSystem, DirectionalLight, EnvironmentType, Group, LocomotionEnvironment, Mesh, MeshBasicMaterial,
   MeshStandardMaterial, OneHandGrabbable, PlaneGeometry, PokeInteractable, Pressed, RayInteractable,
   SphereGeometry, TorusGeometry, Types, Vector2, Vector3, Raycaster, Quaternion, World
 } from '@iwsdk/core';
