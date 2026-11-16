@@ -490,6 +490,39 @@ const arenaMeshes = new Set<Mesh>();
 const arenaEntities = new Map<Mesh, any>();
 const arenaMotion = new Map<number, { x: number; y: number; z: number; phase: number; speed: number; drift: number; approachSpeed: number; attackClock: number }>();
 const hostileShots: { mesh: Mesh; entity: any; speed: number }[] = [];
+let arenaAudio: AudioContext | null = null;
+function playArenaSound(kind: 'shot' | 'hit' | 'damage' | 'start') {
+  try {
+    const AudioCtor = window.AudioContext || (window as any).webkitAudioContext;
+    if (!AudioCtor) return;
+    arenaAudio ||= new AudioCtor();
+    if (arenaAudio.state === 'suspended') void arenaAudio.resume();
+    const ctx = arenaAudio;
+    const now = ctx.currentTime;
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    const filter = ctx.createBiquadFilter();
+    osc.connect(filter); filter.connect(gain); gain.connect(ctx.destination);
+    filter.type = 'lowpass';
+    if (kind === 'shot') {
+      osc.type = 'sawtooth'; osc.frequency.setValueAtTime(210, now); osc.frequency.exponentialRampToValueAtTime(75, now + 0.16);
+      filter.frequency.value = 1100; gain.gain.setValueAtTime(0.0001, now); gain.gain.exponentialRampToValueAtTime(0.11, now + 0.012); gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.18);
+      osc.start(now); osc.stop(now + 0.19);
+    } else if (kind === 'hit') {
+      osc.type = 'triangle'; osc.frequency.setValueAtTime(720, now); osc.frequency.exponentialRampToValueAtTime(260, now + 0.12);
+      filter.frequency.value = 2400; gain.gain.setValueAtTime(0.0001, now); gain.gain.exponentialRampToValueAtTime(0.14, now + 0.008); gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.15);
+      osc.start(now); osc.stop(now + 0.16);
+    } else if (kind === 'damage') {
+      osc.type = 'square'; osc.frequency.setValueAtTime(115, now); osc.frequency.exponentialRampToValueAtTime(42, now + 0.28);
+      filter.frequency.value = 520; gain.gain.setValueAtTime(0.0001, now); gain.gain.exponentialRampToValueAtTime(0.18, now + 0.02); gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.3);
+      osc.start(now); osc.stop(now + 0.31);
+    } else {
+      osc.type = 'sine'; osc.frequency.setValueAtTime(330, now); osc.frequency.exponentialRampToValueAtTime(660, now + 0.22);
+      filter.frequency.value = 1800; gain.gain.setValueAtTime(0.0001, now); gain.gain.exponentialRampToValueAtTime(0.10, now + 0.02); gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.25);
+      osc.start(now); osc.stop(now + 0.26);
+    }
+  } catch (error) { console.warn('[StreamLink arena audio]', error); }
+}
 const actionByEntity = new Map<number, string>();
 const actionHandlers = new Map<string, () => void>();
 const pressedTargets = new Set<number>();
@@ -711,7 +744,8 @@ function spawnArenaTarget() {
     const pupil = new MeshBasicMaterial({ color: 0x171313 });
 
     // Torso, neck and head form a recognisably human silhouette.
-    const torso = new Mesh(new BoxGeometry(0.48, 0.62, 0.27), clothing);
+    const torso = new Mesh(new SphereGeometry(0.31, 24, 18), clothing);
+    torso.scale.set(0.86, 1.12, 0.58);
     torso.position.set(0, 0.03, 0); mesh.add(torso);
     const neck = new Mesh(new BoxGeometry(0.16, 0.16, 0.16), skin);
     neck.position.set(0, 0.39, 0.025); mesh.add(neck);
@@ -726,22 +760,24 @@ function spawnArenaTarget() {
     for (const side of [-1, 1]) {
       const ear = new Mesh(new SphereGeometry(0.045, 10, 8), skinLight);
       ear.position.set(side * 0.18, 0.58, 0.025); mesh.add(ear);
+      const brow = new Mesh(new SphereGeometry(0.043, 10, 8), clothDark);
+      brow.scale.set(1.3, 0.32, 0.42); brow.position.set(side * 0.075, 0.675, 0.194); mesh.add(brow);
       const eye = new Mesh(new SphereGeometry(0.025, 10, 8), eyeWhite);
       eye.position.set(side * 0.075, 0.625, 0.205); mesh.add(eye);
       const iris = new Mesh(new SphereGeometry(0.012, 8, 6), pupil);
       iris.position.set(side * 0.075, 0.625, 0.227); mesh.add(iris);
       const shoulder = new Mesh(new SphereGeometry(0.14, 12, 10), clothing);
       shoulder.position.set(side * 0.29, 0.25, 0); mesh.add(shoulder);
-      const upperArm = new Mesh(new BoxGeometry(0.14, 0.31, 0.16), clothing);
-      upperArm.position.set(side * 0.34, 0.055, 0.025); upperArm.rotation.z = side * -0.12; mesh.add(upperArm);
-      const forearm = new Mesh(new BoxGeometry(0.12, 0.27, 0.14), clothing);
-      forearm.position.set(side * 0.32, -0.19, 0.14); forearm.rotation.x = -0.42; mesh.add(forearm);
+      const upperArm = new Mesh(new SphereGeometry(0.17, 14, 12), clothing);
+      upperArm.scale.set(0.72, 1.15, 0.78); upperArm.position.set(side * 0.34, 0.055, 0.025); upperArm.rotation.z = side * -0.12; mesh.add(upperArm);
+      const forearm = new Mesh(new SphereGeometry(0.145, 14, 12), clothing);
+      forearm.scale.set(0.76, 1.12, 0.78); forearm.position.set(side * 0.32, -0.19, 0.14); forearm.rotation.x = -0.42; mesh.add(forearm);
       const hand = new Mesh(new SphereGeometry(0.075, 12, 10), skinLight);
       hand.position.set(side * 0.30, -0.32, 0.24); mesh.add(hand);
-      const thigh = new Mesh(new BoxGeometry(0.19, 0.34, 0.22), clothing);
-      thigh.position.set(side * 0.13, -0.43, 0); mesh.add(thigh);
-      const lowerLeg = new Mesh(new BoxGeometry(0.16, 0.31, 0.18), clothDark);
-      lowerLeg.position.set(side * 0.13, -0.72, 0.015); mesh.add(lowerLeg);
+      const thigh = new Mesh(new SphereGeometry(0.19, 14, 12), clothing);
+      thigh.scale.set(0.72, 1.12, 0.78); thigh.position.set(side * 0.13, -0.43, 0); mesh.add(thigh);
+      const lowerLeg = new Mesh(new SphereGeometry(0.155, 14, 12), clothDark);
+      lowerLeg.scale.set(0.72, 1.15, 0.78); lowerLeg.position.set(side * 0.13, -0.72, 0.015); mesh.add(lowerLeg);
       const boot = new Mesh(new BoxGeometry(0.19, 0.13, 0.31), clothDark);
       boot.position.set(side * 0.13, -0.91, 0.07); mesh.add(boot);
     }
@@ -761,8 +797,12 @@ function spawnArenaTarget() {
     rifle.position.set(0.13, -0.105, 0.39); mesh.add(rifle);
     const barrel = new Mesh(new BoxGeometry(0.045, 0.045, 0.22), vest);
     barrel.position.set(0.13, -0.10, 0.74); mesh.add(barrel);
-    const muzzle = new Mesh(new SphereGeometry(0.055, 10, 8), new MeshBasicMaterial({ color: 0xff542e }));
+    const muzzle = new Mesh(new SphereGeometry(0.085, 12, 10), new MeshBasicMaterial({ color: 0xff542e }));
     muzzle.position.set(0.13, -0.10, 0.86); mesh.add(muzzle);
+    const nose = new Mesh(new SphereGeometry(0.035, 10, 8), skinLight);
+    nose.scale.set(0.72, 1.2, 0.8); nose.position.set(0, 0.585, 0.226); mesh.add(nose);
+    const mouth = new Mesh(new BoxGeometry(0.085, 0.018, 0.018), clothDark);
+    mouth.position.set(0, 0.515, 0.218); mesh.add(mouth);
     mesh.userData.combatArms = [];
     mesh.userData.muzzle = muzzle;
     mesh.scale.setScalar(activeGameMode === 'nightfall-survival' || activeGameMode === 'last-stand' ? 1.12 : 1.0);
@@ -835,7 +875,7 @@ function startRiftRacer(){
  if(arenaActive)stopArena('Previous game ended');activeGameMode='rift-racer';arenaActive=true;arenaPaused=false;arenaScore=0;arenaHits=0;arenaCombo=0;arenaBestCombo=0;arenaWave=1;arenaShield=3;arenaGoal=999;arenaSeconds=75;arenaDeadline=Date.now()+75000;raceLane=1;raceDistance=0;raceSpawnClock=0;clearArena();buildRaceTrack();
  for(let i=0;i<4;i++){spawnRaceObstacle();raceObjects[raceObjects.length-1].mesh.position.z=-12-i*5;}
  if(arenaTimer!==null)window.clearInterval(arenaTimer);arenaTimer=window.setInterval(()=>{arenaSeconds=Math.max(0,Math.ceil((arenaDeadline-Date.now())/1000));if(arenaSeconds<=0)stopArena('RIFT RACER · FINISH LINE');else refreshQuestPanel();},250);
- statusText('RIFT RACER START · Arrow keys / A-D or drag to steer. Avoid rival cars and roadblocks. Three crashes and it is over!');refreshQuestPanel();
+ playArenaSound('start');statusText('RIFT RACER START · Arrow keys / A-D or drag to steer. Avoid rival cars and roadblocks. Three crashes and it is over!');refreshQuestPanel();
 }
 function clearArena() {
   for (const mesh of arenaMeshes) {
@@ -876,6 +916,7 @@ function hitArenaTarget(entity: any) {
   }
   entity.destroy?.();
   arenaHits += 1;
+  playArenaSound('hit');
   arenaCombo += 1;
   arenaBestCombo = Math.max(arenaBestCombo, arenaCombo);
   const multiplier = Math.min(5, 1 + Math.floor((arenaCombo - 1) / 3));
@@ -912,6 +953,7 @@ function breachArenaTarget(entity: any) {
   }
   entity.destroy?.();
   arenaShield = Math.max(0, arenaShield - 1);
+  playArenaSound('damage');
   arenaCombo = 0;
   if (arenaShield <= 0) {
     stopArena('MISSION FAILED · shield breached');
@@ -953,6 +995,7 @@ function startArena() {
     if (arenaSeconds <= 0) stopArena('Time is up');
     else refreshQuestPanel();
   }, 250);
+  playArenaSound('start');
   statusText(`VR Arena started · hit ${arenaGoal} targets in 45 seconds. Build combos for bonus points.`);
   refreshQuestPanel();
 }
@@ -972,6 +1015,7 @@ function startDroneDefense() {
     arenaSeconds = Math.max(0, Math.ceil((arenaDeadline - Date.now()) / 1000));
     if (arenaSeconds <= 0) stopArena('Defense time expired'); else refreshQuestPanel();
   }, 250);
+  playArenaSound('start');
   statusText('RIFT GUARD ONLINE · intercept attack craft before they breach the core.');
   refreshQuestPanel();
 }
@@ -991,6 +1035,7 @@ function startMeteorBlitz() {
     arenaSeconds = Math.max(0, Math.ceil((arenaDeadline - Date.now()) / 1000));
     if (arenaSeconds <= 0) stopArena('Meteor storm survived'); else refreshQuestPanel();
   }, 250);
+  playArenaSound('start');
   statusText('METEOR BLITZ · smash 30 fast-moving meteors before the storm ends. Keep your combo alive!');
   refreshQuestPanel();
 }
@@ -1019,6 +1064,7 @@ function startExtraGame(mode: 'phantom-hunt' | 'zero-g-rush' | 'last-stand' | 't
     if (arenaSeconds <= 0) stopArena(mode === 'last-stand' || mode === 'nightfall-survival' ? 'SURVIVAL COMPLETE' : 'Challenge complete');
     else refreshQuestPanel();
   }, 250);
+  playArenaSound('start');
   statusText(config.intro);
   refreshQuestPanel();
 }
@@ -1250,10 +1296,11 @@ class ArenaMotionSystem extends createSystem({
           motion.attackClock += delta;
           if (motion.attackClock >= 1.65 + Math.random() * 0.35) {
             motion.attackClock = 0;
-            const shot = new Mesh(new SphereGeometry(0.075, 10, 8), new MeshBasicMaterial({ color: 0xff3c28 }));
+            const shot = new Mesh(new BoxGeometry(0.12, 0.12, 0.72), new MeshBasicMaterial({ color: 0xff5a18 }));
             const shotEntity = world.createTransformEntity(shot, { persistent: true });
             shotEntity.object3D!.position.set(mesh.position.x + 0.42, 1.02, mesh.position.z + 0.42);
-            hostileShots.push({ mesh: shot, entity: shotEntity, speed: 5.2 + arenaWave * 0.25 });
+            hostileShots.push({ mesh: shot, entity: shotEntity, speed: 7.0 + arenaWave * 0.3 });
+            playArenaSound('shot');
           }
         }
         if (motion.z >= 1.05) { breachArenaTarget(entity); return; }
@@ -1267,6 +1314,7 @@ class ArenaMotionSystem extends createSystem({
       shot.mesh.scale.setScalar(1 + Math.sin(time * 18 + i) * 0.16);
       if (shot.mesh.position.z >= 0.75) {
         arenaShield = Math.max(0, arenaShield - 1);
+        playArenaSound('damage');
         statusText(`INCOMING FIRE HIT · shield ${arenaShield}/3 · eliminate the shooters!`);
         shot.entity?.destroy?.(); shot.mesh.parent?.remove(shot.mesh); shot.mesh.geometry.dispose(); (shot.mesh.material as MeshBasicMaterial).dispose(); hostileShots.splice(i, 1);
         if (arenaShield <= 0) { stopArena('OVERWHELMED · SURVIVAL FAILED'); return; }
