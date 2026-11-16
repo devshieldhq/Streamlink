@@ -40,6 +40,8 @@ const arenaShellMaterial = new MeshBasicMaterial({ color: 0x101b35 });
 const arenaAccentMaterial = new MeshBasicMaterial({ color: 0x16d9ff });
 const arenaPurpleMaterial = new MeshBasicMaterial({ color: 0x6c55ff });
 const arenaFloorLineMaterial = new MeshBasicMaterial({ color: 0x174c79 });
+const arenaCoreMaterial = new MeshBasicMaterial({ color: 0x20dfff });
+const arenaGoldMaterial = new MeshBasicMaterial({ color: 0xffb84d });
 const arenaEnvironmentMeshes: Mesh[] = [];
 const arenaEnvironmentRooms = new Map<string, Group>();
 const addArenaMesh = (geometry: any, material: any, position: [number, number, number], rotation?: [number, number, number]) => {
@@ -90,6 +92,18 @@ for (let x = -5.4; x <= 5.4; x += 1.8) {
 }
 addArenaMesh(new TorusGeometry(2.8, 0.035, 8, 64), arenaAccentMaterial, [0, 0.055, -2.2], [Math.PI / 2, 0, 0]);
 addArenaMesh(new TorusGeometry(2.25, 0.022, 8, 64), arenaPurpleMaterial, [0, 0.06, -2.2], [Math.PI / 2, 0, 0]);
+
+// Rift Gate: a large, unmistakable focal point behind the combat zone.
+addArenaMesh(new TorusGeometry(1.72, 0.075, 12, 96), arenaCoreMaterial, [0, 2.45, -5.12]);
+addArenaMesh(new TorusGeometry(1.42, 0.028, 8, 96), arenaGoldMaterial, [0, 2.45, -5.08]);
+addArenaMesh(new TorusGeometry(1.10, 0.018, 8, 96), arenaPurpleMaterial, [0, 2.45, -5.04]);
+addArenaMesh(new SphereGeometry(0.34, 24, 18), arenaCoreMaterial, [0, 2.45, -5.02]);
+for (const x of [-5.35, -4.95, 4.95, 5.35]) {
+  addArenaMesh(new BoxGeometry(0.055, 3.7, 0.055), arenaCoreMaterial, [x, 2.0, -4.9]);
+}
+for (const y of [0.75, 1.05, 3.75, 4.05]) {
+  addArenaMesh(new BoxGeometry(10.4, 0.025, 0.035), arenaFloorLineMaterial, [0, y, -5.0]);
+}
 
 // Side pylons frame the play area while keeping the center open.
 for (const x of [-4.8, -3.8, 3.8, 4.8]) {
@@ -531,7 +545,7 @@ function drawQuestPanel() {
   ctx.fillText(`ARENA OBJECTIVE  ${arenaHits}/${arenaGoal} targets · best combo ${arenaBestCombo}`, 48, 330);
   ctx.fillText('Track the moving targets. Pinch or poke to score; every 5 hits advances the wave.', 48, 365);
   ctx.fillText(`DESTINATIONS  ${selectedDestinationNames.size} selected · use ADD DEST to choose platforms`, 48, 410);
-  ctx.fillText(activeGameMode === 'drone-defense' ? 'DRONE DEFENSE · stop the incoming drones!' : 'ORB RUSH · pinch or poke glowing targets.', 48, 450);
+  ctx.fillText(activeGameMode === 'drone-defense' ? 'RIFT GUARD · protect the core from incoming attack craft.' : 'ORB RUSH · warm-up mode · hit the glowing targets.', 48, 450);
   ctx.fillStyle = '#8198c4'; ctx.font = '18px Inter, sans-serif';
   ctx.fillText('MOVING TARGETS · hand pinch / controller trigger · combos multiply your score', 48, 605);
   panelTexture.needsUpdate = true;
@@ -635,20 +649,33 @@ function refreshDestinationButtons() {
 }
 function spawnArenaTarget() {
   const color = activeGameMode === 'drone-defense' ? [0xff4d6d, 0xff8a3d, 0xffd166][Math.floor(Math.random() * 3)] : [0x31d6ff, 0x8b7bff, 0xffb84d, 0x42e6a4, 0xff668c][Math.floor(Math.random() * 5)];
-  const targetRadius = Math.max(0.075, 0.13 - (arenaWave - 1) * 0.012);
-  const spread = Math.min(0.9, 0.4 + (arenaWave - 1) * 0.08);
+  const isDrone = activeGameMode === 'drone-defense';
+  const targetRadius = Math.max(0.14, 0.24 - (arenaWave - 1) * 0.012);
+  const spread = Math.min(1.35, 0.72 + (arenaWave - 1) * 0.08);
+  const droneMaterial = new MeshStandardMaterial({ color, emissive: color, emissiveIntensity: 1.15, roughness: 0.2, metalness: 0.32 });
   const mesh = new Mesh(
-    new SphereGeometry(targetRadius, 24, 18),
-    new MeshStandardMaterial({ color, emissive: color, emissiveIntensity: 0.8, roughness: 0.22, metalness: 0.25 }),
+    isDrone ? new BoxGeometry(0.34, 0.14, 0.24) : new SphereGeometry(targetRadius, 28, 20),
+    droneMaterial,
   );
-  const ring = new Mesh(new TorusGeometry(0.19, 0.014, 8, 32), new MeshBasicMaterial({ color: 0xffffff }));
+  if (isDrone) {
+    const wingMaterial = new MeshStandardMaterial({ color: 0xffb84d, emissive: 0xff4d6d, emissiveIntensity: 0.65, metalness: 0.45, roughness: 0.25 });
+    for (const side of [-1, 1]) {
+      const wing = new Mesh(new BoxGeometry(0.16, 0.045, 0.42), wingMaterial);
+      wing.position.set(side * 0.22, 0, 0);
+      mesh.add(wing);
+    }
+    const core = new Mesh(new SphereGeometry(0.105, 16, 12), new MeshBasicMaterial({ color: 0xffffff }));
+    core.position.set(0, 0.015, 0.14);
+    mesh.add(core);
+  }
+  const ring = new Mesh(new TorusGeometry(isDrone ? 0.34 : 0.30, 0.018, 8, 40), new MeshBasicMaterial({ color: 0xffffff }));
   mesh.add(ring);
   const entity = world.createTransformEntity(mesh, { persistent: true });
   // Keep runtime-spawned targets on the same persistent scene root as the arena shell.
   // This prevents ECS root visibility/lifecycle differences from hiding gameplay targets.
   const baseX = (Math.random() - 0.5) * spread * 3.2;
-  const baseY = 1.05 + Math.random() * 1.25;
-  const baseZ = -2.15 - Math.random() * 2.1;
+  const baseY = 1.15 + Math.random() * 1.45;
+  const baseZ = -3.0 - Math.random() * 1.55;
   entity.object3D!.position.set(baseX, baseY, baseZ);
   entity.addComponent(RayInteractable).addComponent(PokeInteractable).addComponent(ArenaTarget);
   arenaMeshes.add(mesh);
@@ -658,7 +685,7 @@ function spawnArenaTarget() {
     phase: Math.random() * Math.PI * 2,
     speed: activeGameMode === 'drone-defense' ? 1.35 + arenaWave * 0.12 : 0.85 + arenaWave * 0.08,
     drift: activeGameMode === 'drone-defense' ? 0.48 : 0.30,
-    approachSpeed: activeGameMode === 'drone-defense' ? 0.20 + arenaWave * 0.025 : 0,
+    approachSpeed: activeGameMode === 'drone-defense' ? 0.34 + arenaWave * 0.035 : 0,
   });
   return entity;
 }
@@ -793,7 +820,7 @@ function startDroneDefense() {
     arenaSeconds = Math.max(0, Math.ceil((arenaDeadline - Date.now()) / 1000));
     if (arenaSeconds <= 0) stopArena('Defense time expired'); else refreshQuestPanel();
   }, 250);
-  statusText('Drone Defense started · intercept 20 incoming drones in 60 seconds.');
+  statusText('RIFT GUARD ONLINE · intercept attack craft before they breach the core.');
   refreshQuestPanel();
 }
 function pauseArena() {
@@ -903,7 +930,7 @@ makeQuestButton('COMFORT', 'comfort', 0, 1.10, 0x42e6a4);
 makeQuestButton('RESET', 'reset', 0.42, 1.10, 0xff668c);
 makeQuestButton('PAUSE', 'pause', -0.51, 1.00, 0xffb84d);
 makeQuestButton('DEST', 'destination', -0.17, 1.00, 0x31d6ff);
-makeQuestButton('DRONES', 'drone-defense', 0.17, 1.00, 0xff668c);
+makeQuestButton('RIFT GUARD', 'drone-defense', 0.17, 1.00, 0xff668c);
 makeQuestButton('DONE', 'destination', 0, 1.10, 0x42e6a4, destinationPanelEntity);
 
 // Desktop preview controls provide mouse-accessible equivalents to the 3D hand buttons.
