@@ -20,8 +20,7 @@ const byId = <T extends HTMLElement>(id: string) => document.getElementById(id) 
 const container = byId<HTMLDivElement>('scene-container');
 const enterButton = byId<HTMLButtonElement>('enter-xr');
 const status = byId<HTMLDivElement>('status');
-let vrNoticeUpdater: ((message: string) => void) | null = null;
-const statusText = (message: string) => { if (status) status.textContent = message; vrNoticeUpdater?.(message); };
+const statusText = (message: string) => { if (status) status.textContent = message; };
 const apiFetch = (url: string, options: RequestInit = {}) =>
   window.SLAuth?.enabled ? window.SLAuth.fetch(url, options) : fetch(url, options);
 const socketOptions = () => window.SLAuth?.socketOptions?.() || { transports: ['websocket'] };
@@ -42,23 +41,18 @@ const arenaAccentMaterial = new MeshBasicMaterial({ color: 0x16d9ff });
 const arenaPurpleMaterial = new MeshBasicMaterial({ color: 0x6c55ff });
 const arenaFloorLineMaterial = new MeshBasicMaterial({ color: 0x174c79 });
 const arenaEnvironmentSelect = byId<HTMLSelectElement>('environment-select');
-const arenaEnvironmentPalettes: Record<string, { shell: number; accent: number; purple: number; floor: number; background: number }> = {
-  neon: { shell: 0x101b35, accent: 0x16d9ff, purple: 0x6c55ff, floor: 0x101a31, background: 0x080d20 },
-  sunset: { shell: 0x32182b, accent: 0xffa45b, purple: 0xff4f91, floor: 0x24172b, background: 0x160b20 },
-  arctic: { shell: 0x142c3b, accent: 0x8af4ff, purple: 0x6c9dff, floor: 0x102536, background: 0x071624 },
-  cosmic: { shell: 0x17112e, accent: 0xc18bff, purple: 0xff63c3, floor: 0x100d25, background: 0x070615 },
-};
+const roomNames = ['neon', 'office', 'living-room', 'space'];
 function setArenaEnvironment(name: string) {
-  const palette = arenaEnvironmentPalettes[name] || arenaEnvironmentPalettes.neon;
-  arenaShellMaterial.color.setHex(palette.shell);
-  arenaAccentMaterial.color.setHex(palette.accent);
-  arenaPurpleMaterial.color.setHex(palette.purple);
-  arenaFloorLineMaterial.color.setHex(palette.accent);
-  (floor.material as MeshStandardMaterial).color.setHex(palette.floor);
-  if (container) container.style.background = `#${palette.background.toString(16).padStart(6, '0')}`;
-  statusText(`Environment changed to ${name}.`);
+  const selected = roomNames.includes(name) ? name : 'neon';
+  arenaEnvironmentRooms.forEach((room, key) => { room.visible = key === selected; });
+  arenaEnvironmentMeshes.forEach((mesh) => { mesh.visible = selected === 'neon'; });
+  if (container) container.style.background = selected === 'space' ? '#030713' : selected === 'living-room' ? '#30251d' : selected === 'office' ? '#202b34' : '#080d20';
+  if (arenaEnvironmentSelect) arenaEnvironmentSelect.value = selected;
+  statusText(`Room changed to ${selected === 'living-room' ? 'Living Room' : selected === 'space' ? 'Space Station' : selected === 'office' ? 'Office' : 'Neon Arena'}.`);
 }
 arenaEnvironmentSelect?.addEventListener('change', () => setArenaEnvironment(arenaEnvironmentSelect.value));
+const arenaEnvironmentMeshes: Mesh[] = [];
+const arenaEnvironmentRooms = new Map<string, Group>();
 const addArenaMesh = (geometry: any, material: any, position: [number, number, number], rotation?: [number, number, number]) => {
   const mesh = new Mesh(geometry, material);
   // Register first: IWSDK binds Object3D transforms to ECS storage here.
@@ -86,6 +80,7 @@ const addArenaMesh = (geometry: any, material: any, position: [number, number, n
       sceneChildren: world.scene.children.length,
     });
   }
+  arenaEnvironmentMeshes.push(mesh);
   return mesh;
 };
 
@@ -121,6 +116,56 @@ const floorEntity = world.createTransformEntity(floor, { persistent: true });
 floorEntity.object3D!.rotation.x = -Math.PI / 2;
 floorEntity.object3D!.position.y = -0.025;
 floorEntity.addComponent(LocomotionEnvironment, { type: EnvironmentType.STATIC });
+
+// Procedural room sets: these change the actual 3D surroundings, not just the colour palette.
+function buildRoom(name: string, wallColor: number, floorColor: number) {
+  const group = new Group();
+  group.name = name;
+  const material = (color: number, roughness = 0.82) => new MeshStandardMaterial({ color, roughness });
+  const add = (geometry: any, mat: any, x: number, y: number, z: number) => {
+    const mesh = new Mesh(geometry, mat); mesh.position.set(x, y, z); group.add(mesh); return mesh;
+  };
+  const wall = material(wallColor), floorMat = material(floorColor), trim = material(0x9aa9b8);
+  add(new BoxGeometry(10, 4.8, 0.16), wall, 0, 2.4, -5.2);
+  add(new BoxGeometry(0.16, 4.8, 10), wall, -5, 2.4, -0.2);
+  add(new BoxGeometry(0.16, 4.8, 10), wall, 5, 2.4, -0.2);
+  add(new BoxGeometry(10, 0.12, 10), floorMat, 0, -0.09, -0.2);
+  add(new BoxGeometry(10, 0.12, 0.16), trim, 0, 4.75, -5.1);
+  if (name === 'office') {
+    const wood = material(0x79563c), dark = material(0x26384b), screen = material(0x162b45);
+    add(new BoxGeometry(2.8, 0.12, 1.1), wood, 0, 1.05, -2.4);
+    add(new BoxGeometry(0.12, 1.0, 0.12), dark, -1.25, 0.5, -2.0);
+    add(new BoxGeometry(0.12, 1.0, 0.12), dark, 1.25, 0.5, -2.0);
+    add(new BoxGeometry(1.25, 0.82, 0.08), screen, 0, 1.62, -2.75);
+    add(new BoxGeometry(0.85, 0.08, 0.8), dark, 0, 0.48, -1.55);
+    add(new BoxGeometry(0.12, 0.9, 0.12), dark, 0, 0.05, -1.55);
+    add(new BoxGeometry(1.4, 1.5, 0.12), wood, -3.6, 1.0, -3.8);
+    add(new BoxGeometry(0.9, 0.55, 0.1), material(0x4c83a8), -3.6, 2.0, -3.68);
+  } else if (name === 'living-room') {
+    const sofa = material(0x496b70), cushion = material(0xb5a18a), table = material(0x76563d);
+    add(new BoxGeometry(3.1, 0.65, 0.9), sofa, -1.4, 0.45, -3.2);
+    add(new BoxGeometry(3.1, 0.85, 0.22), sofa, -1.4, 0.95, -3.62);
+    add(new BoxGeometry(0.95, 0.12, 0.7), table, 1.3, 0.42, -2.4);
+    add(new BoxGeometry(0.08, 0.4, 0.08), table, 0.95, 0.2, -2.4);
+    add(new BoxGeometry(0.08, 0.4, 0.08), table, 1.65, 0.2, -2.4);
+    add(new BoxGeometry(1.5, 0.95, 0.08), material(0x172b39), 2.8, 1.75, -5.0);
+    add(new BoxGeometry(0.8, 0.8, 0.8), cushion, -3.4, 0.4, -1.0);
+  } else if (name === 'space') {
+    const metal = material(0x263b5d), glow = new MeshBasicMaterial({ color: 0x35d9ff });
+    add(new BoxGeometry(2.4, 0.08, 1.0), metal, 0, 1.2, -2.5);
+    add(new BoxGeometry(0.08, 2.2, 0.08), glow, -4.3, 1.1, -4.2);
+    add(new BoxGeometry(0.08, 2.2, 0.08), glow, 4.3, 1.1, -4.2);
+    add(new BoxGeometry(2.0, 1.2, 0.08), metal, 0, 2.0, -5.0);
+    add(new SphereGeometry(0.38, 24, 18), glow, -2.8, 2.2, -3.0);
+    add(new SphereGeometry(0.22, 24, 18), material(0xffb85c), 2.9, 2.7, -3.6);
+  }
+  world.scene.add(group);
+  arenaEnvironmentRooms.set(name, group);
+}
+buildRoom('office', 0x354657, 0x4a4035);
+buildRoom('living-room', 0x76675b, 0x655342);
+buildRoom('space', 0x101d38, 0x080f20);
+setArenaEnvironment('neon');
 
 const stage = new Mesh(
   new BoxGeometry(5.2, 0.12, 3.2),
@@ -542,15 +587,11 @@ function drawQuestPanel() {
   ctx.fillText('Pinch or poke targets. Every 5 hits advances the wave and raises the challenge.', 48, 365);
   ctx.fillText(`DESTINATIONS  ${selectedDestinationNames.size} selected · use ADD DEST to choose platforms`, 48, 410);
   ctx.fillText(activeGameMode === 'drone-defense' ? 'DRONE DEFENSE · stop the incoming drones!' : 'ORB RUSH · pinch or poke glowing targets.', 48, 450);
-  ctx.fillStyle = '#d8e7ff'; ctx.font = 'bold 20px Inter, sans-serif';
-  ctx.fillText(`STATUS  ${questNotice.slice(0, 90)}`, 48, 570);
   ctx.fillStyle = '#8198c4'; ctx.font = '18px Inter, sans-serif';
   ctx.fillText('Aim with a controller ray or hand pointer, then pinch / press to interact.', 48, 605);
   panelTexture.needsUpdate = true;
 }
-let questNotice = 'Studio ready.';
 function refreshQuestPanel() { drawQuestPanel(); }
-vrNoticeUpdater = (message: string) => { questNotice = message; refreshQuestPanel(); };
 
 function makeQuestButton(label: string, action: string, x: number, y: number, color: number, parent: any = panelEntity) {
   const canvas = document.createElement('canvas');
@@ -776,7 +817,7 @@ registerQuestAction('quality', () => {
   refreshQuestPanel();
 });
 registerQuestAction('environment', () => {
-  const names = Object.keys(arenaEnvironmentPalettes);
+  const names = roomNames;
   const current = Math.max(0, names.indexOf(arenaEnvironmentSelect?.value || 'neon'));
   const next = names[(current + 1) % names.length];
   if (arenaEnvironmentSelect) arenaEnvironmentSelect.value = next;
@@ -845,7 +886,7 @@ makeQuestButton('RESET', 'reset', 0.42, 1.10, 0xff668c);
 makeQuestButton('PAUSE', 'pause', -0.51, 1.00, 0xffb84d);
 makeQuestButton('DEST', 'destination', -0.17, 1.00, 0x31d6ff);
 makeQuestButton('DRONES', 'drone-defense', 0.17, 1.00, 0xff668c);
-makeQuestButton('ENV', 'environment', 0.51, 1.00, 0x31d6ff);
+makeQuestButton('ROOM', 'environment', 0.51, 1.00, 0x31d6ff);
 makeQuestButton('DONE', 'destination', 0, 1.10, 0x42e6a4, destinationPanelEntity);
 
 // Desktop preview controls provide mouse-accessible equivalents to the 3D hand buttons.
