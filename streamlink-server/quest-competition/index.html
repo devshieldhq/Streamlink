@@ -13,7 +13,9 @@
     #hud { position: fixed; z-index: 5; top: 16px; left: 18px; pointer-events: none; text-shadow: 0 2px 8px #000; }
     #hud strong { display: block; font-size: 19px; letter-spacing: .02em; }
     #hud span { color: #aab8d2; font-size: 11px; }
-    #actions { position: fixed; z-index: 8; right: 16px; top: 16px; display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
+    #actions { position: fixed; z-index: 8; right: 16px; top: 16px; max-width: calc(100vw - 32px); display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
+    #actions button, #actions a { padding: 9px 11px; font-size: 11px; }
+    #desktop-arena { background: #167a63; border-color: #42e6a4; }
     a, button { border: 1px solid #52658e; border-radius: 9px; padding: 10px 13px; background: #263d72; color: white; font: 700 12px system-ui, sans-serif; text-decoration: none; cursor: pointer; }
     a.secondary, button.secondary { background: #121b30; }
     button:disabled { opacity: .45; cursor: not-allowed; }
@@ -42,6 +44,9 @@
     <a class="secondary" href="/">Website</a>
     <a class="secondary" href="/account.html">Account</a>
     <a class="secondary" href="/gamey">Gamey</a>
+    <button id="desktop-arena" type="button">Start Arena</button>
+    <button id="desktop-pause" class="secondary" type="button">Pause / Resume</button>
+    <button id="desktop-reset" class="secondary" type="button">Reset Studio</button>
     <button id="enter-xr" type="button" disabled>Checking XR…</button>
   </nav>
 
