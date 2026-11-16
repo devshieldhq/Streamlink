@@ -525,7 +525,7 @@ const panelCtx = panelCanvas.getContext('2d');
 if (!panelCtx) throw new Error('Could not create Quest Studio panel canvas');
 const panelTexture = new CanvasTexture(panelCanvas);
 const panelMaterial = new MeshBasicMaterial({ map: panelTexture, transparent: true });
-const panelMesh = new Mesh(new PlaneGeometry(0.95, 1.0), panelMaterial);
+const panelMesh = new Mesh(new PlaneGeometry(1.45, 0.90), panelMaterial);
 panelMesh.userData.label = 'StreamLink Quest Studio control panel';
 const panelEntity = world.createTransformEntity(panelMesh, { persistent: true });
 panelEntity.object3D!.position.set(0, 1.5, -1.55);
@@ -588,7 +588,7 @@ function makeQuestButton(label: string, action: string, x: number, y: number, co
   ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
   ctx.fillText(label, 256, 90);
   const texture = new CanvasTexture(canvas);
-  const mesh = new Mesh(new PlaneGeometry(0.25, 0.10), new MeshBasicMaterial({ map: texture, transparent: true }));
+  const mesh = new Mesh(new PlaneGeometry(0.34, 0.13), new MeshBasicMaterial({ map: texture, transparent: true }));
   mesh.userData.action = action;
   const entity = world.createTransformEntity(mesh, { parent });
   entity.object3D!.position.set(x, y - 1.45, 0.025);
@@ -830,15 +830,20 @@ registerQuestAction('destination', () => {
     : 'Destination picker closed.');
 });
 
-makeQuestButton('GO LIVE / STOP', 'stream', -0.31, 1.25, 0x42e6a4);
+makeQuestButton('GO LIVE / STOP', 'stream', -0.42, 1.25, 0x42e6a4);
 makeQuestButton('QUALITY', 'quality', 0, 1.25, 0x31d6ff);
-makeQuestButton('VR ARENA', 'arena', 0.31, 1.25, 0xffb84d);
-makeQuestButton('FOCUS', 'focus', -0.31, 1.10, 0x8b7bff);
+makeQuestButton('VR ARENA', 'arena', 0.42, 1.25, 0xffb84d);
+makeQuestButton('FOCUS', 'focus', -0.42, 1.10, 0x8b7bff);
 makeQuestButton('COMFORT', 'comfort', 0, 1.10, 0x42e6a4);
-makeQuestButton('RESET', 'reset', 0.31, 1.10, 0xff668c);
-makeQuestButton('PAUSE / RESUME', 'pause', -0.16, 1.03, 0xffb84d);
-makeQuestButton('ADD DEST', 'destination', 0.16, 1.03, 0x31d6ff);
+makeQuestButton('RESET', 'reset', 0.42, 1.10, 0xff668c);
+makeQuestButton('PAUSE / RESUME', 'pause', -0.23, 1.03, 0xffb84d);
+makeQuestButton('ADD DEST', 'destination', 0.23, 1.03, 0x31d6ff);
 makeQuestButton('DONE', 'destination', 0, 1.10, 0x42e6a4, destinationPanelEntity);
+
+// Desktop preview controls provide mouse-accessible equivalents to the 3D hand buttons.
+byId<HTMLButtonElement>('desktop-arena')?.addEventListener('click', () => actionHandlers.get('arena')?.());
+byId<HTMLButtonElement>('desktop-pause')?.addEventListener('click', () => actionHandlers.get('pause')?.());
+byId<HTMLButtonElement>('desktop-reset')?.addEventListener('click', () => actionHandlers.get('reset')?.());
 refreshDestinationButtons();
 platformList?.addEventListener('input', refreshDestinationButtons);
 
