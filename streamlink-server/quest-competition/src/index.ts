@@ -487,34 +487,70 @@ const raceTrackMeshes:{mesh:Mesh;entity:any}[]=[];
 let raceCar:Group|null=null, raceCarEntity:any=null, raceTrackActive=false;
 let activeGameMode: 'orb-rush' | 'drone-defense' | 'meteor-blitz' | 'phantom-hunt' | 'zero-g-rush' | 'last-stand' | 'titan-breaker' | 'inferno-run' | 'nightfall-survival' | 'rift-racer' = 'orb-rush';
 const firstPersonGun = new Group();
-const gunBodyMaterial = new MeshStandardMaterial({ color: 0x202a36, metalness: 0.82, roughness: 0.28 });
-const gunBarrelMaterial = new MeshStandardMaterial({ color: 0x778493, metalness: 0.92, roughness: 0.2 });
-const gunGripMaterial = new MeshStandardMaterial({ color: 0x111820, roughness: 0.78 });
-const gunBodyView = new Mesh(new BoxGeometry(0.16, 0.15, 0.62), gunBodyMaterial);
-gunBodyView.position.set(0, -0.035, -0.28);
-firstPersonGun.add(gunBodyView);
-const gunBarrelView = new Mesh(new BoxGeometry(0.075, 0.075, 0.42), gunBarrelMaterial);
-gunBarrelView.position.set(0, 0.005, -0.77);
-firstPersonGun.add(gunBarrelView);
-const gunSightView = new Mesh(new BoxGeometry(0.045, 0.055, 0.12), gunBodyMaterial);
-gunSightView.position.set(0, 0.105, -0.3);
-firstPersonGun.add(gunSightView);
-const gunGripView = new Mesh(new BoxGeometry(0.105, 0.23, 0.13), gunGripMaterial);
-gunGripView.position.set(0, -0.19, -0.12);
-gunGripView.rotation.x = -0.18;
-firstPersonGun.add(gunGripView);
+const rifleMetal = new MeshStandardMaterial({ color: 0x252c34, metalness: 0.86, roughness: 0.3 });
+const rifleDark = new MeshStandardMaterial({ color: 0x111820, metalness: 0.25, roughness: 0.72 });
+const rifleSteel = new MeshStandardMaterial({ color: 0x59636e, metalness: 0.94, roughness: 0.22 });
+const riflePolymer = new MeshStandardMaterial({ color: 0x303a35, metalness: 0.08, roughness: 0.88 });
+const gloveMat = new MeshStandardMaterial({ color: 0x303c32, roughness: 0.96 });
+const sleeveMat = new MeshStandardMaterial({ color: 0x343d43, roughness: 0.95 });
+function addRiflePart(geometry: any, material: any, x: number, y: number, z: number, parent: Group = firstPersonGun) {
+  const part = new Mesh(geometry, material);
+  part.position.set(x, y, z);
+  part.castShadow = true;
+  part.receiveShadow = true;
+  parent.add(part);
+  return part;
+}
+// Detailed first-person carbine: stock, receiver, top rail, barrel, sights,
+// handguard, magazine, trigger guard and textured grip.
+addRiflePart(new BoxGeometry(0.19, 0.16, 0.56), rifleMetal, 0, -0.025, -0.23);
+addRiflePart(new BoxGeometry(0.17, 0.13, 0.38), riflePolymer, 0, -0.015, 0.22);
+addRiflePart(new BoxGeometry(0.14, 0.12, 0.28), riflePolymer, 0, -0.02, 0.51);
+addRiflePart(new BoxGeometry(0.07, 0.075, 0.48), rifleSteel, 0, 0.005, -0.72);
+addRiflePart(new CylinderGeometry(0.027, 0.027, 0.23, 12), rifleSteel, 0, 0.005, -1.035).rotation.x = Math.PI / 2;
+addRiflePart(new CylinderGeometry(0.045, 0.045, 0.045, 16), rifleDark, 0, 0.005, -1.16).rotation.x = Math.PI / 2;
+addRiflePart(new BoxGeometry(0.22, 0.11, 0.34), riflePolymer, 0, -0.015, 0.77);
+const magazine = addRiflePart(new BoxGeometry(0.13, 0.34, 0.18), rifleDark, 0, -0.235, -0.15);
+magazine.rotation.x = -0.13;
+addRiflePart(new BoxGeometry(0.11, 0.22, 0.15), riflePolymer, 0, -0.19, 0.18).rotation.x = -0.18;
+addRiflePart(new BoxGeometry(0.025, 0.035, 0.72), rifleSteel, 0, 0.095, -0.31);
+addRiflePart(new BoxGeometry(0.045, 0.09, 0.07), rifleDark, 0, 0.17, -0.72);
+addRiflePart(new BoxGeometry(0.045, 0.09, 0.07), rifleDark, 0, 0.17, 0.13);
+addRiflePart(new BoxGeometry(0.13, 0.035, 0.12), rifleSteel, 0, 0.125, -0.29);
+addRiflePart(new BoxGeometry(0.055, 0.07, 0.14), rifleDark, 0, -0.14, -0.43);
+addRiflePart(new BoxGeometry(0.045, 0.045, 0.16), rifleSteel, 0.105, 0.015, -0.23);
+addRiflePart(new BoxGeometry(0.045, 0.045, 0.16), rifleSteel, -0.105, 0.015, -0.23);
+// Foregrip and visible gloved support hands give the weapon a held, not floating, view.
+addRiflePart(new BoxGeometry(0.09, 0.17, 0.12), riflePolymer, 0, -0.13, -0.65).rotation.x = -0.12;
+const leftSleeve = addRiflePart(new CapsuleGeometry(0.075, 0.25, 4, 8), sleeveMat, -0.23, -0.32, -0.48);
+leftSleeve.rotation.z = -0.48;
+const leftGlove = addRiflePart(new SphereGeometry(0.085, 12, 10), gloveMat, -0.12, -0.13, -0.62);
+const rightSleeve = addRiflePart(new CapsuleGeometry(0.075, 0.22, 4, 8), sleeveMat, 0.27, -0.32, 0.02);
+rightSleeve.rotation.z = 0.48;
+addRiflePart(new SphereGeometry(0.082, 12, 10), gloveMat, 0.12, -0.13, 0.03);
 const gunMuzzleFlash = new Mesh(new SphereGeometry(0.105, 12, 10), new MeshBasicMaterial({ color: 0xffd45c, toneMapped: false }));
-gunMuzzleFlash.position.set(0, 0.005, -1.02);
+gunMuzzleFlash.position.set(0, 0.005, -1.18);
 gunMuzzleFlash.visible = false;
 firstPersonGun.add(gunMuzzleFlash);
-firstPersonGun.position.set(0.28, -0.24, -0.48);
+firstPersonGun.position.set(0.30, -0.30, -0.52);
 firstPersonGun.visible = false;
 world.camera.add(firstPersonGun);
+// A real recorded gunshot sample (CC0) replaces the old synthetic oscillator tone.
+const recordedGunshot = new Audio('https://sfxmint.com/dl/impact-gunshot-10.mp3');
+recordedGunshot.preload = 'auto';
+recordedGunshot.volume = 0.82;
+function playRecordedGunshot() {
+  try {
+    const shot = recordedGunshot.cloneNode(true) as HTMLAudioElement;
+    shot.volume = 0.82;
+    void shot.play().catch((error) => console.warn('[StreamLink] Gunshot audio could not play until audio is enabled.', error));
+  } catch (error) { console.warn('[StreamLink] Gunshot audio unavailable.', error); }
+}
 function isShooterMode() { return activeGameMode === 'drone-defense' || activeGameMode === 'last-stand' || activeGameMode === 'nightfall-survival'; }
 function syncFirstPersonGun() { firstPersonGun.visible = isShooterMode(); }
 function fireFirstPersonGun(direction?: Vector3) {
   if (!arenaActive || arenaPaused || !isShooterMode()) return;
-  playArenaSound('shot');
+  playRecordedGunshot();
   gunMuzzleFlash.visible = true;
   window.setTimeout(() => { gunMuzzleFlash.visible = false; }, 75);
   const origin = new Vector3();
