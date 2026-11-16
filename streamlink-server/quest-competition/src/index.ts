@@ -486,6 +486,52 @@ const raceObjects: {mesh:Group;entity:any;lane:number;speed:number;passed:boolea
 const raceTrackMeshes:{mesh:Mesh;entity:any}[]=[];
 let raceCar:Group|null=null, raceCarEntity:any=null, raceTrackActive=false;
 let activeGameMode: 'orb-rush' | 'drone-defense' | 'meteor-blitz' | 'phantom-hunt' | 'zero-g-rush' | 'last-stand' | 'titan-breaker' | 'inferno-run' | 'nightfall-survival' | 'rift-racer' = 'orb-rush';
+const firstPersonGun = new Group();
+const gunBodyMaterial = new MeshStandardMaterial({ color: 0x202a36, metalness: 0.82, roughness: 0.28 });
+const gunBarrelMaterial = new MeshStandardMaterial({ color: 0x778493, metalness: 0.92, roughness: 0.2 });
+const gunGripMaterial = new MeshStandardMaterial({ color: 0x111820, roughness: 0.78 });
+const gunBodyView = new Mesh(new BoxGeometry(0.16, 0.15, 0.62), gunBodyMaterial);
+gunBodyView.position.set(0, -0.035, -0.28);
+firstPersonGun.add(gunBodyView);
+const gunBarrelView = new Mesh(new BoxGeometry(0.075, 0.075, 0.42), gunBarrelMaterial);
+gunBarrelView.position.set(0, 0.005, -0.77);
+firstPersonGun.add(gunBarrelView);
+const gunSightView = new Mesh(new BoxGeometry(0.045, 0.055, 0.12), gunBodyMaterial);
+gunSightView.position.set(0, 0.105, -0.3);
+firstPersonGun.add(gunSightView);
+const gunGripView = new Mesh(new BoxGeometry(0.105, 0.23, 0.13), gunGripMaterial);
+gunGripView.position.set(0, -0.19, -0.12);
+gunGripView.rotation.x = -0.18;
+firstPersonGun.add(gunGripView);
+const gunMuzzleFlash = new Mesh(new SphereGeometry(0.105, 12, 10), new MeshBasicMaterial({ color: 0xffd45c, toneMapped: false }));
+gunMuzzleFlash.position.set(0, 0.005, -1.02);
+gunMuzzleFlash.visible = false;
+firstPersonGun.add(gunMuzzleFlash);
+firstPersonGun.position.set(0.28, -0.24, -0.48);
+firstPersonGun.visible = false;
+world.camera.add(firstPersonGun);
+function isShooterMode() { return activeGameMode === 'drone-defense' || activeGameMode === 'last-stand' || activeGameMode === 'nightfall-survival'; }
+function syncFirstPersonGun() { firstPersonGun.visible = isShooterMode(); }
+function fireFirstPersonGun(direction?: Vector3) {
+  if (!arenaActive || arenaPaused || !isShooterMode()) return;
+  playArenaSound('shot');
+  gunMuzzleFlash.visible = true;
+  window.setTimeout(() => { gunMuzzleFlash.visible = false; }, 75);
+  const origin = new Vector3();
+  world.camera.getWorldPosition(origin);
+  const shotDirection = direction?.clone().normalize() || new Vector3();
+  if (!direction) world.camera.getWorldDirection(shotDirection);
+  const tracer = new Mesh(new BoxGeometry(0.028, 0.028, 3.8), new MeshBasicMaterial({ color: 0xffd52a, toneMapped: false }));
+  tracer.position.copy(origin).addScaledVector(shotDirection, 1.95);
+  tracer.quaternion.setFromUnitVectors(new Vector3(0, 0, 1), shotDirection);
+  const tracerEntity = world.createTransformEntity(tracer, { persistent: true });
+  window.setTimeout(() => {
+    tracerEntity.destroy?.();
+    tracer.parent?.remove(tracer);
+    tracer.geometry.dispose();
+    (tracer.material as MeshBasicMaterial).dispose();
+  }, 95);
+}
 let arenaSeconds = 45;
 let arenaDeadline = 0;
 let arenaTimer: number | null = null;
@@ -919,7 +965,7 @@ function buildRaceTrack(){
 }
 function spawnRaceObstacle(){if(!raceTrackActive)return;const policeChance=Math.min(.58,.18+racePoliceLevel*.045);const roll=Math.random();const kind: 'traffic'|'police'|'roadblock'=roll<policeChance?'police':roll>.91?'roadblock':'traffic';const lane=Math.floor(Math.random()*3);const color=kind==='police'?0xe9edf2:[0xb82d35,0x222d3c,0xd9dce0,0x1e765e,0xd18a27][Math.floor(Math.random()*5)];const mesh=kind==='roadblock'?new Group():makeRoadCar(color,kind==='police');if(kind==='roadblock'){const block=new Mesh(new BoxGeometry(2.4,.75,.6),new MeshStandardMaterial({color:0xf3a21b,roughness:.7}));block.position.y=.42;mesh.add(block);for(let x=-.8;x<=.8;x+=.8){const stripe=new Mesh(new BoxGeometry(.34,.78,.63),new MeshBasicMaterial({color:0x20252d}));stripe.position.x=x;mesh.add(stripe);}}mesh.position.set((lane-1)*3.6,.02,-42);const entity=world.createTransformEntity(mesh,{persistent:true});raceObjects.push({mesh,entity,lane,speed:kind==='police'?16+racePoliceLevel*1.3:kind==='roadblock'?15:12+Math.random()*3,passed:false,kind});}
 function steerRace(direction:number){if(!arenaActive||activeGameMode!=='rift-racer'||arenaPaused)return;raceLane=Math.max(0,Math.min(2,raceLane+direction));if(raceCar)raceCar.position.x=(raceLane-1)*3.6;refreshQuestPanel();}
-function startRiftRacer(){if(arenaActive)stopArena('Previous game ended');activeGameMode='rift-racer';arenaActive=true;arenaPaused=false;arenaScore=0;arenaHits=0;arenaCombo=0;arenaBestCombo=0;arenaWave=1;arenaShield=3;arenaGoal=999;arenaSeconds=300;arenaDeadline=Date.now()+300000;raceLane=1;raceDistance=0;raceSpawnClock=0;racePoliceLevel=1;clearArena();buildRaceTrack();for(let i=0;i<5;i++){spawnRaceObstacle();raceObjects[raceObjects.length-1].mesh.position.z=-12-i*6;}if(arenaTimer!==null)window.clearInterval(arenaTimer);arenaTimer=window.setInterval(()=>{arenaSeconds=Math.max(0,Math.ceil((arenaDeadline-Date.now())/1000));if(arenaSeconds<=0)stopArena('FIVE-MINUTE PURSUIT SURVIVED');else refreshQuestPanel();},250);playArenaSound('start');statusText('FBI PURSUIT · 5 MINUTES · Arrow keys / A-D or drag to change lanes. Dodge traffic, roadblocks and flashing FBI interceptors. Three collisions end the chase.');refreshQuestPanel();}
+function startRiftRacer(){if(arenaActive)stopArena('Previous game ended');activeGameMode='rift-racer';syncFirstPersonGun();arenaActive=true;arenaPaused=false;arenaScore=0;arenaHits=0;arenaCombo=0;arenaBestCombo=0;arenaWave=1;arenaShield=3;arenaGoal=999;arenaSeconds=300;arenaDeadline=Date.now()+300000;raceLane=1;raceDistance=0;raceSpawnClock=0;racePoliceLevel=1;clearArena();buildRaceTrack();for(let i=0;i<5;i++){spawnRaceObstacle();raceObjects[raceObjects.length-1].mesh.position.z=-12-i*6;}if(arenaTimer!==null)window.clearInterval(arenaTimer);arenaTimer=window.setInterval(()=>{arenaSeconds=Math.max(0,Math.ceil((arenaDeadline-Date.now())/1000));if(arenaSeconds<=0)stopArena('FIVE-MINUTE PURSUIT SURVIVED');else refreshQuestPanel();},250);playArenaSound('start');statusText('FBI PURSUIT · 5 MINUTES · Arrow keys / A-D or drag to change lanes. Dodge traffic, roadblocks and flashing FBI interceptors. Three collisions end the chase.');refreshQuestPanel();}
 function clearArena() {
   for (const mesh of arenaMeshes) {
     const entity = arenaEntities.get(mesh);
@@ -961,7 +1007,7 @@ function hitArenaTarget(entity: any) {
   }
   entity.destroy?.();
   arenaHits += 1;
-  playArenaSound('hit');
+  if (isShooterMode()) playArenaSound('hit');
   arenaCombo += 1;
   arenaBestCombo = Math.max(arenaBestCombo, arenaCombo);
   const multiplier = Math.min(5, 1 + Math.floor((arenaCombo - 1) / 3));
@@ -1023,6 +1069,7 @@ function stopArena(message = 'Arena complete') {
 function startArena() {
   if (arenaActive) { stopArena('Arena stopped'); return; }
   activeGameMode = 'orb-rush';
+  syncFirstPersonGun();
   arenaShield = 3;
   arenaGoal = 15;
   arenaActive = true;
@@ -1049,6 +1096,7 @@ function startArena() {
 function startDroneDefense() {
   if (arenaActive) stopArena('Previous game ended');
   activeGameMode = 'drone-defense';
+  syncFirstPersonGun();
   arenaShield = 3;
   arenaGoal = 20;
   arenaActive = true;
@@ -1089,6 +1137,7 @@ function startMeteorBlitz() {
 function startExtraGame(mode: 'phantom-hunt' | 'zero-g-rush' | 'last-stand' | 'titan-breaker' | 'inferno-run' | 'nightfall-survival') {
   if (arenaActive) stopArena('Previous game ended');
   activeGameMode = mode;
+  syncFirstPersonGun();
   const config = mode === 'phantom-hunt'
     ? { goal: 18, seconds: 40, targets: 6, intro: 'PHANTOM HUNT · track unstable spectres. Small targets score 25 points; chain precision hits!' }
     : mode === 'zero-g-rush'
@@ -1301,6 +1350,7 @@ container.addEventListener('pointerdown', (event: PointerEvent) => {
     -((event.clientY - bounds.top) / bounds.height) * 2 + 1,
   );
   desktopRaycaster.setFromCamera(desktopPointer, world.camera);
+  if (isShooterMode()) fireFirstPersonGun(desktopRaycaster.ray.direction);
   const intersections = desktopRaycaster.intersectObjects([...arenaMeshes], true);
   if (!intersections.length) return;
   let target: any = intersections[0].object;
