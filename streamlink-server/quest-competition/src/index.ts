@@ -40,17 +40,6 @@ const arenaShellMaterial = new MeshBasicMaterial({ color: 0x101b35 });
 const arenaAccentMaterial = new MeshBasicMaterial({ color: 0x16d9ff });
 const arenaPurpleMaterial = new MeshBasicMaterial({ color: 0x6c55ff });
 const arenaFloorLineMaterial = new MeshBasicMaterial({ color: 0x174c79 });
-const arenaEnvironmentSelect = byId<HTMLSelectElement>('environment-select');
-const roomNames = ['neon', 'office', 'living-room', 'space'];
-function setArenaEnvironment(name: string) {
-  const selected = roomNames.includes(name) ? name : 'neon';
-  arenaEnvironmentRooms.forEach((room, key) => { room.visible = key === selected; });
-  arenaEnvironmentMeshes.forEach((mesh) => { mesh.visible = selected === 'neon'; });
-  if (container) container.style.background = selected === 'space' ? '#030713' : selected === 'living-room' ? '#30251d' : selected === 'office' ? '#202b34' : '#080d20';
-  if (arenaEnvironmentSelect) arenaEnvironmentSelect.value = selected;
-  statusText(`Room changed to ${selected === 'living-room' ? 'Living Room' : selected === 'space' ? 'Space Station' : selected === 'office' ? 'Office' : 'Neon Arena'}.`);
-}
-arenaEnvironmentSelect?.addEventListener('change', () => setArenaEnvironment(arenaEnvironmentSelect.value));
 const arenaEnvironmentMeshes: Mesh[] = [];
 const arenaEnvironmentRooms = new Map<string, Group>();
 const addArenaMesh = (geometry: any, material: any, position: [number, number, number], rotation?: [number, number, number]) => {
@@ -116,56 +105,6 @@ const floorEntity = world.createTransformEntity(floor, { persistent: true });
 floorEntity.object3D!.rotation.x = -Math.PI / 2;
 floorEntity.object3D!.position.y = -0.025;
 floorEntity.addComponent(LocomotionEnvironment, { type: EnvironmentType.STATIC });
-
-// Procedural room sets: these change the actual 3D surroundings, not just the colour palette.
-function buildRoom(name: string, wallColor: number, floorColor: number) {
-  const group = new Group();
-  group.name = name;
-  const material = (color: number, roughness = 0.82) => new MeshStandardMaterial({ color, roughness });
-  const add = (geometry: any, mat: any, x: number, y: number, z: number) => {
-    const mesh = new Mesh(geometry, mat); mesh.position.set(x, y, z); group.add(mesh); return mesh;
-  };
-  const wall = material(wallColor), floorMat = material(floorColor), trim = material(0x9aa9b8);
-  add(new BoxGeometry(10, 4.8, 0.16), wall, 0, 2.4, -5.2);
-  add(new BoxGeometry(0.16, 4.8, 10), wall, -5, 2.4, -0.2);
-  add(new BoxGeometry(0.16, 4.8, 10), wall, 5, 2.4, -0.2);
-  add(new BoxGeometry(10, 0.12, 10), floorMat, 0, -0.09, -0.2);
-  add(new BoxGeometry(10, 0.12, 0.16), trim, 0, 4.75, -5.1);
-  if (name === 'office') {
-    const wood = material(0x79563c), dark = material(0x26384b), screen = material(0x162b45);
-    add(new BoxGeometry(2.8, 0.12, 1.1), wood, 0, 1.05, -2.4);
-    add(new BoxGeometry(0.12, 1.0, 0.12), dark, -1.25, 0.5, -2.0);
-    add(new BoxGeometry(0.12, 1.0, 0.12), dark, 1.25, 0.5, -2.0);
-    add(new BoxGeometry(1.25, 0.82, 0.08), screen, 0, 1.62, -2.75);
-    add(new BoxGeometry(0.85, 0.08, 0.8), dark, 0, 0.48, -1.55);
-    add(new BoxGeometry(0.12, 0.9, 0.12), dark, 0, 0.05, -1.55);
-    add(new BoxGeometry(1.4, 1.5, 0.12), wood, -3.6, 1.0, -3.8);
-    add(new BoxGeometry(0.9, 0.55, 0.1), material(0x4c83a8), -3.6, 2.0, -3.68);
-  } else if (name === 'living-room') {
-    const sofa = material(0x496b70), cushion = material(0xb5a18a), table = material(0x76563d);
-    add(new BoxGeometry(3.1, 0.65, 0.9), sofa, -1.4, 0.45, -3.2);
-    add(new BoxGeometry(3.1, 0.85, 0.22), sofa, -1.4, 0.95, -3.62);
-    add(new BoxGeometry(0.95, 0.12, 0.7), table, 1.3, 0.42, -2.4);
-    add(new BoxGeometry(0.08, 0.4, 0.08), table, 0.95, 0.2, -2.4);
-    add(new BoxGeometry(0.08, 0.4, 0.08), table, 1.65, 0.2, -2.4);
-    add(new BoxGeometry(1.5, 0.95, 0.08), material(0x172b39), 2.8, 1.75, -5.0);
-    add(new BoxGeometry(0.8, 0.8, 0.8), cushion, -3.4, 0.4, -1.0);
-  } else if (name === 'space') {
-    const metal = material(0x263b5d), glow = new MeshBasicMaterial({ color: 0x35d9ff });
-    add(new BoxGeometry(2.4, 0.08, 1.0), metal, 0, 1.2, -2.5);
-    add(new BoxGeometry(0.08, 2.2, 0.08), glow, -4.3, 1.1, -4.2);
-    add(new BoxGeometry(0.08, 2.2, 0.08), glow, 4.3, 1.1, -4.2);
-    add(new BoxGeometry(2.0, 1.2, 0.08), metal, 0, 2.0, -5.0);
-    add(new SphereGeometry(0.38, 24, 18), glow, -2.8, 2.2, -3.0);
-    add(new SphereGeometry(0.22, 24, 18), material(0xffb85c), 2.9, 2.7, -3.6);
-  }
-  world.scene.add(group);
-  arenaEnvironmentRooms.set(name, group);
-}
-buildRoom('office', 0x354657, 0x4a4035);
-buildRoom('living-room', 0x76675b, 0x655342);
-buildRoom('space', 0x101d38, 0x080f20);
-setArenaEnvironment('neon');
 
 const stage = new Mesh(
   new BoxGeometry(5.2, 0.12, 3.2),
@@ -482,7 +421,7 @@ if (enterButton) {
       await world.launchXR();
       // Wait for the XR runtime to apply the headset pose before sampling the camera.
       requestAnimationFrame(() => requestAnimationFrame(() => { placeStudioInFrontOfCamera(); logQuestCameraAndMeshes(); }));
-      statusText('Quest session active · use hand pinch to grab and arrange the studio objects.');
+      document.body.classList.add('immersive-active');
     } catch (error) {
       console.error('Unable to start immersive session:', error);
       statusText('XR could not start. Open this HTTPS page in Quest Browser and check headset permissions.');
@@ -815,13 +754,6 @@ registerQuestAction('quality', () => {
   if (qualityInput) qualityInput.value = currentQuality;
   void setQuality();
   refreshQuestPanel();
-});
-registerQuestAction('environment', () => {
-  const names = roomNames;
-  const current = Math.max(0, names.indexOf(arenaEnvironmentSelect?.value || 'neon'));
-  const next = names[(current + 1) % names.length];
-  if (arenaEnvironmentSelect) arenaEnvironmentSelect.value = next;
-  setArenaEnvironment(next);
 });
 registerQuestAction('arena', startArena);
 registerQuestAction('drone-defense', startDroneDefense);
