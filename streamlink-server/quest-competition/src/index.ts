@@ -1608,7 +1608,7 @@ class ArenaMotionSystem extends createSystem({
             const shotEntity = world.createTransformEntity(shot, { persistent: true });
             shotEntity.object3D!.position.copy(muzzleWorld);
             hostileShots.push({ mesh: shot, entity: shotEntity, velocity: direction.multiplyScalar(8.5 + arenaWave * 0.35), target: targetWorld });
-            muzzle.visible = true;
+            if (muzzle) muzzle.visible = true;
             playArenaSound('shot');
           }
         }
