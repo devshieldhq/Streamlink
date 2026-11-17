@@ -627,116 +627,10 @@ const raiderModelUrls = [
   'https://cdn.3dassets.dev/assets/32901/v1/model.glb', // CC0 rigged scout with authored idle, walk, run and grasp clips
 ];
 const raiderModelPromises: Promise<any>[] = [];
-let raiderSpawnVariant = 0;
-// Keep only a few high-detail imported soldiers active at once. The remaining
-// enemies use the lightweight built-in human models, avoiding a burst of GLB
-// clones, materials and skinning work when a round starts.
-let detailedRaiderCount = 0;
-const MAX_DETAILED_RAIDERS = 3;
-function attachAnimatedHumanRaider(target: Mesh) {
-  if (detailedRaiderCount >= MAX_DETAILED_RAIDERS) return;
-  detailedRaiderCount += 1;
-  const variant = raiderSpawnVariant++ % raiderModelUrls.length;
-  if (!raiderModelPromises[variant]) {
-    const loader = new GLTFLoader();
-    // CC0 rigged character with a real 74-joint skeleton and authored walk/run clips.
-    // The previous heavy-trooper GLBs were static, unrigged meshes, so no code-side
-    // bone animation could ever make their legs move.
-    raiderModelPromises[variant] = loader.loadAsync(raiderModelUrls[variant])
-      .catch((error) => { console.warn('[StreamLink] Free CC0 tactical operator unavailable; keeping fallback character.', error); return null; });
-  }
-  void raiderModelPromises[variant].then((gltf) => {
-    if (!gltf || !arenaMeshes.has(target) || !target.parent) return;
-    const human = cloneSkinnedModel(gltf.scene);
-    const bounds = new Box3().setFromObject(human);
-    const size = bounds.getSize(new Vector3());
-    if (!Number.isFinite(size.y) || size.y < 0.5 || size.y > 5) {
-      console.warn('[StreamLink] Tactical operator model bounds invalid; keeping fallback character.');
-      return;
-    }
-    const modelScale = 1.72 / size.y;
-    human.scale.setScalar(modelScale);
-    // The arena target pivot sits at y=0.93; offset the model down so its boots
-    // meet the floor rather than hovering at the target's centre.
-    human.position.set(0, -0.93 - bounds.min.y * modelScale, 0);
-    // These CC0 operator models face +Z, toward the player standing at +Z.
-    human.rotation.y = 0;
-    human.traverse((part: any) => {
-      if (part.isMesh) {
-        // The arena has no real-time shadow requirement; disabling per-soldier
-        // shadow passes and restoring frustum culling saves Quest GPU time.
-        part.castShadow = false;
-        part.receiveShadow = false;
-        part.frustumCulled = true;
-      }
-    });
-    target.add(human);
-    target.userData.raiderModel = human;
-    target.userData.raiderVariant = variant;
-
-    // Keep the rifle visible when the procedural stand-in is hidden, and add
-    // proper supporting arms/hands so the operator visibly shoulders the weapon.
-    const rifle = target.userData.enemyRifle as Group | undefined;
-    if (rifle) {
-      rifle.visible = true;
-      const armMaterial = new MeshStandardMaterial({ color: 0x35483b, roughness: 0.88, metalness: 0.03 });
-      const gloveMaterial = new MeshStandardMaterial({ color: 0x252b30, roughness: 0.92 });
-      const makeArm = (from: Vector3, to: Vector3) => {
-        const delta = to.clone().sub(from);
-        const arm = new Mesh(new CapsuleGeometry(0.064, Math.max(0.06, delta.length() - 0.13), 5, 9), armMaterial);
-        arm.position.copy(from).add(to).multiplyScalar(0.5);
-        arm.quaternion.setFromUnitVectors(new Vector3(0, 1, 0), delta.normalize());
-        arm.userData.enemyGripPart = true;
-        target.add(arm);
-        const hand = new Mesh(new SphereGeometry(0.075, 12, 10), gloveMaterial);
-        hand.position.copy(to);
-        hand.userData.enemyGripPart = true;
-        target.add(hand);
-      };
-      // Both arms reach forward: right hand on the pistol grip, left hand under
-      // the handguard. Coordinates are in the operator's local, forward-facing space.
-      makeArm(new Vector3(0.29, 0.20, 0.02), new Vector3(0.20, 0.13, 0.34));
-      makeArm(new Vector3(-0.29, 0.20, 0.02), new Vector3(0.20, 0.145, 0.58));
-    }
-    // Prefer an actual walk/run clip when the asset has one. Do not play an
-    // arbitrary first clip (often idle/aim), which makes the character slide.
-    const locomotion = gltf.animations?.find((clip: any) => /walk|run|move|locomotion|march/i.test(clip.name));
-    if (locomotion) {
-      const mixer = new AnimationMixer(human);
-      const action = mixer.clipAction(locomotion);
-      action.reset();
-      action.setLoop(2201, Infinity);
-      action.play();
-      raiderMixers.set(target, mixer);
-    }
-    // Fallback: animate the actual humanoid skeleton when no walk clip exists.
-    // Store each bone's rest pose so the update loop can swing legs/arms cleanly.
-    const walkBones: any[] = [];
-    human.traverse((part: any) => {
-      if (!part.isBone) return;
-      const name = String(part.name || '').toLowerCase().replace(/[^a-z0-9]/g, '');
-      let side = 0;
-      if (/left|\bl\b/.test(name)) side = -1;
-      if (/right|\br\b/.test(name)) side = 1;
-      if (!side) return;
-      let role = '';
-      if (/upleg|thigh|upperleg|femur/.test(name)) role = 'thigh';
-      else if (/leg|calf|shin|lowerleg/.test(name)) role = 'shin';
-      else if (/upperarm|arm|forearm/.test(name)) role = 'arm';
-      if (!role) return;
-      walkBones.push({ bone: part, rest: part.quaternion.clone(), side, role });
-    });
-    human.userData.walkBones = walkBones;
-    human.userData.hasWalkClip = !!locomotion;
-    // Keep the exact floor-alignment offset; animation must not overwrite it.
-    human.userData.floorAlignedY = human.position.y;
-    // Only remove the procedural stand-in after the detailed model is attached.
-    target.children.forEach((child) => {
-      if (child !== human && child !== target.userData.enemyRifle && !child.userData.enemyGripPart) child.visible = false;
-    });
-    target.geometry.dispose();
-    target.geometry = new SphereGeometry(0.001, 4, 4);
-  });
+// Use the optimized built-in human raider for combat rounds. This avoids
+// remote GLB downloads and keeps the weapon, arms and hands in one shared rig.
+function attachAnimatedHumanRaider(_target: Mesh) {
+  // Intentionally use the procedural soldier built in spawnArenaTarget().
 }
 let arenaAudio: AudioContext | null = null;
 function playArenaSound(kind: 'shot' | 'hit' | 'damage' | 'start') {
@@ -1036,12 +930,6 @@ function spawnArenaTarget() {
       iris.position.set(side * 0.075, 0.625, 0.227); mesh.add(iris);
       const shoulder = new Mesh(new SphereGeometry(0.14, 12, 10), clothing);
       shoulder.position.set(side * 0.29, 0.25, 0); mesh.add(shoulder);
-      const upperArm = new Mesh(new SphereGeometry(0.17, 14, 12), clothing);
-      upperArm.scale.set(0.72, 1.15, 0.78); upperArm.position.set(side * 0.34, 0.055, 0.025); upperArm.rotation.z = side * -0.12; mesh.add(upperArm);
-      const forearm = new Mesh(new SphereGeometry(0.145, 14, 12), clothing);
-      forearm.scale.set(0.76, 1.12, 0.78); forearm.position.set(side * 0.32, -0.19, 0.14); forearm.rotation.x = -0.42; mesh.add(forearm);
-      const hand = new Mesh(new SphereGeometry(0.075, 12, 10), skinLight);
-      hand.position.set(side * 0.30, -0.32, 0.24); mesh.add(hand);
       const thigh = new Mesh(new SphereGeometry(0.19, 14, 12), clothing);
       thigh.scale.set(0.72, 1.12, 0.78); thigh.position.set(side * 0.13, -0.43, 0); mesh.add(thigh);
       const lowerLeg = new Mesh(new SphereGeometry(0.155, 14, 12), clothDark);
@@ -1060,33 +948,60 @@ function spawnArenaTarget() {
     const belt = new Mesh(new BoxGeometry(0.47, 0.09, 0.29), clothDark);
     belt.position.set(0, -0.22, 0); mesh.add(belt);
 
-    // Rifle is parented to each enemy so its barrel and muzzle move with the soldier.
+    // Slim, recognisable carbine silhouette with a separate stock, receiver,
+    // handguard, sights, pistol grip, magazine and narrow muzzle.
     const enemyRifle = new Group();
-    enemyRifle.position.set(0.20, 0.13, 0.27);
-    const rifleBody = new Mesh(new BoxGeometry(0.13, 0.13, 0.52), clothDark);
-    rifleBody.position.z = 0.22;
-    enemyRifle.add(rifleBody);
-    const handguard = new Mesh(new BoxGeometry(0.105, 0.105, 0.34), vest);
-    handguard.position.set(0, 0.015, 0.53);
-    enemyRifle.add(handguard);
-    const barrel = new Mesh(new CylinderGeometry(0.027, 0.027, 0.34, 12), rifleMetal);
-    barrel.rotation.x = Math.PI / 2;
-    barrel.position.set(0, 0.015, 0.84);
-    enemyRifle.add(barrel);
-    const stock = new Mesh(new BoxGeometry(0.12, 0.14, 0.25), clothDark);
-    stock.position.set(0, -0.005, -0.16);
-    enemyRifle.add(stock);
-    const magazine = new Mesh(new BoxGeometry(0.085, 0.22, 0.12), rifleDark);
-    magazine.position.set(0, -0.15, 0.27);
-    magazine.rotation.x = -0.12;
-    enemyRifle.add(magazine);
-    const muzzle = new Mesh(new SphereGeometry(0.065, 12, 10), new MeshBasicMaterial({ color: 0xff542e }));
-    muzzle.position.set(0, 0.015, 1.035);
-    muzzle.visible = false;
-    enemyRifle.add(muzzle);
+    enemyRifle.position.set(0.20, 0.105, 0.20);
+    const rifleBody = new Mesh(new BoxGeometry(0.085, 0.09, 0.40), clothDark);
+    rifleBody.position.set(0, 0.015, 0.22); enemyRifle.add(rifleBody);
+    const upperRail = new Mesh(new BoxGeometry(0.045, 0.025, 0.50), rifleMetal);
+    upperRail.position.set(0, 0.067, 0.34); enemyRifle.add(upperRail);
+    const handguard = new Mesh(new BoxGeometry(0.075, 0.075, 0.30), vest);
+    handguard.position.set(0, 0.005, 0.53); enemyRifle.add(handguard);
+    const barrel = new Mesh(new CylinderGeometry(0.014, 0.017, 0.38, 10), rifleMetal);
+    barrel.rotation.x = Math.PI / 2; barrel.position.set(0, 0.015, 0.86); enemyRifle.add(barrel);
+    const stock = new Mesh(new BoxGeometry(0.09, 0.105, 0.22), clothDark);
+    stock.position.set(0, 0.005, -0.105); enemyRifle.add(stock);
+    const grip = new Mesh(new BoxGeometry(0.055, 0.16, 0.075), clothDark);
+    grip.position.set(0, -0.105, 0.16); grip.rotation.x = -0.20; enemyRifle.add(grip);
+    const magazine = new Mesh(new BoxGeometry(0.06, 0.17, 0.085), rifleDark);
+    magazine.position.set(0, -0.125, 0.32); magazine.rotation.x = -0.10; enemyRifle.add(magazine);
+    const frontSight = new Mesh(new BoxGeometry(0.025, 0.07, 0.025), rifleMetal);
+    frontSight.position.set(0, 0.105, 0.69); enemyRifle.add(frontSight);
+    const rearSight = new Mesh(new BoxGeometry(0.045, 0.045, 0.035), rifleMetal);
+    rearSight.position.set(0, 0.095, 0.10); enemyRifle.add(rearSight);
+    const muzzle = new Mesh(new SphereGeometry(0.026, 10, 8), new MeshBasicMaterial({ color: 0xff542e }));
+    muzzle.position.set(0, 0.015, 1.055); muzzle.visible = false; enemyRifle.add(muzzle);
     mesh.add(enemyRifle);
     mesh.userData.enemyRifle = enemyRifle;
     mesh.userData.muzzle = muzzle;
+
+    // Arms are anchored at the shoulders; both gloved hands are children of
+    // the rifle group and sit directly on the pistol grip and forward handguard.
+    const armMaterial = clothing;
+    const gloveMaterial = new MeshStandardMaterial({ color: 0x252b30, roughness: 0.92 });
+    const addArmSegment = (from: Vector3, to: Vector3, radius: number) => {
+      const delta = to.clone().sub(from);
+      const segment = new Mesh(new CapsuleGeometry(radius, Math.max(0.025, delta.length() - radius * 2), 6, 10), armMaterial);
+      segment.position.copy(from).add(to).multiplyScalar(0.5);
+      segment.quaternion.setFromUnitVectors(new Vector3(0, 1, 0), delta.normalize());
+      mesh.add(segment);
+    };
+    const rightShoulder = new Vector3(0.29, 0.25, 0.01);
+    const rightElbow = new Vector3(0.36, 0.10, 0.23);
+    const rightHand = new Vector3(0, -0.055, 0.16);
+    const leftShoulder = new Vector3(-0.29, 0.25, 0.01);
+    const leftElbow = new Vector3(-0.06, 0.08, 0.43);
+    const leftHand = new Vector3(0, 0.005, 0.53);
+    const rifleOrigin = enemyRifle.position.clone();
+    addArmSegment(rightShoulder, rifleOrigin.clone().add(rightElbow), 0.067);
+    addArmSegment(rifleOrigin.clone().add(rightElbow), rifleOrigin.clone().add(rightHand), 0.055);
+    addArmSegment(leftShoulder, rifleOrigin.clone().add(leftElbow), 0.067);
+    addArmSegment(rifleOrigin.clone().add(leftElbow), rifleOrigin.clone().add(leftHand), 0.055);
+    const triggerHand = new Mesh(new SphereGeometry(0.052, 12, 10), gloveMaterial);
+    triggerHand.position.copy(rightHand); enemyRifle.add(triggerHand);
+    const supportHand = new Mesh(new SphereGeometry(0.052, 12, 10), gloveMaterial);
+    supportHand.position.copy(leftHand); enemyRifle.add(supportHand);
 
     const nose = new Mesh(new SphereGeometry(0.035, 10, 8), skinLight);
     nose.scale.set(0.72, 1.2, 0.8); nose.position.set(0, 0.585, 0.226); mesh.add(nose);
