@@ -630,64 +630,52 @@ const arenaEntities = new Map<Mesh, any>();
 const arenaMotion = new Map<number, { x: number; y: number; z: number; phase: number; speed: number; drift: number; approachSpeed: number; attackClock: number }>();
 const hostileShots: { mesh: Mesh; entity: any; speed: number }[] = [];
 const raiderMixers = new Map<Mesh, AnimationMixer>();
-let raiderModelPromise: Promise<any> | null = null;
+const raiderModelUrls = [
+  'https://cdn.3dassets.dev/assets/28526/v1/model.glb', // CC0 heavy trooper advancing
+  'https://cdn.3dassets.dev/assets/28525/v1/model.glb', // CC0 heavy trooper aiming
+];
+const raiderModelPromises: Promise<any>[] = [];
+let raiderSpawnVariant = 0;
 function attachAnimatedHumanRaider(target: Mesh) {
-  if (!raiderModelPromise) {
+  const variant = raiderSpawnVariant++ % raiderModelUrls.length;
+  if (!raiderModelPromises[variant]) {
     const loader = new GLTFLoader();
-    // Use a textured, mid-poly modern military character (15k triangles, PBR textures, 80-bone rig).
-    // MIT-licensed GLB; if its animation clips are absent, arena locomotion still moves the character.
-    raiderModelPromise = loader.loadAsync('https://models.codelove.in/models/military-male-01.glb')
-      .catch((error) => { console.warn('[StreamLink] Animated soldier model unavailable; keeping the detailed fallback character.', error); return null; });
+    // Detailed, game-ready tactical operators from a CC0 1.0 asset pack.
+    // Each model has ~31.6k triangles, seven materials, helmet, goggles,
+    // plate carrier, expedition pack, guards and an integrated battle rifle.
+    raiderModelPromises[variant] = loader.loadAsync(raiderModelUrls[variant])
+      .catch((error) => { console.warn('[StreamLink] Free CC0 tactical operator unavailable; keeping fallback character.', error); return null; });
   }
-  void raiderModelPromise.then((gltf) => {
+  void raiderModelPromises[variant].then((gltf) => {
     if (!gltf || !arenaMeshes.has(target) || !target.parent) return;
     const human = cloneSkinnedModel(gltf.scene);
     const bounds = new Box3().setFromObject(human);
     const size = bounds.getSize(new Vector3());
-    // Reject malformed / empty models so the procedural human remains visible.
-    if (!Number.isFinite(size.y) || size.y < 0.25 || size.y > 20) {
-      console.warn('[StreamLink] Soldier model bounds were invalid; keeping fallback character.');
+    if (!Number.isFinite(size.y) || size.y < 0.5 || size.y > 5) {
+      console.warn('[StreamLink] Tactical operator model bounds invalid; keeping fallback character.');
       return;
     }
     const modelScale = 1.72 / size.y;
     human.scale.setScalar(modelScale);
-    human.position.set(0, -bounds.min.y * modelScale, 0);
-    human.rotation.y = Math.PI;
+    // The arena target pivot sits at y=0.93; offset the model down so its boots
+    // meet the floor rather than hovering at the target's centre.
+    human.position.set(0, -0.93 - bounds.min.y * modelScale, 0);
+    // These CC0 operator models face +Z, toward the player standing at +Z.
+    human.rotation.y = 0;
     human.traverse((part: any) => {
-      if (part.isMesh) { part.castShadow = true; part.receiveShadow = true; part.frustumCulled = false; }
+      if (part.isMesh) {
+        part.castShadow = true;
+        part.receiveShadow = true;
+        part.frustumCulled = false;
+      }
     });
     target.add(human);
-
-    // Hide the procedural stand-in only after the rigged soldier has been attached.
+    target.userData.raiderModel = human;
+    target.userData.raiderVariant = variant;
+    // Only remove the procedural stand-in after the detailed model is attached.
     target.children.forEach((child) => { if (child !== human) child.visible = false; });
     target.geometry.dispose();
     target.geometry = new SphereGeometry(0.001, 4, 4);
-
-    const weapon = new Group();
-    const gunBodyMaterial = new MeshStandardMaterial({ color: 0x202832, metalness: 0.82, roughness: 0.28 });
-    const gunBarrelMaterial = new MeshStandardMaterial({ color: 0x6d7782, metalness: 0.9, roughness: 0.2 });
-    const gunBody = new Mesh(new BoxGeometry(0.105, 0.105, 0.62), gunBodyMaterial);
-    const gunBarrel = new Mesh(new BoxGeometry(0.045, 0.045, 0.34), gunBarrelMaterial);
-    const magazine = new Mesh(new BoxGeometry(0.075, 0.22, 0.12), gunBodyMaterial);
-    gunBarrel.position.z = 0.46;
-    magazine.position.set(0, -0.13, 0.08);
-    weapon.add(gunBody, gunBarrel, magazine);
-    weapon.position.set(0.20, 1.02, 0.18);
-    human.add(weapon);
-
-    const isAggressive = activeGameMode === 'last-stand' || activeGameMode === 'nightfall-survival';
-    const clip = isAggressive
-      ? gltf.animations.find((item: any) => /run/i.test(item.name))
-        || gltf.animations.find((item: any) => /walk/i.test(item.name))
-      : gltf.animations.find((item: any) => /walk/i.test(item.name))
-        || gltf.animations.find((item: any) => /run/i.test(item.name));
-    const idleClip = gltf.animations.find((item: any) => /idle/i.test(item.name));
-    const selectedClip = clip || idleClip || gltf.animations[0];
-    if (selectedClip) {
-      const mixer = new AnimationMixer(human);
-      mixer.clipAction(selectedClip).play();
-      raiderMixers.set(target, mixer);
-    }
   });
 }
 let arenaAudio: AudioContext | null = null;
@@ -1547,8 +1535,12 @@ class ArenaMotionSystem extends createSystem({
         const laneSway = Math.sin(time * 1.25 + motion.phase) * motion.drift;
         mesh.position.set(motion.x + laneSway, motion.y, motion.z);
         mesh.rotation.y = Math.atan2(-mesh.position.x, 4.8) + Math.sin(time * 1.7 + motion.phase) * 0.06;
-        const arms = mesh.userData.combatArms as Mesh[] | undefined;
-        if (arms?.length) { arms[0].rotation.x = Math.sin(time * 7 + motion.phase) * 0.42; arms[1].rotation.x = -0.18 + Math.sin(time * 7 + motion.phase + Math.PI) * 0.42; }
+        const raider = mesh.userData.raiderModel as Group | undefined;
+        if (raider) {
+          // Subtle body weight shift keeps the posed operator from reading as a floating prop.
+          raider.position.y = -0.93 + Math.abs(Math.sin(time * 5.8 + motion.phase)) * 0.018;
+          raider.rotation.z = Math.sin(time * 5.8 + motion.phase) * 0.012;
+        }
         const muzzle = mesh.userData.muzzle as Mesh | undefined;
         if (muzzle) muzzle.visible = Math.sin(time * 16 + motion.phase) > 0.82;
         if (activeGameMode === 'nightfall-survival' || activeGameMode === 'last-stand') {
