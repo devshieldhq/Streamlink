@@ -11,7 +11,7 @@
     "render": { "camera": { "position": [0, 1.7, 4], "lookAt": [0, 1.5, -2.2] } },
     "features": {
       "grabbing": { "useHandPinchForGrab": true },
-      "locomotion": true,
+      "locomotion": { "browserControls": true },
       "spatialUI": true
     }
   },
