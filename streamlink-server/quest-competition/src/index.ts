@@ -595,10 +595,9 @@ enterButton?.addEventListener('click', () => {
     const AudioCtor = window.AudioContext || (window as any).webkitAudioContext;
     if (AudioCtor) { arenaAudio ||= new AudioCtor(); void arenaAudio.resume(); }
     for (const audio of rifleShotVoices) {
-      audio.load();
-      if (audio.readyState >= HTMLMediaElement.HAVE_FUTURE_DATA) {
-        void audio.play().then(() => { audio.pause(); audio.currentTime = 0; }).catch(() => {});
-      }
+      // Calling play directly inside the Enter gesture both starts the download
+      // and unlocks playback for later Quest hand-pinch events.
+      void audio.play().then(() => { audio.pause(); audio.currentTime = 0; }).catch(() => {});
     }
   } catch {}
 }, { capture: true });
