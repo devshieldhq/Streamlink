@@ -594,7 +594,7 @@ enterButton?.addEventListener('click', () => {
   try {
     const AudioCtor = window.AudioContext || (window as any).webkitAudioContext;
     if (AudioCtor) { arenaAudio ||= new AudioCtor(); void arenaAudio.resume(); }
-    for (const audio of rifleShotAudio) {
+    for (const audio of rifleShotVoices) {
       void audio.play().then(() => { audio.pause(); audio.currentTime = 0; }).catch(() => {});
     }
   } catch {}
@@ -603,19 +603,21 @@ const RIFLE_SHOT_URLS = [
   'https://raw.githubusercontent.com/euuuuuuan/fatal-funnel-public/main/apps/game/public/sfx/rifle_556.mp3',
   'https://raw.githubusercontent.com/euuuuuuan/fatal-funnel-public/main/apps/game/public/sfx/rifle_762.mp3',
 ];
-const rifleShotAudio = RIFLE_SHOT_URLS.map((url) => {
-  const audio = new Audio(url);
+// Pre-unlocked voices are reliable for Quest pinch events, which may not count
+// as browser user gestures when playback begins.
+const rifleShotVoices = Array.from({ length: 8 }, (_, index) => {
+  const audio = new Audio(RIFLE_SHOT_URLS[index % RIFLE_SHOT_URLS.length]);
   audio.preload = 'auto';
-  audio.volume = 0.96;
+  audio.volume = 0.98;
   return audio;
 });
+let nextRifleVoice = 0;
 function playRecordedGunshot() {
-  // Genuine, close-mic rifle reports recorded by Ben Jaszczak, Brian Nelson,
-  // Kevin Heras and Matthew Nanney; source collection is CC0.
-  const source = rifleShotAudio[Math.floor(Math.random() * rifleShotAudio.length)];
-  const shot = source.cloneNode(true) as HTMLAudioElement;
-  shot.volume = 0.96;
-  void shot.play().catch((error) => console.warn('[StreamLink] Recorded rifle audio is waiting for a user gesture.', error));
+  // Genuine close-mic rifle reports from the CC0 Free Firearm Sound Library.
+  const shot = rifleShotVoices[nextRifleVoice++ % rifleShotVoices.length];
+  try { shot.pause(); shot.currentTime = 0; } catch {}
+  shot.volume = 0.98;
+  void shot.play().catch((error) => console.warn('[StreamLink] Rifle recording could not play; check audio unlock/network.', error));
 }
 function isShooterMode() { return activeGameMode === 'drone-defense' || activeGameMode === 'last-stand' || activeGameMode === 'nightfall-survival'; }
 function syncFirstPersonGun() { firstPersonGun.visible = isShooterMode(); }
@@ -656,6 +658,11 @@ let raiderSpawnVariant = 0;
 // Never expose the old procedural mannequin fallback while the GLB loads.
 let detailedRaiderCount = 0;
 const MAX_DETAILED_RAIDERS = 10;
+function releaseHumanRaiderSlot(target: Mesh) {
+  if (!target.userData.humanSlotReserved) return;
+  target.userData.humanSlotReserved = false;
+  detailedRaiderCount = Math.max(0, detailedRaiderCount - 1);
+}
 function attachAnimatedHumanRaider(target: Mesh) {
   target.visible = false;
   if (detailedRaiderCount >= MAX_DETAILED_RAIDERS) {
@@ -663,6 +670,7 @@ function attachAnimatedHumanRaider(target: Mesh) {
     return;
   }
   detailedRaiderCount += 1;
+  target.userData.humanSlotReserved = true;
   const variant = raiderSpawnVariant++ % raiderModelUrls.length;
   if (!raiderModelPromises[variant]) {
     const loader = new GLTFLoader();
@@ -673,12 +681,16 @@ function attachAnimatedHumanRaider(target: Mesh) {
       .catch((error) => { console.error('[StreamLink] Rigged human model failed to load; mannequin fallback is disabled.', error); return null; });
   }
   void raiderModelPromises[variant].then((gltf) => {
-    if (!gltf || !arenaMeshes.has(target) || !target.parent) return;
+    if (!gltf || !arenaMeshes.has(target) || !target.parent) {
+      releaseHumanRaiderSlot(target);
+      return;
+    }
     const human = cloneSkinnedModel(gltf.scene);
     const bounds = new Box3().setFromObject(human);
     const size = bounds.getSize(new Vector3());
     if (!Number.isFinite(size.y) || size.y < 0.5 || size.y > 5) {
-      console.warn('[StreamLink] Tactical operator model bounds invalid; keeping fallback character.');
+      console.warn('[StreamLink] Tactical operator model bounds invalid; skipping this target.');
+      releaseHumanRaiderSlot(target);
       return;
     }
     const modelScale = 1.72 / size.y;
@@ -1191,6 +1203,7 @@ function startRiftRacer(){if(arenaActive)stopArena('Previous game ended');active
 function clearArena() {
   detailedRaiderCount = 0;
   for (const mesh of arenaMeshes) {
+    releaseHumanRaiderSlot(mesh);
     const entity = arenaEntities.get(mesh);
     if (entity) arenaMotion.delete(entity.index);
     entity?.destroy?.();
@@ -1214,6 +1227,7 @@ function hitArenaTarget(entity: any) {
   pressedTargets.add(entity.index);
   const mesh = entity.object3D as Mesh | undefined;
   if (mesh) {
+    releaseHumanRaiderSlot(mesh);
     arenaMeshes.delete(mesh);
     raiderMixers.get(mesh)?.stopAllAction();
     raiderMixers.delete(mesh);
@@ -1253,6 +1267,7 @@ function breachArenaTarget(entity: any) {
   if (!arenaActive || arenaPaused) return;
   const mesh = entity.object3D as Mesh | undefined;
   if (mesh) {
+    releaseHumanRaiderSlot(mesh);
     arenaMeshes.delete(mesh);
     raiderMixers.get(mesh)?.stopAllAction();
     raiderMixers.delete(mesh);
