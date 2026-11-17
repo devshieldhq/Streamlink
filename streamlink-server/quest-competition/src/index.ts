@@ -634,37 +634,58 @@ let raiderModelPromise: Promise<any> | null = null;
 function attachAnimatedHumanRaider(target: Mesh) {
   if (!raiderModelPromise) {
     const loader = new GLTFLoader();
-    raiderModelPromise = loader.loadAsync('https://models.codelove.in/models/military-male-03.glb')
-      .catch((error) => { console.warn('[StreamLink] Human character model unavailable; using fallback character.', error); return null; });
+    // Use the official Three.js Soldier asset, matching this app's Three.js r160 runtime.
+    // It includes a rigged human character and Idle / Walk / Run animation clips.
+    raiderModelPromise = loader.loadAsync('https://cdn.jsdelivr.net/gh/mrdoob/three.js@r160/examples/models/gltf/Soldier.glb')
+      .catch((error) => { console.warn('[StreamLink] Animated soldier model unavailable; keeping the detailed fallback character.', error); return null; });
   }
   void raiderModelPromise.then((gltf) => {
     if (!gltf || !arenaMeshes.has(target) || !target.parent) return;
-    target.children.forEach((child) => { child.visible = false; });
-    target.geometry.dispose();
-    target.geometry = new SphereGeometry(0.001, 4, 4);
     const human = cloneSkinnedModel(gltf.scene);
     const bounds = new Box3().setFromObject(human);
     const size = bounds.getSize(new Vector3());
-    const modelScale = 1.72 / Math.max(0.01, size.y);
+    // Reject malformed / empty models so the procedural human remains visible.
+    if (!Number.isFinite(size.y) || size.y < 0.25 || size.y > 20) {
+      console.warn('[StreamLink] Soldier model bounds were invalid; keeping fallback character.');
+      return;
+    }
+    const modelScale = 1.72 / size.y;
     human.scale.setScalar(modelScale);
     human.position.set(0, -bounds.min.y * modelScale, 0);
     human.rotation.y = Math.PI;
     human.traverse((part: any) => {
-      if (part.isMesh) { part.castShadow = true; part.frustumCulled = false; }
+      if (part.isMesh) { part.castShadow = true; part.receiveShadow = true; part.frustumCulled = false; }
     });
     target.add(human);
+
+    // Hide the procedural stand-in only after the rigged soldier has been attached.
+    target.children.forEach((child) => { if (child !== human) child.visible = false; });
+    target.geometry.dispose();
+    target.geometry = new SphereGeometry(0.001, 4, 4);
+
     const weapon = new Group();
-    const gunMaterial = new MeshStandardMaterial({ color: 0x202832, metalness: 0.82, roughness: 0.28 });
-    const gunBody = new Mesh(new BoxGeometry(0.105, 0.105, 0.62), gunMaterial);
-    const gunBarrel = new Mesh(new BoxGeometry(0.045, 0.045, 0.34), new MeshStandardMaterial({ color: 0x6d7782, metalness: 0.9, roughness: 0.2 }));
+    const gunBodyMaterial = new MeshStandardMaterial({ color: 0x202832, metalness: 0.82, roughness: 0.28 });
+    const gunBarrelMaterial = new MeshStandardMaterial({ color: 0x6d7782, metalness: 0.9, roughness: 0.2 });
+    const gunBody = new Mesh(new BoxGeometry(0.105, 0.105, 0.62), gunBodyMaterial);
+    const gunBarrel = new Mesh(new BoxGeometry(0.045, 0.045, 0.34), gunBarrelMaterial);
+    const magazine = new Mesh(new BoxGeometry(0.075, 0.22, 0.12), gunBodyMaterial);
     gunBarrel.position.z = 0.46;
-    weapon.add(gunBody, gunBarrel);
+    magazine.position.set(0, -0.13, 0.08);
+    weapon.add(gunBody, gunBarrel, magazine);
     weapon.position.set(0.20, 1.02, 0.18);
     human.add(weapon);
-    const walkClip = gltf.animations.find((clip: any) => /walk/i.test(clip.name)) || gltf.animations.find((clip: any) => /run/i.test(clip.name)) || gltf.animations[0];
-    if (walkClip) {
+
+    const isAggressive = activeGameMode === 'last-stand' || activeGameMode === 'nightfall-survival';
+    const clip = isAggressive
+      ? gltf.animations.find((item: any) => /run/i.test(item.name))
+        || gltf.animations.find((item: any) => /walk/i.test(item.name))
+      : gltf.animations.find((item: any) => /walk/i.test(item.name))
+        || gltf.animations.find((item: any) => /run/i.test(item.name));
+    const idleClip = gltf.animations.find((item: any) => /idle/i.test(item.name));
+    const selectedClip = clip || idleClip || gltf.animations[0];
+    if (selectedClip) {
       const mixer = new AnimationMixer(human);
-      mixer.clipAction(walkClip).play();
+      mixer.clipAction(selectedClip).play();
       raiderMixers.set(target, mixer);
     }
   });
