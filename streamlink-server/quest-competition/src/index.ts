@@ -289,12 +289,31 @@ function connectSocket() {
 async function ensureCapture() {
   if (cameraStream) return;
   if (!navigator.mediaDevices?.getUserMedia || !window.MediaRecorder) {
-    throw new Error('This browser does not support camera streaming. Use Gamey on a desktop browser instead.');
+    throw new Error('This browser does not support live capture. Open StreamLink in a supported browser.');
   }
-  cameraStream = await navigator.mediaDevices.getUserMedia({
-    video: { width: { ideal: 1280 }, height: { ideal: 720 }, frameRate: { ideal: 30 } },
-    audio: true,
-  });
+  try {
+    cameraStream = await navigator.mediaDevices.getUserMedia({
+      video: { width: { ideal: 1280 }, height: { ideal: 720 }, frameRate: { ideal: 30 } },
+      audio: true,
+    });
+    return;
+  } catch (error) {
+    const captureError = error as DOMException;
+    // Meta Quest Browser does not expose its headset cameras as ordinary webcam
+    // devices. When that happens, broadcast the actual IWSDK canvas instead.
+    if (captureError?.name !== 'NotFoundError' && captureError?.name !== 'OverconstrainedError') throw error;
+    const canvas = container.querySelector('canvas') as HTMLCanvasElement | null;
+    if (!canvas?.captureStream) throw error;
+    const gameplayStream = canvas.captureStream(30);
+    try {
+      const microphoneStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      for (const track of microphoneStream.getAudioTracks()) gameplayStream.addTrack(track);
+    } catch (audioError) {
+      console.warn('[StreamLink] Quest microphone unavailable; continuing with gameplay video only.', audioError);
+    }
+    cameraStream = gameplayStream;
+    statusText('Quest mode · broadcasting VR gameplay. Headset camera is not required.');
+  }
 }
 function beginRecording() {
   if (!cameraStream) throw new Error('Camera and microphone are not ready.');
