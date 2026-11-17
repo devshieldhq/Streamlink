@@ -672,6 +672,21 @@ function attachAnimatedHumanRaider(target: Mesh) {
     target.add(human);
     target.userData.raiderModel = human;
     target.userData.raiderVariant = variant;
+    // Play the model's authored locomotion clip when available. Prefer walk/run
+    // over idle/aim clips so the operators visibly step as they advance.
+    if (gltf.animations?.length) {
+      const mixer = new AnimationMixer(human);
+      const locomotion = gltf.animations.find((clip: any) => /walk|run|move|locomotion|march/i.test(clip.name))
+        || gltf.animations[0];
+      const action = mixer.clipAction(locomotion);
+      action.reset();
+      action.setLoop(2201, Infinity);
+      action.play();
+      raiderMixers.set(target, mixer);
+      target.userData.raiderWalkAction = action;
+    }
+    // Keep the exact floor-alignment offset; animation must not overwrite it.
+    human.userData.floorAlignedY = human.position.y;
     // Only remove the procedural stand-in after the detailed model is attached.
     target.children.forEach((child) => { if (child !== human) child.visible = false; });
     target.geometry.dispose();
@@ -1537,9 +1552,11 @@ class ArenaMotionSystem extends createSystem({
         mesh.rotation.y = Math.atan2(-mesh.position.x, 4.8) + Math.sin(time * 1.7 + motion.phase) * 0.06;
         const raider = mesh.userData.raiderModel as Group | undefined;
         if (raider) {
-          // Subtle body weight shift keeps the posed operator from reading as a floating prop.
-          raider.position.y = -0.93 + Math.abs(Math.sin(time * 5.8 + motion.phase)) * 0.018;
-          raider.rotation.z = Math.sin(time * 5.8 + motion.phase) * 0.012;
+          // Keep the boots planted at the imported model's measured floor offset.
+          // Authored walk/run animation (when supplied by the model) moves the legs;
+          // only a tiny torso sway is added here, never a vertical hover/bob.
+          raider.position.y = raider.userData.floorAlignedY ?? raider.position.y;
+          raider.rotation.z = Math.sin(time * 5.8 + motion.phase) * 0.008;
         }
         const muzzle = mesh.userData.muzzle as Mesh | undefined;
         if (muzzle) muzzle.visible = Math.sin(time * 16 + motion.phase) > 0.82;
