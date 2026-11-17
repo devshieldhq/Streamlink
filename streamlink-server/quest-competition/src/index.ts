@@ -628,7 +628,7 @@ let arenaTimer: number | null = null;
 const arenaMeshes = new Set<Mesh>();
 const arenaEntities = new Map<Mesh, any>();
 const arenaMotion = new Map<number, { x: number; y: number; z: number; phase: number; speed: number; drift: number; approachSpeed: number; attackClock: number }>();
-const hostileShots: { mesh: Mesh; entity: any; speed: number }[] = [];
+const hostileShots: { mesh: Mesh; entity: any; velocity: Vector3; target: Vector3 }[] = [];
 const raiderMixers = new Map<Mesh, AnimationMixer>();
 const raiderModelUrls = [
   'https://cdn.3dassets.dev/assets/32901/v1/model.glb', // CC0 rigged scout with authored idle, walk, run and grasp clips
@@ -1589,16 +1589,26 @@ class ArenaMotionSystem extends createSystem({
         }
         const muzzle = mesh.userData.muzzle as Mesh | undefined;
         if (muzzle) muzzle.visible = Math.sin(time * 16 + motion.phase) > 0.82;
-        if (activeGameMode === 'nightfall-survival' || activeGameMode === 'last-stand') {
+        if (isShooterMode()) {
           motion.attackClock += delta;
-          if (motion.attackClock >= 4.0 + Math.random() * 1.0) {
+          if (motion.attackClock >= 1.65 + Math.random() * 1.15) {
             motion.attackClock = 0;
-            const shot = new Mesh(new BoxGeometry(0.22, 0.22, 1.35), new MeshBasicMaterial({ color: 0xffd52a, toneMapped: false }));
-            const tracerGlow = new Mesh(new SphereGeometry(0.19, 12, 10), new MeshBasicMaterial({ color: 0xff5a08, transparent: true, opacity: 0.72, toneMapped: false }));
+            // Aim each hostile round at the player's current headset/camera position.
+            // Use world coordinates so the projectile visibly travels from the rifle muzzle to the player.
+            const muzzleWorld = new Vector3(mesh.position.x + 0.42, mesh.position.y + 1.02, mesh.position.z + 0.42);
+            const targetWorld = new Vector3();
+            world.camera.getWorldPosition(targetWorld);
+            targetWorld.y -= 0.28;
+            const direction = targetWorld.clone().sub(muzzleWorld).normalize();
+            const shot = new Mesh(new BoxGeometry(0.105, 0.105, 0.62), new MeshBasicMaterial({ color: 0xffd52a, toneMapped: false }));
+            const tracerGlow = new Mesh(new SphereGeometry(0.105, 12, 10), new MeshBasicMaterial({ color: 0xff5a08, transparent: true, opacity: 0.82, toneMapped: false }));
+            tracerGlow.position.z = 0.24;
             shot.add(tracerGlow);
+            shot.quaternion.setFromUnitVectors(new Vector3(0, 0, 1), direction);
             const shotEntity = world.createTransformEntity(shot, { persistent: true });
-            shotEntity.object3D!.position.set(mesh.position.x + 0.42, 1.02, mesh.position.z + 0.42);
-            hostileShots.push({ mesh: shot, entity: shotEntity, speed: 7.0 + arenaWave * 0.3 });
+            shotEntity.object3D!.position.copy(muzzleWorld);
+            hostileShots.push({ mesh: shot, entity: shotEntity, velocity: direction.multiplyScalar(8.5 + arenaWave * 0.35), target: targetWorld });
+            muzzle.visible = true;
             playArenaSound('shot');
           }
         }
@@ -1609,16 +1619,18 @@ class ArenaMotionSystem extends createSystem({
     });
     for (let i = hostileShots.length - 1; i >= 0; i--) {
       const shot = hostileShots[i];
-      shot.mesh.position.z += shot.speed * delta;
-      shot.mesh.scale.setScalar(1 + Math.sin(time * 18 + i) * 0.16);
-      if (shot.mesh.position.z >= 0.75) {
+      shot.mesh.position.addScaledVector(shot.velocity, delta);
+      shot.mesh.scale.setScalar(1 + Math.sin(time * 22 + i) * 0.12);
+      const distanceToPlayer = shot.mesh.position.distanceTo(shot.target);
+      const travelledPastTarget = shot.mesh.position.clone().sub(shot.target).dot(shot.velocity) > 0;
+      if (distanceToPlayer < 0.38 || travelledPastTarget) {
         arenaShield = Math.max(0, arenaShield - 1);
         playArenaSound('damage');
-        statusText(`INCOMING FIRE HIT · shield ${arenaShield}/3 · eliminate the shooters!`);
+        statusText(`ENEMY FIRE HIT · shield ${arenaShield}/3 · eliminate the shooters!`);
         shot.entity?.destroy?.(); shot.mesh.parent?.remove(shot.mesh); shot.mesh.geometry.dispose(); (shot.mesh.material as MeshBasicMaterial).dispose(); hostileShots.splice(i, 1);
-        if (arenaShield <= 0) statusText('SHIELDS DOWN · stay in the fight until the full survival round ends!');
+        if (arenaShield <= 0) statusText('SHIELDS DOWN · keep fighting until the round ends!');
         refreshQuestPanel();
-      } else if (shot.mesh.position.z > 2.2) {
+      } else if (shot.mesh.position.distanceTo(shot.target) > 18) {
         shot.entity?.destroy?.(); shot.mesh.parent?.remove(shot.mesh); shot.mesh.geometry.dispose(); (shot.mesh.material as MeshBasicMaterial).dispose(); hostileShots.splice(i, 1);
       }
     }
