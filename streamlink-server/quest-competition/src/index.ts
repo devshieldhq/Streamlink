@@ -671,6 +671,29 @@ function attachAnimatedHumanRaider(target: Mesh) {
     target.add(human);
     target.userData.raiderModel = human;
     target.userData.raiderVariant = variant;
+
+    // Keep the rifle visible when the procedural stand-in is hidden, and add
+    // proper supporting arms/hands so the operator visibly shoulders the weapon.
+    const rifle = target.userData.enemyRifle as Group | undefined;
+    if (rifle) {
+      rifle.visible = true;
+      const armMaterial = new MeshStandardMaterial({ color: 0x35483b, roughness: 0.88, metalness: 0.03 });
+      const gloveMaterial = new MeshStandardMaterial({ color: 0x252b30, roughness: 0.92 });
+      const makeArm = (from: Vector3, to: Vector3) => {
+        const delta = to.clone().sub(from);
+        const arm = new Mesh(new CapsuleGeometry(0.064, Math.max(0.06, delta.length() - 0.13), 5, 9), armMaterial);
+        arm.position.copy(from).add(to).multiplyScalar(0.5);
+        arm.quaternion.setFromUnitVectors(new Vector3(0, 1, 0), delta.normalize());
+        target.add(arm);
+        const hand = new Mesh(new SphereGeometry(0.075, 12, 10), gloveMaterial);
+        hand.position.copy(to);
+        target.add(hand);
+      };
+      // Both arms reach forward: right hand on the pistol grip, left hand under
+      // the handguard. Coordinates are in the operator's local, forward-facing space.
+      makeArm(new Vector3(0.29, 0.20, 0.02), new Vector3(0.20, 0.13, 0.34));
+      makeArm(new Vector3(-0.29, 0.20, 0.02), new Vector3(0.20, 0.145, 0.58));
+    }
     // Prefer an actual walk/run clip when the asset has one. Do not play an
     // arbitrary first clip (often idle/aim), which makes the character slide.
     const locomotion = gltf.animations?.find((clip: any) => /walk|run|move|locomotion|march/i.test(clip.name));
@@ -704,7 +727,10 @@ function attachAnimatedHumanRaider(target: Mesh) {
     // Keep the exact floor-alignment offset; animation must not overwrite it.
     human.userData.floorAlignedY = human.position.y;
     // Only remove the procedural stand-in after the detailed model is attached.
-    target.children.forEach((child) => { if (child !== human) child.visible = false; });
+    target.children.forEach((child) => {
+      if (child !== human && child !== target.userData.enemyRifle &&
+          !(child instanceof Mesh && child.geometry instanceof CapsuleGeometry)) child.visible = false;
+    });
     target.geometry.dispose();
     target.geometry = new SphereGeometry(0.001, 4, 4);
   });
