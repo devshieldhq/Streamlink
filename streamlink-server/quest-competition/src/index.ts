@@ -634,9 +634,9 @@ let raiderModelPromise: Promise<any> | null = null;
 function attachAnimatedHumanRaider(target: Mesh) {
   if (!raiderModelPromise) {
     const loader = new GLTFLoader();
-    // Use the official Three.js Soldier asset, matching this app's Three.js r160 runtime.
-    // It includes a rigged human character and Idle / Walk / Run animation clips.
-    raiderModelPromise = loader.loadAsync('https://cdn.jsdelivr.net/gh/mrdoob/three.js@r160/examples/models/gltf/Soldier.glb')
+    // Use a textured, mid-poly modern military character (15k triangles, PBR textures, 80-bone rig).
+    // MIT-licensed GLB; if its animation clips are absent, arena locomotion still moves the character.
+    raiderModelPromise = loader.loadAsync('https://models.codelove.in/models/military-male-01.glb')
       .catch((error) => { console.warn('[StreamLink] Animated soldier model unavailable; keeping the detailed fallback character.', error); return null; });
   }
   void raiderModelPromise.then((gltf) => {
