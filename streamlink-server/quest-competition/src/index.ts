@@ -496,8 +496,9 @@ const sleeveMat = new MeshStandardMaterial({ color: 0x343d43, roughness: 0.95 })
 function addRiflePart(geometry: any, material: any, x: number, y: number, z: number, parent: Group = firstPersonGun) {
   const part = new Mesh(geometry, material);
   part.position.set(x, y, z);
-  part.castShadow = true;
-  part.receiveShadow = true;
+  // Avoid shadow passes for the many camera-mounted weapon parts.
+  part.castShadow = false;
+  part.receiveShadow = false;
   parent.add(part);
   return part;
 }
@@ -545,8 +546,15 @@ world.camera.add(firstPersonGun);
 // thumb and index fingertips to fire once; release before pinching again.
 let rightHandPinching = false;
 const handGunDirection = new Vector3();
+const combatTargetCenter = new Vector3();
+const combatToTarget = new Vector3();
+const combatClosestPoint = new Vector3();
 world.onXRFrame((frame) => {
-  const rightHandSource = Array.from(frame.session.inputSources).find(
+  if (!arenaActive || arenaPaused || !isShooterMode()) {
+    rightHandPinching = false;
+    return;
+  }
+  const rightHandSource = frame.session.inputSources.find(
     (source) => source.handedness === 'right' && source.hand,
   );
   const trackedHand = rightHandSource?.hand;
@@ -568,10 +576,8 @@ world.onXRFrame((frame) => {
     firstPersonGun.parent?.remove(firstPersonGun);
     world.camera.add(firstPersonGun);
   }
-  firstPersonGun.position.set(0.30, -0.30, -0.52);
-  firstPersonGun.rotation.set(0, 0, 0);
-  firstPersonGun.visible = arenaActive && isShooterMode();
-
+  // Keep the camera-mounted rifle at its calibrated POV transform; avoid
+  // rewriting its position and rotation on every XR frame.
   const thumb = trackedHand.get('thumb-tip');
   const index = trackedHand.get('index-finger-tip');
   if (!thumb || !index) return;
@@ -653,17 +659,22 @@ function fireFirstPersonGun(direction?: Vector3) {
   // Resolve hits along the same first-person firing ray. Previously the gun
   // played a tracer but never tested the enemy line, so Quest pinches could
   // appear to fire blanks while human raiders kept walking past.
-  const combatRay = new Raycaster(origin, shotDirection, 0, 80);
-  const combatHits = combatRay.intersectObjects([...arenaMeshes], true);
-  for (const intersection of combatHits) {
-    let candidate: any = intersection.object;
-    while (candidate && !arenaEntities.has(candidate)) candidate = candidate.parent;
-    const targetEntity = candidate ? arenaEntities.get(candidate as Mesh) : null;
-    if (targetEntity) {
-      hitArenaTarget(targetEntity);
-      break;
+  // Check a cheap sphere around each enemy root instead of recursively raycasting
+  // every skinned-body, rifle, finger and clothing mesh on every trigger pull.
+  let nearestTarget: any = null;
+  let nearestDistance = 80;
+  for (const targetMesh of arenaMeshes) {
+    targetMesh.getWorldPosition(combatTargetCenter);
+    combatToTarget.subVectors(combatTargetCenter, origin);
+    const along = combatToTarget.dot(shotDirection);
+    if (along < 0 || along > nearestDistance) continue;
+    combatClosestPoint.copy(origin).addScaledVector(shotDirection, along);
+    if (combatClosestPoint.distanceToSquared(combatTargetCenter) <= 0.42 * 0.42) {
+      nearestDistance = along;
+      nearestTarget = arenaEntities.get(targetMesh);
     }
   }
+  if (nearestTarget) hitArenaTarget(nearestTarget);
   const tracer = new Mesh(new BoxGeometry(0.028, 0.028, 3.8), new MeshBasicMaterial({ color: 0xffd52a, toneMapped: false }));
   tracer.position.copy(origin).addScaledVector(shotDirection, 1.95);
   tracer.quaternion.setFromUnitVectors(new Vector3(0, 0, 1), shotDirection);
@@ -691,7 +702,7 @@ let raiderSpawnVariant = 0;
 // Every ground-combat enemy must use the imported rigged human model.
 // Never expose the old procedural mannequin fallback while the GLB loads.
 let detailedRaiderCount = 0;
-const MAX_DETAILED_RAIDERS = 6; // Quest-friendly rig count; replacements keep the fight populated.
+const MAX_DETAILED_RAIDERS = 4; // Keep skinned-character work within Quest's mobile GPU budget.
 function releaseHumanRaiderSlot(target: Mesh) {
   if (!target.userData.humanSlotReserved) return;
   target.userData.humanSlotReserved = false;
@@ -1671,6 +1682,7 @@ container.addEventListener('pointerdown', (event: PointerEvent) => {
 container.style.cursor = 'crosshair';
 
 
+let raiderAnimationElapsed = 0;
 const WALK_AXIS_X = new Vector3(1, 0, 0);
 const walkStepQuaternion = new Quaternion();
 
@@ -1685,7 +1697,14 @@ class ArenaMotionSystem extends createSystem({
     arenaLastFrameTime = time;
     // Do not spend CPU animating hidden enemies while the arena is idle or paused.
     if (!arenaActive || arenaPaused) return;
-    for (const mixer of raiderMixers.values()) mixer.update(delta);
+    // Advance imported skeletal rigs at 30 Hz while the headset renders every
+    // frame. This reduces bone-evaluation work during rapid firing and aiming.
+    raiderAnimationElapsed += delta;
+    if (raiderAnimationElapsed >= 1 / 30) {
+      const animationDelta = Math.min(0.066, raiderAnimationElapsed);
+      raiderAnimationElapsed = 0;
+      for (const mixer of raiderMixers.values()) mixer.update(animationDelta);
+    }
     if(activeGameMode==='rift-racer'&&raceTrackActive){
  raceDistance+=delta*(42+racePoliceLevel*3);raceSpawnClock+=delta;racePoliceLevel=1+Math.floor(raceDistance/850);if(raceSpawnClock>Math.max(.62,1.35-racePoliceLevel*.075)){raceSpawnClock=0;spawnRaceObstacle();}
  for(const part of raceTrackMeshes){if(part.mesh.userData.scroll){part.mesh.position.z+=delta*(14+racePoliceLevel*1.2);if(part.mesh.position.z>7)part.mesh.position.z-=58;}}
