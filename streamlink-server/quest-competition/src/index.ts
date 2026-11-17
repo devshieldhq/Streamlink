@@ -630,6 +630,21 @@ function fireFirstPersonGun(direction?: Vector3) {
   world.camera.getWorldPosition(origin);
   const shotDirection = direction?.clone().normalize() || new Vector3();
   if (!direction) world.camera.getWorldDirection(shotDirection);
+  // Resolve hits along the same first-person firing ray. Previously the gun
+  // played a tracer but never tested the enemy line, so Quest pinches could
+  // appear to fire blanks while human raiders kept walking past.
+  world.scene.updateMatrixWorld(true);
+  const combatRay = new Raycaster(origin, shotDirection, 0, 80);
+  const combatHits = combatRay.intersectObjects([...arenaMeshes], true);
+  for (const intersection of combatHits) {
+    let candidate: any = intersection.object;
+    while (candidate && !arenaEntities.has(candidate)) candidate = candidate.parent;
+    const targetEntity = candidate ? arenaEntities.get(candidate as Mesh) : null;
+    if (targetEntity) {
+      hitArenaTarget(targetEntity);
+      break;
+    }
+  }
   const tracer = new Mesh(new BoxGeometry(0.028, 0.028, 3.8), new MeshBasicMaterial({ color: 0xffd52a, toneMapped: false }));
   tracer.position.copy(origin).addScaledVector(shotDirection, 1.95);
   tracer.quaternion.setFromUnitVectors(new Vector3(0, 0, 1), shotDirection);
