@@ -1,48 +1,29 @@
 # StreamLink XR
 
-**One control room. Every platform. A world of play.**
+**Play. Stream. Connect.**
 
-StreamLink XR brings live streaming, gaming and immersive VR experiences together in one place. Creators can manage their streaming setup, step into the VR Arena, and connect with their community without jumping between a pile of separate tools.
+StreamLink XR brings gaming, live streaming and immersive VR together in one platform.
 
-[Open StreamLink XR](https://streamlink-xr.onrender.com/) · [Explore the VR Arena](https://streamlink-xr.onrender.com/quest/) · [Follow on X](https://x.com/StreamLink145)
+[Website](https://streamlink-xr.onrender.com/) · [VR Arena](https://streamlink-xr.onrender.com/quest/) · [X](https://x.com/StreamLink145)
 
----
+## Features
 
-## Step inside
+- **VR Arena** — immersive first-person gameplay for supported headsets.
+- **Creator Studio** — a dedicated space for managing streaming controls.
+- **Hand tracking** — interact with the VR interface using Quest hand tracking and pinch gestures.
+- **Go Live** — prepare and manage broadcasts from supported browsers.
+- **Gamey** — desktop-friendly gaming access.
+- **Community** — chat rooms and social features.
 
-StreamLink is being built for people who create, play and bring communities together.
+## Getting started
 
-- **VR Arena** — enter an immersive arena and experience first-person gameplay.
-- **Creator Studio** — manage your streaming setup from a dedicated control space.
-- **Hands-first controls** — use Quest hand tracking and pinch gestures to interact with the VR interface.
-- **Go Live** — prepare and manage broadcasts from the web or VR experience.
-- **Gamey** — a way for players without a VR headset to join the gaming experience.
-- **Community spaces** — chat rooms and creator-focused features are part of the wider StreamLink experience.
+### Requirements
 
-## Built for the headset and the desktop
+- Node.js 18 or newer for the relay server.
+- A modern browser for the web platform.
+- A WebXR-compatible headset and browser for immersive VR.
 
-StreamLink XR is designed to work across different ways of playing and creating.
-
-| Experience | What it is |
-| --- | --- |
-| Web platform | The main StreamLink website and creator entry points |
-| VR Arena | An immersive WebXR experience for supported headsets |
-| Creator Studio | A hands-first workspace for streaming controls |
-| Gamey | A desktop-friendly route into gaming |
-
-For the immersive experience, use a WebXR-capable browser on a supported headset. On Meta Quest, open the VR Arena over HTTPS and allow the permissions requested by the browser.
-
-## Try it
-
-- Website: https://streamlink-xr.onrender.com/
-- VR Arena: https://streamlink-xr.onrender.com/quest/
-- X: https://x.com/StreamLink145
-
-Some features depend on browser support, account setup, connected platform credentials and service configuration. Streaming to an external platform should be tested with that platform's own live dashboard before a broadcast is treated as confirmed.
-
-## Run the server locally
-
-The relay server requires Node.js 18 or newer.
+### Run locally
 
 ```bash
 cd streamlink-server
@@ -50,29 +31,30 @@ npm install
 npm start
 ```
 
-The server listens on the port provided by the hosting environment. For local development, configure the environment variables your setup needs before starting the service.
+Configure the environment variables required by your setup before starting the server.
 
-### Environment configuration
+## Configuration
 
-Set configuration values in your hosting provider's environment settings. Common settings include:
+Set environment values in your hosting provider. Depending on the features you use, these may include:
 
-- `SUPABASE_URL` and `SUPABASE_ANON_KEY` for the account experience.
-- `REQUIRE_SIGN_IN` to control whether a signed-in account is required for protected streaming actions.
-- `MODEL_API_KEY` only if you choose to enable the optional StreamBot assistant.
+- `SUPABASE_URL`
+- `SUPABASE_ANON_KEY`
+- `REQUIRE_SIGN_IN`
+- `MODEL_API_KEY` (optional)
 
-**Never commit API keys, service-role keys, stream keys or other secrets to this repository.**
+Keep API keys, service-role keys, stream keys and other secrets out of source control.
 
-## Hosting
+## Deployment
 
-The project includes a Render Blueprint at the repository root. To deploy:
+The repository includes a Render Blueprint in `render.yaml`.
 
-1. Create a new Blueprint on [Render](https://render.com/).
+1. Create a Blueprint on [Render](https://render.com/).
 2. Connect this repository.
-3. Review the service settings from `render.yaml`.
-4. Add the required environment values in the Render dashboard.
-5. Deploy and check the service health endpoint at `/api/status`.
+3. Review the service configuration.
+4. Add the required environment variables.
+5. Deploy and check `/api/status`.
 
-## Project layout
+## Project structure
 
 ```text
 .
@@ -86,25 +68,18 @@ The project includes a Render Blueprint at the repository root. To deploy:
         └── src/
 ```
 
-The server serves the web experience and relay endpoints. The Quest project contains the immersive experience and its IWSDK-based application code.
+## Development status
 
-## Current development
-
-StreamLink XR is actively being developed. The VR Arena, hands-first interaction and streaming workflow are being tested and improved across desktop browsers and Meta Quest. Browser permissions, headset compatibility and external platform delivery can vary, so please report issues with the device, browser and steps that led to them.
+StreamLink XR is under active development. Features and device support may vary by browser, headset and service configuration. Verify external broadcasts through the destination platform's own live dashboard.
 
 ## Contributing
 
-Ideas, bug reports and thoughtful contributions are welcome. Before opening a pull request:
+Bug reports and contributions are welcome. Include clear reproduction steps, test relevant changes, and never commit private credentials.
 
-1. Explain the change and the problem it solves.
-2. Keep credentials and private configuration out of commits.
-3. Test the affected experience on the device or browser it targets.
-4. Include clear steps to reproduce any reported issue.
+## Wallet linking
 
-## A note on creator wallets
-
-The account experience includes wallet linking through a signed message. Linking a wallet does not transfer funds, create a token, mint an NFT or deploy a smart contract.
+Wallet linking uses a signed message. It does not transfer funds or create tokens, NFTs or smart contracts.
 
 ---
 
-**StreamLink XR — Play. Stream. Connect.**
+**StreamLink XR** — One control room. Every platform.
