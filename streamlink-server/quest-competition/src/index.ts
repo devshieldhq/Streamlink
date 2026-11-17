@@ -535,6 +535,52 @@ firstPersonGun.add(gunMuzzleFlash);
 firstPersonGun.position.set(0.30, -0.30, -0.52);
 firstPersonGun.visible = false;
 world.camera.add(firstPersonGun);
+
+// Quest hand-tracking mode: mount the rifle to the right hand's tracked grip
+// space. A thumb-to-index fingertip pinch fires once; releasing resets the shot.
+let rightHandPinching = false;
+const handGunDirection = new Vector3();
+world.onXRFrame((frame) => {
+  const rightHandSource = Array.from(frame.session.inputSources).find(
+    (source) => source.handedness === 'right' && source.hand,
+  );
+  if (!rightHandSource || !world.xrReferenceSpace) {
+    rightHandPinching = false;
+    if (firstPersonGun.parent !== world.camera) {
+      firstPersonGun.parent?.remove(firstPersonGun);
+      world.camera.add(firstPersonGun);
+      firstPersonGun.position.set(0.30, -0.30, -0.52);
+      firstPersonGun.rotation.set(0, 0, 0);
+    }
+    return;
+  }
+
+  const rightGrip = world.input.xr.xrOrigin.gripSpaces.right;
+  if (firstPersonGun.parent !== rightGrip) {
+    firstPersonGun.parent?.remove(firstPersonGun);
+    rightGrip.add(firstPersonGun);
+    firstPersonGun.position.set(0.02, -0.035, -0.10);
+    firstPersonGun.rotation.set(0, 0, 0);
+  }
+  firstPersonGun.visible = arenaActive && isShooterMode();
+
+  const thumb = rightHandSource.hand.get('thumb-tip');
+  const index = rightHandSource.hand.get('index-finger-tip');
+  if (!thumb || !index) return;
+  const thumbPose = frame.getJointPose(thumb, world.xrReferenceSpace);
+  const indexPose = frame.getJointPose(index, world.xrReferenceSpace);
+  if (!thumbPose || !indexPose) return;
+  const a = thumbPose.transform.position;
+  const b = indexPose.transform.position;
+  const pinchDistance = Math.hypot(a.x - b.x, a.y - b.y, a.z - b.z);
+  const pinching = pinchDistance < 0.027;
+  if (pinching && !rightHandPinching && arenaActive && !arenaPaused && isShooterMode()) {
+    rightGrip.getWorldQuaternion(new Quaternion());
+    handGunDirection.set(0, 0, -1).applyQuaternion(rightGrip.getWorldQuaternion(new Quaternion())).normalize();
+    fireFirstPersonGun(handGunDirection);
+  }
+  rightHandPinching = pinching;
+});
 // A real recorded gunshot sample (CC0) replaces the old synthetic oscillator tone.
 const recordedGunshot = new Audio('https://sfxmint.com/dl/impact-gunshot-10.mp3');
 recordedGunshot.preload = 'auto';
