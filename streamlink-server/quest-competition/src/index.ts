@@ -554,9 +554,10 @@ world.onXRFrame((frame) => {
     rightHandPinching = false;
     return;
   }
-  const rightHandSource = frame.session.inputSources.find(
-    (source) => source.handedness === 'right' && source.hand,
-  );
+  let rightHandSource: XRInputSource | undefined;
+  for (const source of frame.session.inputSources) {
+    if (source.handedness === 'right' && source.hand) { rightHandSource = source; break; }
+  }
   const trackedHand = rightHandSource?.hand;
   if (!rightHandSource || !trackedHand || !world.xrReferenceSpace) {
     rightHandPinching = false;
