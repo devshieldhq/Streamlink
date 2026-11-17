@@ -302,7 +302,8 @@ async function ensureCapture() {
     // Meta Quest Browser does not expose its headset cameras as ordinary webcam
     // devices. When that happens, broadcast the actual IWSDK canvas instead.
     if (captureError?.name !== 'NotFoundError' && captureError?.name !== 'OverconstrainedError') throw error;
-    const canvas = container.querySelector('canvas') as HTMLCanvasElement | null;
+    const sceneContainer = byId<HTMLDivElement>('scene-container');
+    const canvas = sceneContainer?.querySelector('canvas') as HTMLCanvasElement | null;
     if (!canvas?.captureStream) throw error;
     const gameplayStream = canvas.captureStream(30);
     try {
