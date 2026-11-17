@@ -1398,30 +1398,20 @@ makeQuestButton('STEER RIGHT','race-right',0.45,0.82,0xffb84d);
 // Desktop preview controls provide mouse-accessible equivalents to the 3D hand buttons.
 byId<HTMLButtonElement>('desktop-pause')?.addEventListener('click', () => actionHandlers.get('pause')?.());
 byId<HTMLButtonElement>('desktop-reset')?.addEventListener('click', () => actionHandlers.get('reset')?.());
-// Desktop keyboard controls. Apply each movement step directly on keydown so it
-// works even when the desktop camera controller replaces per-frame camera poses.
-const arenaMoveKeys = new Set<string>();
+// Desktop controls: IWSDK's browserControls binding handles WASD/arrow movement
+// through its locomotion engine and moves world.player (not the headset camera).
+// Keep L as the desktop fire key; racing retains its dedicated lane steering.
 window.addEventListener('keydown',(event)=>{
   const key=event.key.toLowerCase();
   const target=event.target as HTMLElement|null;
   const typing=!!target&&(['INPUT','TEXTAREA','SELECT'].includes(target.tagName)||target.isContentEditable);
   if(typing)return;
-  if(key==='l'&&!event.repeat){event.preventDefault();fireFirstPersonGun();}
-  if(['w','a','s','d'].includes(key)&&arenaActive&&!arenaPaused&&activeGameMode!=='rift-racer'){
-    event.preventDefault();
-    const step=event.shiftKey?0.72:0.42;
-    if(key==='w')world.camera.translateZ(-step);
-    if(key==='s')world.camera.translateZ(step);
-    if(key==='a')world.camera.translateX(-step);
-    if(key==='d')world.camera.translateX(step);
-    world.camera.updateMatrixWorld(true);
-    arenaMoveKeys.add(key);
+  if(key==='l'&&!event.repeat&&arenaActive&&!arenaPaused){event.preventDefault();fireFirstPersonGun();}
+  if(activeGameMode==='rift-racer'&&arenaActive&&!arenaPaused){
+    if(event.key==='ArrowLeft'||key==='a'){event.preventDefault();steerRace(-1);}
+    if(event.key==='ArrowRight'||key==='d'){event.preventDefault();steerRace(1);}
   }
-  if(event.key==='ArrowLeft'||(key==='a'&&activeGameMode==='rift-racer')){event.preventDefault();steerRace(-1);}
-  if(event.key==='ArrowRight'||(key==='d'&&activeGameMode==='rift-racer')){event.preventDefault();steerRace(1);}
 });
-window.addEventListener('keyup',(event)=>arenaMoveKeys.delete(event.key.toLowerCase()));
-window.addEventListener('blur',()=>arenaMoveKeys.clear());
 // Desktop mouse/touch drag lets players physically reposition and aim the first-person rifle.
 let gunDragPointer:number|null=null;
 let gunDragLastX=0, gunDragLastY=0;
