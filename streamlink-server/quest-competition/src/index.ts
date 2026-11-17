@@ -1398,12 +1398,25 @@ makeQuestButton('STEER RIGHT','race-right',0.45,0.82,0xffb84d);
 // Desktop preview controls provide mouse-accessible equivalents to the 3D hand buttons.
 byId<HTMLButtonElement>('desktop-pause')?.addEventListener('click', () => actionHandlers.get('pause')?.());
 byId<HTMLButtonElement>('desktop-reset')?.addEventListener('click', () => actionHandlers.get('reset')?.());
-// Keyboard locomotion for desktop testing; WASD moves the player relative to camera facing.
+// Desktop keyboard controls. Apply each movement step directly on keydown so it
+// works even when the desktop camera controller replaces per-frame camera poses.
 const arenaMoveKeys = new Set<string>();
 window.addEventListener('keydown',(event)=>{
   const key=event.key.toLowerCase();
+  const target=event.target as HTMLElement|null;
+  const typing=!!target&&(['INPUT','TEXTAREA','SELECT'].includes(target.tagName)||target.isContentEditable);
+  if(typing)return;
   if(key==='l'&&!event.repeat){event.preventDefault();fireFirstPersonGun();}
-  if(['w','a','s','d'].includes(key)&&arenaActive&&!arenaPaused&&activeGameMode!=='rift-racer'){event.preventDefault();arenaMoveKeys.add(key);}
+  if(['w','a','s','d'].includes(key)&&arenaActive&&!arenaPaused&&activeGameMode!=='rift-racer'){
+    event.preventDefault();
+    const step=event.shiftKey?0.72:0.42;
+    if(key==='w')world.camera.translateZ(-step);
+    if(key==='s')world.camera.translateZ(step);
+    if(key==='a')world.camera.translateX(-step);
+    if(key==='d')world.camera.translateX(step);
+    world.camera.updateMatrixWorld(true);
+    arenaMoveKeys.add(key);
+  }
   if(event.key==='ArrowLeft'||(key==='a'&&activeGameMode==='rift-racer')){event.preventDefault();steerRace(-1);}
   if(event.key==='ArrowRight'||(key==='d'&&activeGameMode==='rift-racer')){event.preventDefault();steerRace(1);}
 });
@@ -1503,14 +1516,6 @@ class ArenaMotionSystem extends createSystem({
     for (const mixer of raiderMixers.values()) mixer.update(delta);
     arenaLastFrameTime = time;
     if (!arenaActive || arenaPaused) return;
-    // Desktop WASD locomotion for arena play. translateX/Z follows camera facing.
-    if(activeGameMode!=='rift-racer'&&arenaMoveKeys.size){
-      const moveSpeed=3.4*delta;
-      if(arenaMoveKeys.has('w'))world.camera.translateZ(-moveSpeed);
-      if(arenaMoveKeys.has('s'))world.camera.translateZ(moveSpeed);
-      if(arenaMoveKeys.has('a'))world.camera.translateX(-moveSpeed);
-      if(arenaMoveKeys.has('d'))world.camera.translateX(moveSpeed);
-    }
     if(activeGameMode==='rift-racer'&&raceTrackActive){
  raceDistance+=delta*(42+racePoliceLevel*3);raceSpawnClock+=delta;racePoliceLevel=1+Math.floor(raceDistance/850);if(raceSpawnClock>Math.max(.62,1.35-racePoliceLevel*.075)){raceSpawnClock=0;spawnRaceObstacle();}
  for(const part of raceTrackMeshes){if(part.mesh.userData.scroll){part.mesh.position.z+=delta*(14+racePoliceLevel*1.2);if(part.mesh.position.z>7)part.mesh.position.z-=58;}}
