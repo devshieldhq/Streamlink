@@ -595,7 +595,10 @@ enterButton?.addEventListener('click', () => {
     const AudioCtor = window.AudioContext || (window as any).webkitAudioContext;
     if (AudioCtor) { arenaAudio ||= new AudioCtor(); void arenaAudio.resume(); }
     for (const audio of rifleShotVoices) {
-      void audio.play().then(() => { audio.pause(); audio.currentTime = 0; }).catch(() => {});
+      audio.load();
+      if (audio.readyState >= HTMLMediaElement.HAVE_FUTURE_DATA) {
+        void audio.play().then(() => { audio.pause(); audio.currentTime = 0; }).catch(() => {});
+      }
     }
   } catch {}
 }, { capture: true });
@@ -603,21 +606,39 @@ const RIFLE_SHOT_URLS = [
   'https://raw.githubusercontent.com/euuuuuuan/fatal-funnel-public/main/apps/game/public/sfx/rifle_556.mp3',
   'https://raw.githubusercontent.com/euuuuuuan/fatal-funnel-public/main/apps/game/public/sfx/rifle_762.mp3',
 ];
-// Pre-unlocked voices are reliable for Quest pinch events, which may not count
-// as browser user gestures when playback begins.
-const rifleShotVoices = Array.from({ length: 8 }, (_, index) => {
-  const audio = new Audio(RIFLE_SHOT_URLS[index % RIFLE_SHOT_URLS.length]);
+// Keep only two preloaded recorded rifle voices. The previous eight-voice
+// pool fetched the same two large MP3s four times each and could stall Quest.
+const rifleShotVoices = RIFLE_SHOT_URLS.map((url) => {
+  const audio = new Audio();
   audio.preload = 'auto';
-  audio.volume = 0.98;
+  audio.volume = 0.92;
+  audio.src = url;
+  audio.load();
+  audio.addEventListener('error', () => console.warn('[StreamLink] Rifle audio failed to load:', url, audio.error?.code), { once: true });
   return audio;
 });
 let nextRifleVoice = 0;
+let queuedRifleShot = false;
+for (const audio of rifleShotVoices) {
+  audio.addEventListener('canplaythrough', () => {
+    if (!queuedRifleShot) return;
+    queuedRifleShot = false;
+    void playRecordedGunshot();
+  });
+}
 function playRecordedGunshot() {
-  // Genuine close-mic rifle reports from the CC0 Free Firearm Sound Library.
+  // Play a locally buffered browser audio element; never fetch audio per shot.
   const shot = rifleShotVoices[nextRifleVoice++ % rifleShotVoices.length];
+  if (shot.readyState < HTMLMediaElement.HAVE_FUTURE_DATA) {
+    queuedRifleShot = true;
+    return;
+  }
   try { shot.pause(); shot.currentTime = 0; } catch {}
-  shot.volume = 0.98;
-  void shot.play().catch((error) => console.warn('[StreamLink] Rifle recording could not play; check audio unlock/network.', error));
+  shot.volume = 0.92;
+  void shot.play().catch((error) => {
+    console.warn('[StreamLink] Recorded rifle playback was blocked:', error);
+    queuedRifleShot = true;
+  });
 }
 function isShooterMode() { return activeGameMode === 'drone-defense' || activeGameMode === 'last-stand' || activeGameMode === 'nightfall-survival'; }
 function syncFirstPersonGun() { firstPersonGun.visible = isShooterMode(); }
@@ -633,7 +654,6 @@ function fireFirstPersonGun(direction?: Vector3) {
   // Resolve hits along the same first-person firing ray. Previously the gun
   // played a tracer but never tested the enemy line, so Quest pinches could
   // appear to fire blanks while human raiders kept walking past.
-  world.scene.updateMatrixWorld(true);
   const combatRay = new Raycaster(origin, shotDirection, 0, 80);
   const combatHits = combatRay.intersectObjects([...arenaMeshes], true);
   for (const intersection of combatHits) {
@@ -672,7 +692,7 @@ let raiderSpawnVariant = 0;
 // Every ground-combat enemy must use the imported rigged human model.
 // Never expose the old procedural mannequin fallback while the GLB loads.
 let detailedRaiderCount = 0;
-const MAX_DETAILED_RAIDERS = 10;
+const MAX_DETAILED_RAIDERS = 6; // Quest-friendly rig count; replacements keep the fight populated.
 function releaseHumanRaiderSlot(target: Mesh) {
   if (!target.userData.humanSlotReserved) return;
   target.userData.humanSlotReserved = false;
@@ -1652,6 +1672,9 @@ container.addEventListener('pointerdown', (event: PointerEvent) => {
 container.style.cursor = 'crosshair';
 
 
+const WALK_AXIS_X = new Vector3(1, 0, 0);
+const walkStepQuaternion = new Quaternion();
+
 // Animate every live target so the arena feels like an active arcade game.
 // Targets drift across the play space, bob vertically, rotate and pulse.
 class ArenaMotionSystem extends createSystem({
@@ -1660,9 +1683,10 @@ class ArenaMotionSystem extends createSystem({
   update() {
     const time = performance.now() / 1000;
     const delta = Math.min(0.05, Math.max(0, time - arenaLastFrameTime));
-    for (const mixer of raiderMixers.values()) mixer.update(delta);
     arenaLastFrameTime = time;
+    // Do not spend CPU animating hidden enemies while the arena is idle or paused.
     if (!arenaActive || arenaPaused) return;
+    for (const mixer of raiderMixers.values()) mixer.update(delta);
     if(activeGameMode==='rift-racer'&&raceTrackActive){
  raceDistance+=delta*(42+racePoliceLevel*3);raceSpawnClock+=delta;racePoliceLevel=1+Math.floor(raceDistance/850);if(raceSpawnClock>Math.max(.62,1.35-racePoliceLevel*.075)){raceSpawnClock=0;spawnRaceObstacle();}
  for(const part of raceTrackMeshes){if(part.mesh.userData.scroll){part.mesh.position.z+=delta*(14+racePoliceLevel*1.2);if(part.mesh.position.z>7)part.mesh.position.z-=58;}}
@@ -1700,7 +1724,7 @@ class ArenaMotionSystem extends createSystem({
               if (role === 'thigh') angle = stride * 0.48 * side;
               else if (role === 'shin') angle = bend * 0.58 * (side === (stride > 0 ? 1 : -1) ? 1 : 0.18);
               else if (role === 'arm') angle = -stride * 0.22 * side;
-              bone.quaternion.copy(rest).multiply(new Quaternion().setFromAxisAngle(new Vector3(1, 0, 0), angle));
+              bone.quaternion.copy(rest).multiply(walkStepQuaternion.setFromAxisAngle(WALK_AXIS_X, angle));
             });
           }
         }
@@ -1712,7 +1736,6 @@ class ArenaMotionSystem extends createSystem({
             motion.attackClock = 0;
             // Aim each hostile round at the player's current headset/camera position.
             // Use world coordinates so the projectile visibly travels from the rifle muzzle to the player.
-            world.scene.updateMatrixWorld(true);
             const muzzle = mesh.userData.muzzle as Mesh | undefined;
             if (!muzzle) return;
             const muzzleWorld = new Vector3();
