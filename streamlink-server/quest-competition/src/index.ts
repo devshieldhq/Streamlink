@@ -684,9 +684,11 @@ function attachAnimatedHumanRaider(target: Mesh) {
         const arm = new Mesh(new CapsuleGeometry(0.064, Math.max(0.06, delta.length() - 0.13), 5, 9), armMaterial);
         arm.position.copy(from).add(to).multiplyScalar(0.5);
         arm.quaternion.setFromUnitVectors(new Vector3(0, 1, 0), delta.normalize());
+        arm.userData.enemyGripPart = true;
         target.add(arm);
         const hand = new Mesh(new SphereGeometry(0.075, 12, 10), gloveMaterial);
         hand.position.copy(to);
+        hand.userData.enemyGripPart = true;
         target.add(hand);
       };
       // Both arms reach forward: right hand on the pistol grip, left hand under
@@ -728,8 +730,7 @@ function attachAnimatedHumanRaider(target: Mesh) {
     human.userData.floorAlignedY = human.position.y;
     // Only remove the procedural stand-in after the detailed model is attached.
     target.children.forEach((child) => {
-      if (child !== human && child !== target.userData.enemyRifle &&
-          !(child instanceof Mesh && child.geometry instanceof CapsuleGeometry)) child.visible = false;
+      if (child !== human && child !== target.userData.enemyRifle && !child.userData.enemyGripPart) child.visible = false;
     });
     target.geometry.dispose();
     target.geometry = new SphereGeometry(0.001, 4, 4);
