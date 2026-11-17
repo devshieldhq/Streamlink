@@ -729,7 +729,25 @@ let arenaTimer: number | null = null;
 const arenaMeshes = new Set<Mesh>();
 const arenaEntities = new Map<Mesh, any>();
 const arenaMotion = new Map<number, { x: number; y: number; z: number; phase: number; speed: number; drift: number; approachSpeed: number; attackClock: number }>();
-const hostileShots: { mesh: Mesh; entity: any; velocity: Vector3; target: Vector3 }[] = [];
+type HostileShot = { mesh: Mesh; velocity: Vector3; target: Vector3; active: boolean };
+const hostileShotGeometry = new BoxGeometry(0.105, 0.105, 0.62);
+const hostileShotMaterial = new MeshBasicMaterial({ color: 0xffd52a, toneMapped: false });
+const hostileShotGlowGeometry = new SphereGeometry(0.105, 8, 6);
+const hostileShotGlowMaterial = new MeshBasicMaterial({ color: 0xff5a08, toneMapped: false });
+const hostileShots: HostileShot[] = Array.from({ length: 12 }, () => {
+  const mesh = new Mesh(hostileShotGeometry, hostileShotMaterial);
+  const glow = new Mesh(hostileShotGlowGeometry, hostileShotGlowMaterial);
+  glow.position.z = 0.24;
+  mesh.add(glow);
+  mesh.visible = false;
+  world.scene.add(mesh);
+  return { mesh, velocity: new Vector3(), target: new Vector3(), active: false };
+});
+let nextHostileShot = 0;
+const hostileShotMuzzleWorld = new Vector3();
+const hostileShotTargetWorld = new Vector3();
+const hostileShotDirection = new Vector3();
+const hostileShotToTarget = new Vector3();
 const raiderMixers = new Map<Mesh, AnimationMixer>();
 const raiderModelUrls = [
   'https://cdn.3dassets.dev/assets/32901/v1/model.glb', // CC0 rigged scout with authored idle, walk, run and grasp clips
@@ -1304,8 +1322,7 @@ function clearArena() {
     });
   }
   arenaMeshes.clear();
-  for (const shot of hostileShots) { shot.entity?.destroy?.(); shot.mesh.parent?.remove(shot.mesh); shot.mesh.geometry.dispose(); (shot.mesh.material as MeshBasicMaterial).dispose(); }
-  hostileShots.length = 0;
+  for (const shot of hostileShots) { shot.active = false; shot.mesh.visible = false; }
   clearRaceTrack();
 }
 function hitArenaTarget(entity: any) {
@@ -1796,7 +1813,7 @@ class ArenaMotionSystem extends createSystem({
           }
         }
         const muzzle = mesh.userData.muzzle as Mesh | undefined;
-        if (muzzle) muzzle.visible = Math.sin(time * 16 + motion.phase) > 0.82;
+        if (muzzle?.visible && frameNow >= (muzzle.userData.hideAt || 0)) muzzle.visible = false;
         if (isShooterMode()) {
           motion.attackClock += delta;
           if (motion.attackClock >= 1.65 + Math.random() * 1.15) {
@@ -1805,22 +1822,19 @@ class ArenaMotionSystem extends createSystem({
             // Use world coordinates so the projectile visibly travels from the rifle muzzle to the player.
             const muzzle = mesh.userData.muzzle as Mesh | undefined;
             if (!muzzle) return;
-            const muzzleWorld = new Vector3();
-            muzzle.getWorldPosition(muzzleWorld);
-            const targetWorld = new Vector3();
-            world.camera.getWorldPosition(targetWorld);
-            targetWorld.y -= 0.28;
-            const direction = targetWorld.clone().sub(muzzleWorld).normalize();
-            const shot = new Mesh(new BoxGeometry(0.105, 0.105, 0.62), new MeshBasicMaterial({ color: 0xffd52a, toneMapped: false }));
-            const tracerGlow = new Mesh(new SphereGeometry(0.105, 12, 10), new MeshBasicMaterial({ color: 0xff5a08, transparent: true, opacity: 0.82, toneMapped: false }));
-            tracerGlow.position.z = 0.24;
-            shot.add(tracerGlow);
-            shot.quaternion.setFromUnitVectors(new Vector3(0, 0, 1), direction);
-            const shotEntity = world.createTransformEntity(shot, { persistent: true });
-            shotEntity.object3D!.position.copy(muzzleWorld);
-            hostileShots.push({ mesh: shot, entity: shotEntity, velocity: direction.multiplyScalar(8.5 + arenaWave * 0.35), target: targetWorld });
+            muzzle.getWorldPosition(hostileShotMuzzleWorld);
+            world.camera.getWorldPosition(hostileShotTargetWorld);
+            hostileShotTargetWorld.y -= 0.28;
+            hostileShotDirection.subVectors(hostileShotTargetWorld, hostileShotMuzzleWorld).normalize();
+            const shot = hostileShots[nextHostileShot++ % hostileShots.length];
+            shot.active = true;
+            shot.mesh.visible = true;
+            shot.mesh.position.copy(hostileShotMuzzleWorld);
+            shot.mesh.quaternion.setFromUnitVectors(combatTracerAxis, hostileShotDirection);
+            shot.velocity.copy(hostileShotDirection).multiplyScalar(8.5 + arenaWave * 0.35);
+            shot.target.copy(hostileShotTargetWorld);
             muzzle.visible = true;
-            window.setTimeout(() => { muzzle.visible = false; }, 105);
+            muzzle.userData.hideAt = frameNow + 105;
             playArenaSound('shot');
           }
         }
@@ -1829,21 +1843,23 @@ class ArenaMotionSystem extends createSystem({
       }
       // All non-racing modes are handled by the grounded enemy movement above.
     });
-    for (let i = hostileShots.length - 1; i >= 0; i--) {
-      const shot = hostileShots[i];
+    for (const shot of hostileShots) {
+      if (!shot.active) continue;
       shot.mesh.position.addScaledVector(shot.velocity, delta);
-      shot.mesh.scale.setScalar(1 + Math.sin(time * 22 + i) * 0.12);
       const distanceToPlayer = shot.mesh.position.distanceTo(shot.target);
-      const travelledPastTarget = shot.mesh.position.clone().sub(shot.target).dot(shot.velocity) > 0;
+      hostileShotToTarget.subVectors(shot.mesh.position, shot.target);
+      const travelledPastTarget = hostileShotToTarget.dot(shot.velocity) > 0;
       if (distanceToPlayer < 0.38 || travelledPastTarget) {
         arenaShield = Math.max(0, arenaShield - 1);
         playArenaSound('damage');
         statusText(`ENEMY FIRE HIT · shield ${arenaShield}/3 · eliminate the shooters!`);
-        shot.entity?.destroy?.(); shot.mesh.parent?.remove(shot.mesh); shot.mesh.geometry.dispose(); (shot.mesh.material as MeshBasicMaterial).dispose(); hostileShots.splice(i, 1);
+        shot.active = false;
+        shot.mesh.visible = false;
         if (arenaShield <= 0) statusText('SHIELDS DOWN · keep fighting until the round ends!');
         refreshQuestPanel();
-      } else if (shot.mesh.position.distanceTo(shot.target) > 18) {
-        shot.entity?.destroy?.(); shot.mesh.parent?.remove(shot.mesh); shot.mesh.geometry.dispose(); (shot.mesh.material as MeshBasicMaterial).dispose(); hostileShots.splice(i, 1);
+      } else if (distanceToPlayer > 18) {
+        shot.active = false;
+        shot.mesh.visible = false;
       }
     }
   }
