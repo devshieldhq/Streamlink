@@ -631,8 +631,7 @@ const arenaMotion = new Map<number, { x: number; y: number; z: number; phase: nu
 const hostileShots: { mesh: Mesh; entity: any; speed: number }[] = [];
 const raiderMixers = new Map<Mesh, AnimationMixer>();
 const raiderModelUrls = [
-  'https://cdn.3dassets.dev/assets/28526/v1/model.glb', // CC0 heavy trooper advancing
-  'https://cdn.3dassets.dev/assets/28525/v1/model.glb', // CC0 heavy trooper aiming
+  'https://cdn.3dassets.dev/assets/32901/v1/model.glb', // CC0 rigged scout with authored idle, walk, run and grasp clips
 ];
 const raiderModelPromises: Promise<any>[] = [];
 let raiderSpawnVariant = 0;
@@ -640,9 +639,9 @@ function attachAnimatedHumanRaider(target: Mesh) {
   const variant = raiderSpawnVariant++ % raiderModelUrls.length;
   if (!raiderModelPromises[variant]) {
     const loader = new GLTFLoader();
-    // Detailed, game-ready tactical operators from a CC0 1.0 asset pack.
-    // Each model has ~31.6k triangles, seven materials, helmet, goggles,
-    // plate carrier, expedition pack, guards and an integrated battle rifle.
+    // CC0 rigged character with a real 74-joint skeleton and authored walk/run clips.
+    // The previous heavy-trooper GLBs were static, unrigged meshes, so no code-side
+    // bone animation could ever make their legs move.
     raiderModelPromises[variant] = loader.loadAsync(raiderModelUrls[variant])
       .catch((error) => { console.warn('[StreamLink] Free CC0 tactical operator unavailable; keeping fallback character.', error); return null; });
   }
