@@ -596,56 +596,83 @@ world.onXRFrame((frame) => {
   }
   rightHandPinching = pinching;
 });
-// Unlock/resume Web Audio from a real user gesture before the first headset shot.
-enterButton?.addEventListener('click', () => {
-  try {
-    const AudioCtor = window.AudioContext || (window as any).webkitAudioContext;
-    if (AudioCtor) { arenaAudio ||= new AudioCtor(); void arenaAudio.resume(); }
-    for (const audio of rifleShotVoices) {
-      // Calling play directly inside the Enter gesture both starts the download
-      // and unlocks playback for later Quest hand-pinch events.
-      void audio.play().then(() => { audio.pause(); audio.currentTime = 0; }).catch(() => {});
-    }
-  } catch {}
-}, { capture: true });
+// Decode the recorded rifle samples into Web Audio buffers. HTMLAudioElement
+// playback is unreliable in Quest immersive sessions; AudioBufferSourceNode is
+// the dependable low-latency path once the Enter gesture unlocks the context.
 const RIFLE_SHOT_URLS = [
   'https://raw.githubusercontent.com/euuuuuuan/fatal-funnel-public/main/apps/game/public/sfx/rifle_556.mp3',
   'https://raw.githubusercontent.com/euuuuuuan/fatal-funnel-public/main/apps/game/public/sfx/rifle_762.mp3',
 ];
-// Keep only two preloaded recorded rifle voices. The previous eight-voice
-// pool fetched the same two large MP3s four times each and could stall Quest.
-const rifleShotVoices = RIFLE_SHOT_URLS.map((url) => {
-  const audio = new Audio();
-  audio.preload = 'auto';
-  audio.volume = 0.92;
-  audio.src = url;
-  audio.load();
-  audio.addEventListener('error', () => console.warn('[StreamLink] Rifle audio failed to load:', url, audio.error?.code), { once: true });
-  return audio;
-});
-let nextRifleVoice = 0;
-let queuedRifleShot = false;
-for (const audio of rifleShotVoices) {
-  audio.addEventListener('canplaythrough', () => {
-    if (!queuedRifleShot) return;
-    queuedRifleShot = false;
-    void playRecordedGunshot();
-  });
+const rifleShotBuffers: AudioBuffer[] = [];
+let rifleAudioLoadStarted = false;
+let nextRifleBuffer = 0;
+function loadRifleShotBuffers() {
+  if (rifleAudioLoadStarted) return;
+  rifleAudioLoadStarted = true;
+  const AudioCtor = window.AudioContext || (window as any).webkitAudioContext;
+  if (!AudioCtor) return;
+  arenaAudio ||= new AudioCtor();
+  const ctx = arenaAudio;
+  for (const url of RIFLE_SHOT_URLS) {
+    void fetch(url).then((response) => {
+      if (!response.ok) throw new Error('HTTP ' + response.status);
+      return response.arrayBuffer();
+    }).then((data) => ctx.decodeAudioData(data)).then((buffer) => {
+      rifleShotBuffers.push(buffer);
+      console.info('[StreamLink] Rifle sample decoded and ready');
+    }).catch((error) => {
+      console.warn('[StreamLink] Could not load recorded rifle sample:', error);
+    });
+  }
 }
 function playRecordedGunshot() {
-  // Play a locally buffered browser audio element; never fetch audio per shot.
-  const shot = rifleShotVoices[nextRifleVoice++ % rifleShotVoices.length];
-  if (shot.readyState < HTMLMediaElement.HAVE_FUTURE_DATA) {
-    queuedRifleShot = true;
+  const ctx = arenaAudio;
+  if (ctx && ctx.state === 'running' && rifleShotBuffers.length) {
+    const buffer = rifleShotBuffers[nextRifleBuffer++ % rifleShotBuffers.length];
+    const source = ctx.createBufferSource();
+    const gain = ctx.createGain();
+    source.buffer = buffer;
+    gain.gain.value = 1.0;
+    source.connect(gain);
+    gain.connect(ctx.destination);
+    source.start(0);
     return;
   }
-  try { shot.pause(); shot.currentTime = 0; } catch {}
-  shot.volume = 0.92;
-  void shot.play().catch((error) => {
-    console.warn('[StreamLink] Recorded rifle playback was blocked:', error);
-    queuedRifleShot = true;
-  });
+  // Do not silently queue a shot and play it seconds later. If buffers are not
+  // ready yet, the browser element is a fallback while decoding completes.
+  const fallback = rifleShotFallbacks[nextRifleFallback++ % rifleShotFallbacks.length];
+  try {
+    fallback.pause();
+    fallback.currentTime = 0;
+    void fallback.play().catch((error) => console.warn('[StreamLink] Rifle fallback playback blocked:', error));
+  } catch (error) {
+    console.warn('[StreamLink] Rifle fallback unavailable:', error);
+  }
 }
+const rifleShotFallbacks = RIFLE_SHOT_URLS.map((url) => {
+  const audio = new Audio(url);
+  audio.preload = 'auto';
+  audio.volume = 1;
+  audio.load();
+  return audio;
+});
+let nextRifleFallback = 0;
+enterButton?.addEventListener('click', () => {
+  try {
+    const AudioCtor = window.AudioContext || (window as any).webkitAudioContext;
+    if (AudioCtor) {
+      arenaAudio ||= new AudioCtor();
+      if (arenaAudio.state !== 'running') void arenaAudio.resume();
+      loadRifleShotBuffers();
+    }
+    // Prime the HTML fallback in the same user gesture for browsers that block
+    // Web Audio or do not support decoding the remote samples.
+    const fallback = rifleShotFallbacks[0];
+    void fallback.play().then(() => { fallback.pause(); fallback.currentTime = 0; }).catch(() => {});
+  } catch (error) {
+    console.warn('[StreamLink] Audio unlock failed:', error);
+  }
+}, { capture: true });
 function isShooterMode() { return activeGameMode === 'drone-defense' || activeGameMode === 'last-stand' || activeGameMode === 'nightfall-survival'; }
 function syncFirstPersonGun() { firstPersonGun.visible = isShooterMode(); }
 function fireFirstPersonGun(direction?: Vector3) {
