@@ -544,7 +544,8 @@ world.onXRFrame((frame) => {
   const rightHandSource = Array.from(frame.session.inputSources).find(
     (source) => source.handedness === 'right' && source.hand,
   );
-  if (!rightHandSource || !world.xrReferenceSpace) {
+  const trackedHand = rightHandSource?.hand;
+  if (!rightHandSource || !trackedHand || !world.xrReferenceSpace) {
     rightHandPinching = false;
     if (firstPersonGun.parent !== world.camera) {
       firstPersonGun.parent?.remove(firstPersonGun);
@@ -564,11 +565,11 @@ world.onXRFrame((frame) => {
   }
   firstPersonGun.visible = arenaActive && isShooterMode();
 
-  const thumb = rightHandSource.hand.get('thumb-tip');
-  const index = rightHandSource.hand.get('index-finger-tip');
+  const thumb = trackedHand.get('thumb-tip');
+  const index = trackedHand.get('index-finger-tip');
   if (!thumb || !index) return;
-  const thumbPose = frame.getJointPose(thumb, world.xrReferenceSpace);
-  const indexPose = frame.getJointPose(index, world.xrReferenceSpace);
+  const thumbPose = frame.getJointPose?.(thumb, world.xrReferenceSpace);
+  const indexPose = frame.getJointPose?.(index, world.xrReferenceSpace);
   if (!thumbPose || !indexPose) return;
   const a = thumbPose.transform.position;
   const b = indexPose.transform.position;
