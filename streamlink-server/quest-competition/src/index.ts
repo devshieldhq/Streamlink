@@ -591,11 +591,18 @@ world.onXRFrame((frame) => {
 });
 // Unlock/resume Web Audio from a real user gesture before the first headset shot.
 enterButton?.addEventListener('click', () => {
-  try { const AudioCtor = window.AudioContext || (window as any).webkitAudioContext; if (AudioCtor) { arenaAudio ||= new AudioCtor(); void arenaAudio.resume(); } } catch {}
+  try { const AudioCtor = window.AudioContext || (window as any).webkitAudioContext; if (AudioCtor) { arenaAudio ||= new AudioCtor(); void arenaAudio.resume(); } void rifleShotAudio.play().then(() => { rifleShotAudio.pause(); rifleShotAudio.currentTime = 0; }).catch(() => {}); } catch {}
 }, { capture: true });
+const RIFLE_SHOT_URL = 'https://sfxmint.com/dl/growth-65de718ff53302fbf797166e-retry.mp3';
+const rifleShotAudio = new Audio(RIFLE_SHOT_URL);
+rifleShotAudio.preload = 'auto';
+rifleShotAudio.volume = 0.92;
 function playRecordedGunshot() {
-  // Generate the shot locally. No remote audio request or download is needed.
-  playArenaSound('shot');
+  // Use a real rifle-style sound-effect file rather than a synthesized oscillator.
+  // Clone the preloaded element so rapid shots can overlap without cutting off.
+  const shot = rifleShotAudio.cloneNode(true) as HTMLAudioElement;
+  shot.volume = rifleShotAudio.volume;
+  void shot.play().catch((error) => console.warn('[StreamLink] Rifle audio is waiting for a user gesture.', error));
 }
 function isShooterMode() { return activeGameMode === 'drone-defense' || activeGameMode === 'last-stand' || activeGameMode === 'nightfall-survival'; }
 function syncFirstPersonGun() { firstPersonGun.visible = isShooterMode(); }
@@ -632,13 +639,16 @@ const raiderModelUrls = [
 ];
 const raiderModelPromises: Promise<any>[] = [];
 let raiderSpawnVariant = 0;
-// Keep only a few high-detail imported soldiers active at once. The remaining
-// enemies use the lightweight built-in human models, avoiding a burst of GLB
-// clones, materials and skinning work when a round starts.
+// Every ground-combat enemy must use the imported rigged human model.
+// Never expose the old procedural mannequin fallback while the GLB loads.
 let detailedRaiderCount = 0;
-const MAX_DETAILED_RAIDERS = 3;
+const MAX_DETAILED_RAIDERS = 10;
 function attachAnimatedHumanRaider(target: Mesh) {
-  if (detailedRaiderCount >= MAX_DETAILED_RAIDERS) return;
+  target.visible = false;
+  if (detailedRaiderCount >= MAX_DETAILED_RAIDERS) {
+    console.warn('[StreamLink] Human raider limit reached; skipping this spawn rather than showing a mannequin.');
+    return;
+  }
   detailedRaiderCount += 1;
   const variant = raiderSpawnVariant++ % raiderModelUrls.length;
   if (!raiderModelPromises[variant]) {
@@ -647,7 +657,7 @@ function attachAnimatedHumanRaider(target: Mesh) {
     // The previous heavy-trooper GLBs were static, unrigged meshes, so no code-side
     // bone animation could ever make their legs move.
     raiderModelPromises[variant] = loader.loadAsync(raiderModelUrls[variant])
-      .catch((error) => { console.warn('[StreamLink] Free CC0 tactical operator unavailable; keeping fallback character.', error); return null; });
+      .catch((error) => { console.error('[StreamLink] Rigged human model failed to load; mannequin fallback is disabled.', error); return null; });
   }
   void raiderModelPromises[variant].then((gltf) => {
     if (!gltf || !arenaMeshes.has(target) || !target.parent) return;
@@ -674,13 +684,21 @@ function attachAnimatedHumanRaider(target: Mesh) {
         part.frustumCulled = true;
       }
     });
+    // Remove every procedural body/mannequin piece. Keep only the rifle group
+    // (including muzzle flash) and the imported skinned human character.
+    const rifle = target.userData.enemyRifle as Group | undefined;
+    for (const child of [...target.children]) {
+      if (child !== rifle) child.visible = false;
+    }
+    const baseMaterial = target.material as MeshStandardMaterial;
+    baseMaterial.transparent = true;
+    baseMaterial.opacity = 0;
+    baseMaterial.depthWrite = false;
+    if (rifle) rifle.visible = true;
     target.add(human);
     target.userData.raiderModel = human;
     target.userData.raiderVariant = variant;
-
-    // The rifle and its attached grip arms/hands remain as a single child group.
-    const rifle = target.userData.enemyRifle as Group | undefined;
-    if (rifle) rifle.visible = true;
+    target.visible = true;
     // Prefer an actual walk/run clip when the asset has one. Do not play an
     // arbitrary first clip (often idle/aim), which makes the character slide.
     const locomotion = gltf.animations?.find((clip: any) => /walk|run|move|locomotion|march/i.test(clip.name));
@@ -736,23 +754,8 @@ function playArenaSound(kind: 'shot' | 'hit' | 'damage' | 'start') {
     osc.connect(filter); filter.connect(gain); gain.connect(ctx.destination);
     filter.type = 'lowpass';
     if (kind === 'shot') {
-      // Punchy close-range rifle report: a short broadband crack plus a low
-      // body thump. The noise buffer is created once and reused for every shot.
-      let noiseBuffer = (ctx as any).__streamLinkGunNoise as AudioBuffer | undefined;
-      if (!noiseBuffer) {
-        noiseBuffer = ctx.createBuffer(1, Math.floor(ctx.sampleRate * 0.22), ctx.sampleRate);
-        const samples = noiseBuffer.getChannelData(0);
-        for (let i = 0; i < samples.length; i++) samples[i] = (Math.random() * 2 - 1) * (1 - i / samples.length);
-        (ctx as any).__streamLinkGunNoise = noiseBuffer;
-      }
-      const noise = ctx.createBufferSource(); noise.buffer = noiseBuffer;
-      const crackFilter = ctx.createBiquadFilter(); crackFilter.type = 'highpass'; crackFilter.frequency.setValueAtTime(520, now);
-      const crackGain = ctx.createGain(); crackGain.gain.setValueAtTime(0.0001, now); crackGain.gain.exponentialRampToValueAtTime(0.34, now + 0.004); crackGain.gain.exponentialRampToValueAtTime(0.0001, now + 0.19);
-      noise.connect(crackFilter); crackFilter.connect(crackGain); crackGain.connect(ctx.destination);
-      osc.type = 'triangle'; osc.frequency.setValueAtTime(118, now); osc.frequency.exponentialRampToValueAtTime(38, now + 0.15);
-      filter.type = 'lowpass'; filter.frequency.setValueAtTime(460, now);
-      gain.gain.setValueAtTime(0.0001, now); gain.gain.exponentialRampToValueAtTime(0.24, now + 0.006); gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.17);
-      noise.start(now); noise.stop(now + 0.2); osc.start(now); osc.stop(now + 0.18);
+      playRecordedGunshot();
+      return;
     } else if (kind === 'hit') {
       osc.type = 'triangle'; osc.frequency.setValueAtTime(720, now); osc.frequency.exponentialRampToValueAtTime(260, now + 0.12);
       filter.frequency.value = 2400; gain.gain.setValueAtTime(0.0001, now); gain.gain.exponentialRampToValueAtTime(0.14, now + 0.008); gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.15);
