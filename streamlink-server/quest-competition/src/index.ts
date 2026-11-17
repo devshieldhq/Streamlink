@@ -589,6 +589,10 @@ world.onXRFrame((frame) => {
   }
   rightHandPinching = pinching;
 });
+// Unlock/resume Web Audio from a real user gesture before the first headset shot.
+enterButton?.addEventListener('click', () => {
+  try { const AudioCtor = window.AudioContext || (window as any).webkitAudioContext; if (AudioCtor) { arenaAudio ||= new AudioCtor(); void arenaAudio.resume(); } } catch {}
+}, { capture: true });
 function playRecordedGunshot() {
   // Generate the shot locally. No remote audio request or download is needed.
   playArenaSound('shot');
@@ -627,10 +631,95 @@ const raiderModelUrls = [
   'https://cdn.3dassets.dev/assets/32901/v1/model.glb', // CC0 rigged scout with authored idle, walk, run and grasp clips
 ];
 const raiderModelPromises: Promise<any>[] = [];
-// Use the optimized built-in human raider for combat rounds. This avoids
-// remote GLB downloads and keeps the weapon, arms and hands in one shared rig.
-function attachAnimatedHumanRaider(_target: Mesh) {
-  // Intentionally use the procedural soldier built in spawnArenaTarget().
+let raiderSpawnVariant = 0;
+// Keep only a few high-detail imported soldiers active at once. The remaining
+// enemies use the lightweight built-in human models, avoiding a burst of GLB
+// clones, materials and skinning work when a round starts.
+let detailedRaiderCount = 0;
+const MAX_DETAILED_RAIDERS = 3;
+function attachAnimatedHumanRaider(target: Mesh) {
+  if (detailedRaiderCount >= MAX_DETAILED_RAIDERS) return;
+  detailedRaiderCount += 1;
+  const variant = raiderSpawnVariant++ % raiderModelUrls.length;
+  if (!raiderModelPromises[variant]) {
+    const loader = new GLTFLoader();
+    // CC0 rigged character with a real 74-joint skeleton and authored walk/run clips.
+    // The previous heavy-trooper GLBs were static, unrigged meshes, so no code-side
+    // bone animation could ever make their legs move.
+    raiderModelPromises[variant] = loader.loadAsync(raiderModelUrls[variant])
+      .catch((error) => { console.warn('[StreamLink] Free CC0 tactical operator unavailable; keeping fallback character.', error); return null; });
+  }
+  void raiderModelPromises[variant].then((gltf) => {
+    if (!gltf || !arenaMeshes.has(target) || !target.parent) return;
+    const human = cloneSkinnedModel(gltf.scene);
+    const bounds = new Box3().setFromObject(human);
+    const size = bounds.getSize(new Vector3());
+    if (!Number.isFinite(size.y) || size.y < 0.5 || size.y > 5) {
+      console.warn('[StreamLink] Tactical operator model bounds invalid; keeping fallback character.');
+      return;
+    }
+    const modelScale = 1.72 / size.y;
+    human.scale.setScalar(modelScale);
+    // The arena target pivot sits at y=0.93; offset the model down so its boots
+    // meet the floor rather than hovering at the target's centre.
+    human.position.set(0, -0.93 - bounds.min.y * modelScale, 0);
+    // These CC0 operator models face +Z, toward the player standing at +Z.
+    human.rotation.y = 0;
+    human.traverse((part: any) => {
+      if (part.isMesh) {
+        // The arena has no real-time shadow requirement; disabling per-soldier
+        // shadow passes and restoring frustum culling saves Quest GPU time.
+        part.castShadow = false;
+        part.receiveShadow = false;
+        part.frustumCulled = true;
+      }
+    });
+    target.add(human);
+    target.userData.raiderModel = human;
+    target.userData.raiderVariant = variant;
+
+    // The rifle and its attached grip arms/hands remain as a single child group.
+    const rifle = target.userData.enemyRifle as Group | undefined;
+    if (rifle) rifle.visible = true;
+    // Prefer an actual walk/run clip when the asset has one. Do not play an
+    // arbitrary first clip (often idle/aim), which makes the character slide.
+    const locomotion = gltf.animations?.find((clip: any) => /walk|run|move|locomotion|march/i.test(clip.name));
+    if (locomotion) {
+      const mixer = new AnimationMixer(human);
+      const action = mixer.clipAction(locomotion);
+      action.reset();
+      action.setLoop(2201, Infinity);
+      action.play();
+      raiderMixers.set(target, mixer);
+    }
+    // Fallback: animate the actual humanoid skeleton when no walk clip exists.
+    // Store each bone's rest pose so the update loop can swing legs/arms cleanly.
+    const walkBones: any[] = [];
+    human.traverse((part: any) => {
+      if (!part.isBone) return;
+      const name = String(part.name || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+      let side = 0;
+      if (/left|\bl\b/.test(name)) side = -1;
+      if (/right|\br\b/.test(name)) side = 1;
+      if (!side) return;
+      let role = '';
+      if (/upleg|thigh|upperleg|femur/.test(name)) role = 'thigh';
+      else if (/leg|calf|shin|lowerleg/.test(name)) role = 'shin';
+      else if (/upperarm|arm|forearm/.test(name)) role = 'arm';
+      if (!role) return;
+      walkBones.push({ bone: part, rest: part.quaternion.clone(), side, role });
+    });
+    human.userData.walkBones = walkBones;
+    human.userData.hasWalkClip = !!locomotion;
+    // Keep the exact floor-alignment offset; animation must not overwrite it.
+    human.userData.floorAlignedY = human.position.y;
+    // Only remove the procedural stand-in after the detailed model is attached.
+    target.children.forEach((child) => {
+      if (child !== human && child !== target.userData.enemyRifle && !child.userData.enemyGripPart) child.visible = false;
+    });
+    target.geometry.dispose();
+    target.geometry = new SphereGeometry(0.001, 4, 4);
+  });
 }
 let arenaAudio: AudioContext | null = null;
 function playArenaSound(kind: 'shot' | 'hit' | 'damage' | 'start') {
