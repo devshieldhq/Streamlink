@@ -714,7 +714,13 @@ function drawQuestPanel() {
   ctx.fillText('MOVING TARGETS · hand pinch / controller trigger · combos multiply your score', 48, 605);
   panelTexture.needsUpdate = true;
 }
-function refreshQuestPanel() { drawQuestPanel(); }
+function refreshQuestPanel() {
+  drawQuestPanel();
+  // Keep the floating creator/settings panel out of the player's sight during active gameplay.
+  // Its hand controls return automatically when the round ends.
+  panelMesh.visible = !arenaActive;
+  if (arenaActive) destinationPanelGroup.visible = false;
+}
 
 function makeQuestButton(label: string, action: string, x: number, y: number, color: number, parent: any = panelEntity) {
   const canvas = document.createElement('canvas');
