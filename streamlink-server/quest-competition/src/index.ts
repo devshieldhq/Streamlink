@@ -541,17 +541,17 @@ firstPersonGun.position.set(0.30, -0.30, -0.52);
 firstPersonGun.visible = false;
 world.camera.add(firstPersonGun);
 
-// Quest hand-tracking mode: mount the rifle to the right hand's tracked grip
-// space. A thumb-to-index fingertip pinch fires once; releasing resets the shot.
-let rightHandPinching = false;
+// Quest hand-tracking mode: the POV rifle stays camera-mounted. Pinch the LEFT
+// thumb and index fingertips to fire once; release before pinching again.
+let leftHandPinching = false;
 const handGunDirection = new Vector3();
 world.onXRFrame((frame) => {
-  const rightHandSource = Array.from(frame.session.inputSources).find(
-    (source) => source.handedness === 'right' && source.hand,
+  const leftHandSource = Array.from(frame.session.inputSources).find(
+    (source) => source.handedness === 'left' && source.hand,
   );
-  const trackedHand = rightHandSource?.hand;
-  if (!rightHandSource || !trackedHand || !world.xrReferenceSpace) {
-    rightHandPinching = false;
+  const trackedHand = leftHandSource?.hand;
+  if (!leftHandSource || !trackedHand || !world.xrReferenceSpace) {
+    leftHandPinching = false;
     if (firstPersonGun.parent !== world.camera) {
       firstPersonGun.parent?.remove(firstPersonGun);
       world.camera.add(firstPersonGun);
@@ -582,12 +582,12 @@ world.onXRFrame((frame) => {
   const b = indexPose.transform.position;
   const pinchDistance = Math.hypot(a.x - b.x, a.y - b.y, a.z - b.z);
   const pinching = pinchDistance < 0.027;
-  if (pinching && !rightHandPinching && arenaActive && !arenaPaused && isShooterMode()) {
+  if (pinching && !leftHandPinching && arenaActive && !arenaPaused && isShooterMode()) {
     world.camera.getWorldQuaternion(new Quaternion());
     handGunDirection.set(0, 0, -1).applyQuaternion(world.camera.getWorldQuaternion(new Quaternion())).normalize();
     fireFirstPersonGun(handGunDirection);
   }
-  rightHandPinching = pinching;
+  leftHandPinching = pinching;
 });
 // A real recorded gunshot sample (CC0) replaces the old synthetic oscillator tone.
 const recordedGunshot = new Audio('https://sfxmint.com/dl/impact-gunshot-10.mp3');
