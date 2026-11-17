@@ -561,13 +561,15 @@ world.onXRFrame((frame) => {
     return;
   }
 
-  const rightGrip = world.input.xr.xrOrigin.gripSpaces.right;
-  if (firstPersonGun.parent !== rightGrip) {
+  // Keep the weapon camera-mounted for a true first-person POV in Quest.
+  // Hand tracking is used only for the pinch-to-fire gesture, not to attach
+  // the rifle to the palm (which makes the weapon look awkward and unstable).
+  if (firstPersonGun.parent !== world.camera) {
     firstPersonGun.parent?.remove(firstPersonGun);
-    rightGrip.add(firstPersonGun);
-    firstPersonGun.position.set(0.015, -0.045, -0.13);
-    firstPersonGun.rotation.set(0, 0, 0);
+    world.camera.add(firstPersonGun);
   }
+  firstPersonGun.position.set(0.30, -0.30, -0.52);
+  firstPersonGun.rotation.set(0, 0, 0);
   firstPersonGun.visible = arenaActive && isShooterMode();
 
   const thumb = trackedHand.get('thumb-tip');
@@ -581,8 +583,8 @@ world.onXRFrame((frame) => {
   const pinchDistance = Math.hypot(a.x - b.x, a.y - b.y, a.z - b.z);
   const pinching = pinchDistance < 0.027;
   if (pinching && !rightHandPinching && arenaActive && !arenaPaused && isShooterMode()) {
-    rightGrip.getWorldQuaternion(new Quaternion());
-    handGunDirection.set(0, 0, -1).applyQuaternion(rightGrip.getWorldQuaternion(new Quaternion())).normalize();
+    world.camera.getWorldQuaternion(new Quaternion());
+    handGunDirection.set(0, 0, -1).applyQuaternion(world.camera.getWorldQuaternion(new Quaternion())).normalize();
     fireFirstPersonGun(handGunDirection);
   }
   rightHandPinching = pinching;
