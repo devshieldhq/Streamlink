@@ -589,16 +589,9 @@ world.onXRFrame((frame) => {
   }
   rightHandPinching = pinching;
 });
-// A real recorded gunshot sample (CC0) replaces the old synthetic oscillator tone.
-const recordedGunshot = new Audio('https://sfxmint.com/dl/impact-gunshot-10.mp3');
-recordedGunshot.preload = 'auto';
-recordedGunshot.volume = 0.82;
 function playRecordedGunshot() {
-  try {
-    const shot = recordedGunshot.cloneNode(true) as HTMLAudioElement;
-    shot.volume = 0.82;
-    void shot.play().catch((error) => console.warn('[StreamLink] Gunshot audio could not play until audio is enabled.', error));
-  } catch (error) { console.warn('[StreamLink] Gunshot audio unavailable.', error); }
+  // Generate the shot locally. No remote audio request or download is needed.
+  playArenaSound('shot');
 }
 function isShooterMode() { return activeGameMode === 'drone-defense' || activeGameMode === 'last-stand' || activeGameMode === 'nightfall-survival'; }
 function syncFirstPersonGun() { firstPersonGun.visible = isShooterMode(); }
@@ -635,7 +628,14 @@ const raiderModelUrls = [
 ];
 const raiderModelPromises: Promise<any>[] = [];
 let raiderSpawnVariant = 0;
+// Keep only a few high-detail imported soldiers active at once. The remaining
+// enemies use the lightweight built-in human models, avoiding a burst of GLB
+// clones, materials and skinning work when a round starts.
+let detailedRaiderCount = 0;
+const MAX_DETAILED_RAIDERS = 3;
 function attachAnimatedHumanRaider(target: Mesh) {
+  if (detailedRaiderCount >= MAX_DETAILED_RAIDERS) return;
+  detailedRaiderCount += 1;
   const variant = raiderSpawnVariant++ % raiderModelUrls.length;
   if (!raiderModelPromises[variant]) {
     const loader = new GLTFLoader();
@@ -663,9 +663,11 @@ function attachAnimatedHumanRaider(target: Mesh) {
     human.rotation.y = 0;
     human.traverse((part: any) => {
       if (part.isMesh) {
-        part.castShadow = true;
-        part.receiveShadow = true;
-        part.frustumCulled = false;
+        // The arena has no real-time shadow requirement; disabling per-soldier
+        // shadow passes and restoring frustum culling saves Quest GPU time.
+        part.castShadow = false;
+        part.receiveShadow = false;
+        part.frustumCulled = true;
       }
     });
     target.add(human);
@@ -751,9 +753,23 @@ function playArenaSound(kind: 'shot' | 'hit' | 'damage' | 'start') {
     osc.connect(filter); filter.connect(gain); gain.connect(ctx.destination);
     filter.type = 'lowpass';
     if (kind === 'shot') {
-      osc.type = 'sawtooth'; osc.frequency.setValueAtTime(210, now); osc.frequency.exponentialRampToValueAtTime(75, now + 0.16);
-      filter.frequency.value = 1100; gain.gain.setValueAtTime(0.0001, now); gain.gain.exponentialRampToValueAtTime(0.11, now + 0.012); gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.18);
-      osc.start(now); osc.stop(now + 0.19);
+      // Punchy close-range rifle report: a short broadband crack plus a low
+      // body thump. The noise buffer is created once and reused for every shot.
+      let noiseBuffer = (ctx as any).__streamLinkGunNoise as AudioBuffer | undefined;
+      if (!noiseBuffer) {
+        noiseBuffer = ctx.createBuffer(1, Math.floor(ctx.sampleRate * 0.22), ctx.sampleRate);
+        const samples = noiseBuffer.getChannelData(0);
+        for (let i = 0; i < samples.length; i++) samples[i] = (Math.random() * 2 - 1) * (1 - i / samples.length);
+        (ctx as any).__streamLinkGunNoise = noiseBuffer;
+      }
+      const noise = ctx.createBufferSource(); noise.buffer = noiseBuffer;
+      const crackFilter = ctx.createBiquadFilter(); crackFilter.type = 'highpass'; crackFilter.frequency.setValueAtTime(520, now);
+      const crackGain = ctx.createGain(); crackGain.gain.setValueAtTime(0.0001, now); crackGain.gain.exponentialRampToValueAtTime(0.34, now + 0.004); crackGain.gain.exponentialRampToValueAtTime(0.0001, now + 0.19);
+      noise.connect(crackFilter); crackFilter.connect(crackGain); crackGain.connect(ctx.destination);
+      osc.type = 'triangle'; osc.frequency.setValueAtTime(118, now); osc.frequency.exponentialRampToValueAtTime(38, now + 0.15);
+      filter.type = 'lowpass'; filter.frequency.setValueAtTime(460, now);
+      gain.gain.setValueAtTime(0.0001, now); gain.gain.exponentialRampToValueAtTime(0.24, now + 0.006); gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.17);
+      noise.start(now); noise.stop(now + 0.2); osc.start(now); osc.stop(now + 0.18);
     } else if (kind === 'hit') {
       osc.type = 'triangle'; osc.frequency.setValueAtTime(720, now); osc.frequency.exponentialRampToValueAtTime(260, now + 0.12);
       filter.frequency.value = 2400; gain.gain.setValueAtTime(0.0001, now); gain.gain.exponentialRampToValueAtTime(0.14, now + 0.008); gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.15);
@@ -1151,6 +1167,7 @@ function spawnRaceObstacle(){if(!raceTrackActive)return;const policeChance=Math.
 function steerRace(direction:number){if(!arenaActive||activeGameMode!=='rift-racer'||arenaPaused)return;raceLane=Math.max(0,Math.min(2,raceLane+direction));if(raceCar)raceCar.position.x=(raceLane-1)*3.6;refreshQuestPanel();}
 function startRiftRacer(){if(arenaActive)stopArena('Previous game ended');activeGameMode='rift-racer';syncFirstPersonGun();arenaActive=true;arenaPaused=false;arenaScore=0;arenaHits=0;arenaCombo=0;arenaBestCombo=0;arenaWave=1;arenaShield=3;arenaGoal=999;arenaSeconds=300;arenaDeadline=Date.now()+300000;raceLane=1;raceDistance=0;raceSpawnClock=0;racePoliceLevel=1;clearArena();buildRaceTrack();for(let i=0;i<5;i++){spawnRaceObstacle();raceObjects[raceObjects.length-1].mesh.position.z=-12-i*6;}if(arenaTimer!==null)window.clearInterval(arenaTimer);arenaTimer=window.setInterval(()=>{arenaSeconds=Math.max(0,Math.ceil((arenaDeadline-Date.now())/1000));if(arenaSeconds<=0)stopArena('FIVE-MINUTE PURSUIT SURVIVED');else refreshQuestPanel();},250);playArenaSound('start');statusText('FBI PURSUIT · 5 MINUTES · Arrow keys / A-D or drag to change lanes. Dodge traffic, roadblocks and flashing FBI interceptors. Three collisions end the chase.');refreshQuestPanel();}
 function clearArena() {
+  detailedRaiderCount = 0;
   for (const mesh of arenaMeshes) {
     const entity = arenaEntities.get(mesh);
     if (entity) arenaMotion.delete(entity.index);
