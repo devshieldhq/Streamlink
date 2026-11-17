@@ -630,11 +630,8 @@ function playRecordedGunshot() {
   if (ctx && ctx.state === 'running' && rifleShotBuffers.length) {
     const buffer = rifleShotBuffers[nextRifleBuffer++ % rifleShotBuffers.length];
     const source = ctx.createBufferSource();
-    const gain = ctx.createGain();
     source.buffer = buffer;
-    gain.gain.value = 1.0;
-    source.connect(gain);
-    gain.connect(ctx.destination);
+    source.connect(ctx.destination);
     source.start(0);
     return;
   }
@@ -675,15 +672,31 @@ enterButton?.addEventListener('click', () => {
 }, { capture: true });
 function isShooterMode() { return activeGameMode === 'drone-defense' || activeGameMode === 'last-stand' || activeGameMode === 'nightfall-survival'; }
 function syncFirstPersonGun() { firstPersonGun.visible = isShooterMode(); }
+// Reuse combat vectors and a tiny tracer pool. Allocating geometry, materials,
+ // ECS entities and timers for every trigger pull caused firing-time frame drops.
+const combatShotOrigin = new Vector3();
+const combatShotDirection = new Vector3();
+const combatTracerAxis = new Vector3(0, 0, 1);
+const combatTracerPool = Array.from({ length: 4 }, () => {
+  const mesh = new Mesh(
+    new BoxGeometry(0.028, 0.028, 3.8),
+    new MeshBasicMaterial({ color: 0xffd52a, toneMapped: false }),
+  );
+  mesh.visible = false;
+  world.scene.add(mesh);
+  return { mesh, expiresAt: 0 };
+});
+let nextCombatTracer = 0;
 function fireFirstPersonGun(direction?: Vector3) {
   if (!arenaActive || arenaPaused || !isShooterMode()) return;
   playRecordedGunshot();
   gunMuzzleFlash.visible = true;
-  window.setTimeout(() => { gunMuzzleFlash.visible = false; }, 75);
-  const origin = new Vector3();
-  world.camera.getWorldPosition(origin);
-  const shotDirection = direction?.clone().normalize() || new Vector3();
-  if (!direction) world.camera.getWorldDirection(shotDirection);
+  (gunMuzzleFlash as any).userData.hideAt = performance.now() + 75;
+  world.camera.getWorldPosition(combatShotOrigin);
+  if (direction) combatShotDirection.copy(direction).normalize();
+  else world.camera.getWorldDirection(combatShotDirection);
+  const origin = combatShotOrigin;
+  const shotDirection = combatShotDirection;
   // Resolve hits along the same first-person firing ray. Previously the gun
   // played a tracer but never tested the enemy line, so Quest pinches could
   // appear to fire blanks while human raiders kept walking past.
@@ -703,16 +716,12 @@ function fireFirstPersonGun(direction?: Vector3) {
     }
   }
   if (nearestTarget) hitArenaTarget(nearestTarget);
-  const tracer = new Mesh(new BoxGeometry(0.028, 0.028, 3.8), new MeshBasicMaterial({ color: 0xffd52a, toneMapped: false }));
+  const tracerSlot = combatTracerPool[nextCombatTracer++ % combatTracerPool.length];
+  const tracer = tracerSlot.mesh;
   tracer.position.copy(origin).addScaledVector(shotDirection, 1.95);
-  tracer.quaternion.setFromUnitVectors(new Vector3(0, 0, 1), shotDirection);
-  const tracerEntity = world.createTransformEntity(tracer, { persistent: true });
-  window.setTimeout(() => {
-    tracerEntity.destroy?.();
-    tracer.parent?.remove(tracer);
-    tracer.geometry.dispose();
-    (tracer.material as MeshBasicMaterial).dispose();
-  }, 95);
+  tracer.quaternion.setFromUnitVectors(combatTracerAxis, shotDirection);
+  tracer.visible = true;
+  tracerSlot.expiresAt = performance.now() + 95;
 }
 let arenaSeconds = 45;
 let arenaDeadline = 0;
@@ -936,11 +945,15 @@ function drawQuestPanel() {
   panelTexture.needsUpdate = true;
 }
 function refreshQuestPanel() {
+  // The creator panel is hidden throughout gameplay. Do not redraw its 1024px
+  // canvas textures on every hit; that work caused visible Quest frame spikes.
+  if (arenaActive) {
+    panelMesh.visible = false;
+    destinationPanelGroup.visible = false;
+    return;
+  }
   drawQuestPanel();
-  // Keep the floating creator/settings panel out of the player's sight during active gameplay.
-  // Its hand controls return automatically when the round ends.
-  panelMesh.visible = !arenaActive;
-  if (arenaActive) destinationPanelGroup.visible = false;
+  panelMesh.visible = true;
 }
 
 function makeQuestButton(label: string, action: string, x: number, y: number, color: number, parent: any = panelEntity) {
@@ -1720,9 +1733,17 @@ class ArenaMotionSystem extends createSystem({
   targets: { required: [ArenaTarget] },
 }) {
   update() {
-    const time = performance.now() / 1000;
+    const frameNow = performance.now();
+    const time = frameNow / 1000;
     const delta = Math.min(0.05, Math.max(0, time - arenaLastFrameTime));
     arenaLastFrameTime = time;
+    // Expire pooled visual effects without allocating one timeout per shot.
+    for (const tracer of combatTracerPool) {
+      if (tracer.mesh.visible && frameNow >= tracer.expiresAt) tracer.mesh.visible = false;
+    }
+    if (gunMuzzleFlash.visible && (gunMuzzleFlash as any).userData.hideAt && frameNow >= (gunMuzzleFlash as any).userData.hideAt) {
+      gunMuzzleFlash.visible = false;
+    }
     // Do not spend CPU animating hidden enemies while the arena is idle or paused.
     if (!arenaActive || arenaPaused) return;
     // Advance imported skeletal rigs at 30 Hz while the headset renders every
