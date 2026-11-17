@@ -501,33 +501,38 @@ function addRiflePart(geometry: any, material: any, x: number, y: number, z: num
   parent.add(part);
   return part;
 }
-// Detailed first-person carbine: stock, receiver, top rail, barrel, sights,
-// handguard, magazine, trigger guard and textured grip.
-addRiflePart(new BoxGeometry(0.19, 0.16, 0.56), rifleMetal, 0, -0.025, -0.23);
-addRiflePart(new BoxGeometry(0.17, 0.13, 0.38), riflePolymer, 0, -0.015, 0.22);
-addRiflePart(new BoxGeometry(0.14, 0.12, 0.28), riflePolymer, 0, -0.02, 0.51);
-addRiflePart(new BoxGeometry(0.07, 0.075, 0.48), rifleSteel, 0, 0.005, -0.72);
-addRiflePart(new CylinderGeometry(0.027, 0.027, 0.23, 12), rifleSteel, 0, 0.005, -1.035).rotation.x = Math.PI / 2;
-addRiflePart(new CylinderGeometry(0.045, 0.045, 0.045, 16), rifleDark, 0, 0.005, -1.16).rotation.x = Math.PI / 2;
-addRiflePart(new BoxGeometry(0.22, 0.11, 0.34), riflePolymer, 0, -0.015, 0.77);
-const magazine = addRiflePart(new BoxGeometry(0.13, 0.34, 0.18), rifleDark, 0, -0.235, -0.15);
-magazine.rotation.x = -0.13;
-addRiflePart(new BoxGeometry(0.11, 0.22, 0.15), riflePolymer, 0, -0.19, 0.18).rotation.x = -0.18;
-addRiflePart(new BoxGeometry(0.025, 0.035, 0.72), rifleSteel, 0, 0.095, -0.31);
-addRiflePart(new BoxGeometry(0.045, 0.09, 0.07), rifleDark, 0, 0.17, -0.72);
-addRiflePart(new BoxGeometry(0.045, 0.09, 0.07), rifleDark, 0, 0.17, 0.13);
-addRiflePart(new BoxGeometry(0.13, 0.035, 0.12), rifleSteel, 0, 0.125, -0.29);
-addRiflePart(new BoxGeometry(0.055, 0.07, 0.14), rifleDark, 0, -0.14, -0.43);
-addRiflePart(new BoxGeometry(0.045, 0.045, 0.16), rifleSteel, 0.105, 0.015, -0.23);
-addRiflePart(new BoxGeometry(0.045, 0.045, 0.16), rifleSteel, -0.105, 0.015, -0.23);
-// Foregrip and visible gloved support hands give the weapon a held, not floating, view.
-addRiflePart(new BoxGeometry(0.09, 0.17, 0.12), riflePolymer, 0, -0.13, -0.65).rotation.x = -0.12;
-const leftSleeve = addRiflePart(new CapsuleGeometry(0.075, 0.25, 4, 8), sleeveMat, -0.23, -0.32, -0.48);
-leftSleeve.rotation.z = -0.48;
-const leftGlove = addRiflePart(new SphereGeometry(0.085, 12, 10), gloveMat, -0.12, -0.13, -0.62);
-const rightSleeve = addRiflePart(new CapsuleGeometry(0.075, 0.22, 4, 8), sleeveMat, 0.27, -0.32, 0.02);
-rightSleeve.rotation.z = 0.48;
-addRiflePart(new SphereGeometry(0.082, 12, 10), gloveMat, 0.12, -0.13, 0.03);
+// Detailed compact tactical carbine. The muzzle points down local -Z;
+// stock and shoulder pad sit behind the receiver on +Z.
+addRiflePart(new BoxGeometry(0.22, 0.17, 0.48), rifleMetal, 0, 0, -0.12); // receiver
+addRiflePart(new BoxGeometry(0.19, 0.15, 0.42), riflePolymer, 0, 0.005, -0.53); // handguard
+addRiflePart(new BoxGeometry(0.075, 0.075, 0.48), rifleSteel, 0, 0.015, -0.91); // barrel
+addRiflePart(new CylinderGeometry(0.034, 0.034, 0.15, 16), rifleSteel, 0, 0.015, -1.205).rotation.x = Math.PI / 2;
+addRiflePart(new CylinderGeometry(0.052, 0.052, 0.075, 20), rifleDark, 0, 0.015, -1.31).rotation.x = Math.PI / 2; // muzzle brake
+// Stock with a broad shoulder pad, cheek rest and angled buffer tube.
+addRiflePart(new BoxGeometry(0.13, 0.13, 0.34), rifleDark, 0, -0.005, 0.28);
+addRiflePart(new BoxGeometry(0.19, 0.23, 0.13), riflePolymer, 0, -0.005, 0.53);
+addRiflePart(new BoxGeometry(0.205, 0.25, 0.045), rifleDark, 0, -0.005, 0.615);
+addRiflePart(new BoxGeometry(0.13, 0.045, 0.22), riflePolymer, 0, 0.095, 0.37); // cheek rest
+// Magazine, pistol grip, trigger guard and forward support grip.
+const magazine = addRiflePart(new BoxGeometry(0.145, 0.34, 0.19), rifleDark, 0, -0.245, -0.10);
+magazine.rotation.x = -0.10;
+addRiflePart(new BoxGeometry(0.13, 0.22, 0.15), riflePolymer, 0, -0.185, 0.13).rotation.x = -0.20;
+addRiflePart(new BoxGeometry(0.10, 0.19, 0.12), rifleDark, 0, -0.17, -0.62).rotation.x = -0.10;
+addRiflePart(new TorusGeometry(0.075, 0.012, 8, 18), rifleSteel, 0, -0.13, 0.015).scale.set(1, 0.8, 0.7);
+// Top rail and a compact optic with visible front/rear glass rings.
+addRiflePart(new BoxGeometry(0.055, 0.035, 0.82), rifleDark, 0, 0.105, -0.34);
+addRiflePart(new BoxGeometry(0.075, 0.045, 0.20), rifleSteel, 0, 0.16, -0.38);
+addRiflePart(new CylinderGeometry(0.055, 0.055, 0.19, 18), rifleDark, 0, 0.225, -0.38).rotation.x = Math.PI / 2;
+addRiflePart(new TorusGeometry(0.052, 0.012, 8, 20), rifleSteel, 0, 0.225, -0.49);
+addRiflePart(new TorusGeometry(0.052, 0.012, 8, 20), rifleSteel, 0, 0.225, -0.27);
+addRiflePart(new BoxGeometry(0.045, 0.09, 0.06), rifleDark, 0, 0.17, -0.79); // front sight
+// Side rails and small fasteners make the handguard read as a real assembly.
+addRiflePart(new BoxGeometry(0.035, 0.055, 0.52), rifleSteel, 0.115, 0.005, -0.53);
+addRiflePart(new BoxGeometry(0.035, 0.055, 0.52), rifleSteel, -0.115, 0.005, -0.53);
+for (let z = -0.72; z <= -0.32; z += 0.10) {
+  addRiflePart(new BoxGeometry(0.012, 0.018, 0.035), rifleDark, 0.14, 0.012, z);
+  addRiflePart(new BoxGeometry(0.012, 0.018, 0.035), rifleDark, -0.14, 0.012, z);
+}
 const gunMuzzleFlash = new Mesh(new SphereGeometry(0.105, 12, 10), new MeshBasicMaterial({ color: 0xffd45c, toneMapped: false }));
 gunMuzzleFlash.position.set(0, 0.005, -1.18);
 gunMuzzleFlash.visible = false;
@@ -560,8 +565,8 @@ world.onXRFrame((frame) => {
   if (firstPersonGun.parent !== rightGrip) {
     firstPersonGun.parent?.remove(firstPersonGun);
     rightGrip.add(firstPersonGun);
-    firstPersonGun.position.set(0.02, -0.035, -0.10);
-    firstPersonGun.rotation.set(0, 0, Math.PI);
+    firstPersonGun.position.set(0.015, -0.045, -0.13);
+    firstPersonGun.rotation.set(0, 0, 0);
   }
   firstPersonGun.visible = arenaActive && isShooterMode();
 
