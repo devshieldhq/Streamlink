@@ -541,17 +541,17 @@ firstPersonGun.position.set(0.30, -0.30, -0.52);
 firstPersonGun.visible = false;
 world.camera.add(firstPersonGun);
 
-// Quest hand-tracking mode: the POV rifle stays camera-mounted. Pinch the LEFT
+// Quest hand-tracking mode: the POV rifle stays camera-mounted. Pinch the RIGHT
 // thumb and index fingertips to fire once; release before pinching again.
-let leftHandPinching = false;
+let rightHandPinching = false;
 const handGunDirection = new Vector3();
 world.onXRFrame((frame) => {
-  const leftHandSource = Array.from(frame.session.inputSources).find(
-    (source) => source.handedness === 'left' && source.hand,
+  const rightHandSource = Array.from(frame.session.inputSources).find(
+    (source) => source.handedness === 'right' && source.hand,
   );
-  const trackedHand = leftHandSource?.hand;
-  if (!leftHandSource || !trackedHand || !world.xrReferenceSpace) {
-    leftHandPinching = false;
+  const trackedHand = rightHandSource?.hand;
+  if (!rightHandSource || !trackedHand || !world.xrReferenceSpace) {
+    rightHandPinching = false;
     if (firstPersonGun.parent !== world.camera) {
       firstPersonGun.parent?.remove(firstPersonGun);
       world.camera.add(firstPersonGun);
@@ -582,12 +582,12 @@ world.onXRFrame((frame) => {
   const b = indexPose.transform.position;
   const pinchDistance = Math.hypot(a.x - b.x, a.y - b.y, a.z - b.z);
   const pinching = pinchDistance < 0.027;
-  if (pinching && !leftHandPinching && arenaActive && !arenaPaused && isShooterMode()) {
+  if (pinching && !rightHandPinching && arenaActive && !arenaPaused && isShooterMode()) {
     world.camera.getWorldQuaternion(new Quaternion());
     handGunDirection.set(0, 0, -1).applyQuaternion(world.camera.getWorldQuaternion(new Quaternion())).normalize();
     fireFirstPersonGun(handGunDirection);
   }
-  leftHandPinching = pinching;
+  rightHandPinching = pinching;
 });
 // A real recorded gunshot sample (CC0) replaces the old synthetic oscillator tone.
 const recordedGunshot = new Audio('https://sfxmint.com/dl/impact-gunshot-10.mp3');
@@ -1398,7 +1398,7 @@ makeQuestButton('STEER RIGHT','race-right',0.45,0.82,0xffb84d);
 // Desktop preview controls provide mouse-accessible equivalents to the 3D hand buttons.
 byId<HTMLButtonElement>('desktop-pause')?.addEventListener('click', () => actionHandlers.get('pause')?.());
 byId<HTMLButtonElement>('desktop-reset')?.addEventListener('click', () => actionHandlers.get('reset')?.());
-window.addEventListener('keydown',(event)=>{if(event.key==='ArrowLeft'||event.key.toLowerCase()==='a'){event.preventDefault();steerRace(-1);}if(event.key==='ArrowRight'||event.key.toLowerCase()==='d'){event.preventDefault();steerRace(1);}});
+window.addEventListener('keydown',(event)=>{if(event.key.toLowerCase()==='l'&&!event.repeat){event.preventDefault();fireFirstPersonGun();}if(event.key==='ArrowLeft'||event.key.toLowerCase()==='a'){event.preventDefault();steerRace(-1);}if(event.key==='ArrowRight'||event.key.toLowerCase()==='d'){event.preventDefault();steerRace(1);}});
 // Desktop mouse/touch drag lets players physically reposition and aim the first-person rifle.
 let gunDragPointer:number|null=null;
 let gunDragLastX=0, gunDragLastY=0;
