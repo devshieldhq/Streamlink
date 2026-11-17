@@ -672,19 +672,36 @@ function attachAnimatedHumanRaider(target: Mesh) {
     target.add(human);
     target.userData.raiderModel = human;
     target.userData.raiderVariant = variant;
-    // Play the model's authored locomotion clip when available. Prefer walk/run
-    // over idle/aim clips so the operators visibly step as they advance.
-    if (gltf.animations?.length) {
+    // Prefer an actual walk/run clip when the asset has one. Do not play an
+    // arbitrary first clip (often idle/aim), which makes the character slide.
+    const locomotion = gltf.animations?.find((clip: any) => /walk|run|move|locomotion|march/i.test(clip.name));
+    if (locomotion) {
       const mixer = new AnimationMixer(human);
-      const locomotion = gltf.animations.find((clip: any) => /walk|run|move|locomotion|march/i.test(clip.name))
-        || gltf.animations[0];
       const action = mixer.clipAction(locomotion);
       action.reset();
       action.setLoop(2201, Infinity);
       action.play();
       raiderMixers.set(target, mixer);
-      target.userData.raiderWalkAction = action;
     }
+    // Fallback: animate the actual humanoid skeleton when no walk clip exists.
+    // Store each bone's rest pose so the update loop can swing legs/arms cleanly.
+    const walkBones: any[] = [];
+    human.traverse((part: any) => {
+      if (!part.isBone) return;
+      const name = String(part.name || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+      let side = 0;
+      if (/left|\bl\b/.test(name)) side = -1;
+      if (/right|\br\b/.test(name)) side = 1;
+      if (!side) return;
+      let role = '';
+      if (/upleg|thigh|upperleg|femur/.test(name)) role = 'thigh';
+      else if (/leg|calf|shin|lowerleg/.test(name)) role = 'shin';
+      else if (/upperarm|arm|forearm/.test(name)) role = 'arm';
+      if (!role) return;
+      walkBones.push({ bone: part, rest: part.quaternion.clone(), side, role });
+    });
+    human.userData.walkBones = walkBones;
+    human.userData.hasWalkClip = !!locomotion;
     // Keep the exact floor-alignment offset; animation must not overwrite it.
     human.userData.floorAlignedY = human.position.y;
     // Only remove the procedural stand-in after the detailed model is attached.
@@ -1557,6 +1574,19 @@ class ArenaMotionSystem extends createSystem({
           // only a tiny torso sway is added here, never a vertical hover/bob.
           raider.position.y = raider.userData.floorAlignedY ?? raider.position.y;
           raider.rotation.z = Math.sin(time * 5.8 + motion.phase) * 0.008;
+          if (!raider.userData.hasWalkClip) {
+            const phase = time * (4.8 + motion.approachSpeed * 0.55) + motion.phase;
+            const stride = Math.sin(phase);
+            const bend = Math.max(0, Math.cos(phase));
+            const bones = raider.userData.walkBones as any[] | undefined;
+            bones?.forEach(({ bone, rest, side, role }) => {
+              let angle = 0;
+              if (role === 'thigh') angle = stride * 0.48 * side;
+              else if (role === 'shin') angle = bend * 0.58 * (side === (stride > 0 ? 1 : -1) ? 1 : 0.18);
+              else if (role === 'arm') angle = -stride * 0.22 * side;
+              bone.quaternion.copy(rest).multiply(new Quaternion().setFromAxisAngle(new Vector3(1, 0, 0), angle));
+            });
+          }
         }
         const muzzle = mesh.userData.muzzle as Mesh | undefined;
         if (muzzle) muzzle.visible = Math.sin(time * 16 + motion.phase) > 0.82;
