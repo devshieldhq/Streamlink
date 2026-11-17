@@ -1017,6 +1017,34 @@ function spawnArenaTarget() {
     const belt = new Mesh(new BoxGeometry(0.47, 0.09, 0.29), clothDark);
     belt.position.set(0, -0.22, 0); mesh.add(belt);
 
+    // Rifle is parented to each enemy so its barrel and muzzle move with the soldier.
+    const enemyRifle = new Group();
+    enemyRifle.position.set(0.20, 0.13, 0.27);
+    const rifleBody = new Mesh(new BoxGeometry(0.13, 0.13, 0.52), clothDark);
+    rifleBody.position.z = 0.22;
+    enemyRifle.add(rifleBody);
+    const handguard = new Mesh(new BoxGeometry(0.105, 0.105, 0.34), vest);
+    handguard.position.set(0, 0.015, 0.53);
+    enemyRifle.add(handguard);
+    const barrel = new Mesh(new CylinderGeometry(0.027, 0.027, 0.34, 12), rifleMetal);
+    barrel.rotation.x = Math.PI / 2;
+    barrel.position.set(0, 0.015, 0.84);
+    enemyRifle.add(barrel);
+    const stock = new Mesh(new BoxGeometry(0.12, 0.14, 0.25), clothDark);
+    stock.position.set(0, -0.005, -0.16);
+    enemyRifle.add(stock);
+    const magazine = new Mesh(new BoxGeometry(0.085, 0.22, 0.12), rifleDark);
+    magazine.position.set(0, -0.15, 0.27);
+    magazine.rotation.x = -0.12;
+    enemyRifle.add(magazine);
+    const muzzle = new Mesh(new SphereGeometry(0.065, 12, 10), new MeshBasicMaterial({ color: 0xff542e }));
+    muzzle.position.set(0, 0.015, 1.035);
+    muzzle.visible = false;
+    enemyRifle.add(muzzle);
+    mesh.add(enemyRifle);
+    mesh.userData.enemyRifle = enemyRifle;
+    mesh.userData.muzzle = muzzle;
+
     const nose = new Mesh(new SphereGeometry(0.035, 10, 8), skinLight);
     nose.scale.set(0.72, 1.2, 0.8); nose.position.set(0, 0.585, 0.226); mesh.add(nose);
     const mouth = new Mesh(new BoxGeometry(0.085, 0.018, 0.018), clothDark);
@@ -1048,36 +1076,6 @@ function spawnArenaTarget() {
   if (!isGroundCombat) {
     const ring = new Mesh(new TorusGeometry(isDrone ? 0.34 : 0.30, 0.018, 8, 40), new MeshBasicMaterial({ color: 0xffffff }));
     mesh.add(ring);
-  }
-  if (isGroundCombat) {
-    // Attach a clearly visible rifle to every enemy, including imported GLTF humans.
-    // The weapon is part of the enemy transform, not a floating scene decoration.
-    const enemyRifle = new Group();
-    enemyRifle.position.set(0.20, 0.13, 0.27);
-    const rifleBody = new Mesh(new BoxGeometry(0.13, 0.13, 0.52), clothDark);
-    rifleBody.position.z = 0.22;
-    enemyRifle.add(rifleBody);
-    const handguard = new Mesh(new BoxGeometry(0.105, 0.105, 0.34), vest);
-    handguard.position.set(0, 0.015, 0.53);
-    enemyRifle.add(handguard);
-    const barrel = new Mesh(new CylinderGeometry(0.027, 0.027, 0.34, 12), rifleMetal);
-    barrel.rotation.x = Math.PI / 2;
-    barrel.position.set(0, 0.015, 0.84);
-    enemyRifle.add(barrel);
-    const stock = new Mesh(new BoxGeometry(0.12, 0.14, 0.25), clothDark);
-    stock.position.set(0, -0.005, -0.16);
-    enemyRifle.add(stock);
-    const magazine = new Mesh(new BoxGeometry(0.085, 0.22, 0.12), rifleDark);
-    magazine.position.set(0, -0.15, 0.27);
-    magazine.rotation.x = -0.12;
-    enemyRifle.add(magazine);
-    const muzzle = new Mesh(new SphereGeometry(0.065, 12, 10), new MeshBasicMaterial({ color: 0xff542e, emissive: 0xff2a08, emissiveIntensity: 1.8 }));
-    muzzle.position.set(0, 0.015, 1.035);
-    muzzle.visible = false;
-    enemyRifle.add(muzzle);
-    mesh.add(enemyRifle);
-    mesh.userData.enemyRifle = enemyRifle;
-    mesh.userData.muzzle = muzzle;
   }
   const entity = world.createTransformEntity(mesh, { persistent: true });
   if (isGroundCombat) attachAnimatedHumanRaider(mesh);
