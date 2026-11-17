@@ -591,18 +591,31 @@ world.onXRFrame((frame) => {
 });
 // Unlock/resume Web Audio from a real user gesture before the first headset shot.
 enterButton?.addEventListener('click', () => {
-  try { const AudioCtor = window.AudioContext || (window as any).webkitAudioContext; if (AudioCtor) { arenaAudio ||= new AudioCtor(); void arenaAudio.resume(); } void rifleShotAudio.play().then(() => { rifleShotAudio.pause(); rifleShotAudio.currentTime = 0; }).catch(() => {}); } catch {}
+  try {
+    const AudioCtor = window.AudioContext || (window as any).webkitAudioContext;
+    if (AudioCtor) { arenaAudio ||= new AudioCtor(); void arenaAudio.resume(); }
+    for (const audio of rifleShotAudio) {
+      void audio.play().then(() => { audio.pause(); audio.currentTime = 0; }).catch(() => {});
+    }
+  } catch {}
 }, { capture: true });
-const RIFLE_SHOT_URL = 'https://sfxmint.com/dl/growth-65de718ff53302fbf797166e-retry.mp3';
-const rifleShotAudio = new Audio(RIFLE_SHOT_URL);
-rifleShotAudio.preload = 'auto';
-rifleShotAudio.volume = 0.92;
+const RIFLE_SHOT_URLS = [
+  'https://raw.githubusercontent.com/euuuuuuan/fatal-funnel-public/main/apps/game/public/sfx/rifle_556.mp3',
+  'https://raw.githubusercontent.com/euuuuuuan/fatal-funnel-public/main/apps/game/public/sfx/rifle_762.mp3',
+];
+const rifleShotAudio = RIFLE_SHOT_URLS.map((url) => {
+  const audio = new Audio(url);
+  audio.preload = 'auto';
+  audio.volume = 0.96;
+  return audio;
+});
 function playRecordedGunshot() {
-  // Use a real rifle-style sound-effect file rather than a synthesized oscillator.
-  // Clone the preloaded element so rapid shots can overlap without cutting off.
-  const shot = rifleShotAudio.cloneNode(true) as HTMLAudioElement;
-  shot.volume = rifleShotAudio.volume;
-  void shot.play().catch((error) => console.warn('[StreamLink] Rifle audio is waiting for a user gesture.', error));
+  // Genuine, close-mic rifle reports recorded by Ben Jaszczak, Brian Nelson,
+  // Kevin Heras and Matthew Nanney; source collection is CC0.
+  const source = rifleShotAudio[Math.floor(Math.random() * rifleShotAudio.length)];
+  const shot = source.cloneNode(true) as HTMLAudioElement;
+  shot.volume = 0.96;
+  void shot.play().catch((error) => console.warn('[StreamLink] Recorded rifle audio is waiting for a user gesture.', error));
 }
 function isShooterMode() { return activeGameMode === 'drone-defense' || activeGameMode === 'last-stand' || activeGameMode === 'nightfall-survival'; }
 function syncFirstPersonGun() { firstPersonGun.visible = isShooterMode(); }
