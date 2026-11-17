@@ -561,7 +561,7 @@ world.onXRFrame((frame) => {
     firstPersonGun.parent?.remove(firstPersonGun);
     rightGrip.add(firstPersonGun);
     firstPersonGun.position.set(0.02, -0.035, -0.10);
-    firstPersonGun.rotation.set(0, 0, 0);
+    firstPersonGun.rotation.set(0, 0, Math.PI);
   }
   firstPersonGun.visible = arenaActive && isShooterMode();
 
